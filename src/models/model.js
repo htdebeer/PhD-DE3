@@ -23,10 +23,16 @@
 var model = function(config) {
     "use strict";
 
+    var appendix = {};
+
+
     // ## Data invariant and initialization
     //
     // This model describes a dynamic phenomenon in terms of changing
-    // quantities over time. This description starts at `T_START` milliseconds
+    // quantities over time.
+    //
+    //
+    // This description starts at `T_START` milliseconds
     // (ms), defaulting to 0 ms and ends at `T_END` ms. If no end is specified
     // it is assumed that the phenomenon does not end or is still ongoing in
     // the real world (RW). The phenomenon's change is tracked by "measuring"
@@ -34,9 +40,9 @@ var model = function(config) {
     // are `T_STEP` apart, defaulting to 1 ms, and are tracked by order
     // number.
 
-    var T_START = config.time.start || 0,
-        T_END = config.time.end || Math.Infinity,
-        T_STEP = config.time.step || 1;
+    var T_START     = config.time.start     || 0,
+        T_END       = config.time.end       || Infinity,
+        T_STEP      = config.time.step      || 1;
 
     // To translate from a moment's order number to its corresponding time in
     // ms and vice versa, two helper functions are defined, `time_to_moment`
@@ -64,6 +70,12 @@ var model = function(config) {
 
     var measure_moment = function(moment) {
         // to be implemented in an object implementing model
+        var x = moment,
+            y = x * x;
+        return {
+            x: x,
+            y: y
+        };
     };
 
 
@@ -117,53 +129,69 @@ var model = function(config) {
         return now >= 0;
     };
 
-    // To 
+    // The `step` function will advance `now` to the next moment if the end of
+    // the phenomenon has not been reached yet. If that moment has not been
+    // "measured" earlier, "measure" it now.
 
     var step = function() {
-        // Go to the next moment of this dynamic phenomenon if there is such a
-        // moment
         if (m2t(now) + T_STEP <= T_END) {
             now++;
-            if (!moment_computed(now)) {
-                compute_moment(now);
-            };
-        };
+            if (!moment_measured(now)) {
+                var moment = measure_moment(now);
+                moment._time_ = m2t(now);
+                moments.push(moment);
+                last_measured_moment++;
+            }
+        }
         return now;
     };
 
+    // If the phenomenon is a finite process or the "measuring" process cannot
+    // go further `T_END` will have a value that is not `Infinity`.
+
     var can_finish = function() {
-        // When no end of the dynamic phenomenon has been specified, it is
-        // assumed to be still ongoing and cannot be finished.
         return Math.abs(T_END) !== Infinity;
     };
 
+    // To inspect the whole phenomenon at once or inspect the last moment,
+    // `finish`ing the model will ensure that all moments during the
+    // phenomenon have been "measured".
+
     var finish = function() {
-        // Go to the end of the dynamic phenomenon. If that moment has not yet
-        // been computed, computed all moments. 
         if (can_finish()) {
-            while (last_computed_moment < t2m(T_END)) {
+            while (last_measured_moment < t2m(T_END)) {
                 step();
-            };
-        };
+            }
+        }
         return now;
     };
 
+    // We call the model finished if the current moment, or `now`, is the
+    // phenomenon's last moment.
+
     var is_finished = function() {
         return can_finish() && m2t(now) >= T_END;
-    }
-
-           
-
-
-    var quantities = config.quantities || {};
-    
-    var set = function(quantity, value) {
-        // sets the quantity in this model to value
-        quantities[quantity].value = value;
     };
 
-    var get = function(quantity) {
-        return quantities[quantity].value;
+           
+    // ## Coordinating quantities
+    //
+    // All quantities that describe the phenomenon being modeled change in
+    // coordination with time's change. Add the model's time as a quantity to
+    // the list with quantities. To allow people to model time as part of
+    // their model, for example to describe the phenomenon accelerated, the
+    // internal time is added as quantity `_time_` and, as a result, "_time_"
+    // is not allowed as a quantity name.
+
+    var quantities = config.quantities || {};
+    quantities._time_ = {
+        minimum: T_START,
+        maximum: T_END,
+        value: m2t(now),
+        stepsize: T_STEP,
+        unit: "ms",
+        label: "internal time",
+        monotonicity: true
     };
 
     var get_minimum = function(quantity) {
@@ -179,7 +207,7 @@ var model = function(config) {
         } else {
             // return quantity's minimum
             return quantities[quantity].minimum;
-        };
+        }
     };
                     
     var get_maximum = function(quantity) {
@@ -195,8 +223,188 @@ var model = function(config) {
         } else {
             // return quantity's minimum
             return quantities[quantity].maximum;
-        };
+        }
     };
+
+
+    var find_moment = function(quantity, value, EPSILON) {
+        if (last_measured_moment < 0) {
+            // no moment are measured yet, so there is nothing to be found
+
+            return -1;
+        } else {
+            var val = appendix.quantity_value(quantity);
+
+            // pre: quantity is monotone
+            // determine if it is increasing or decreasing
+            // determine type of monotonicity
+            //
+            // As the first moment has been measured and we do know the
+            // minimum of this quantity, type of monotonicity follows.
+
+            var start = val(0),
+                increasing = (start === get_minimum(quantity));
+
+            // Use a binary search to find the moment that approaches the
+            // value best
+
+
+            var bmin = 0, 
+                bmid, 
+                bmax = last_measured_moment,
+                approx = appendix.approximates(EPSILON);
+            if (increasing) {
+                // Increasing "function", meaning
+                //
+                //  (∀m: 0 ≤ m < `last_measured_moment`: `val`(m) <= `val`(m+1))
+                //
+                // Therefore,
+                //
+                //  (∃m, n: 0 ≤ m < n ≤ `last_measured_moment`: 
+                //      `val`(m) ≤ value ≤ `val`(n) ⋀
+                //      (∀p: m < p < n: `val`(p) = value))
+                //
+                // `find_moment` finds those moments m and n and returns the
+                // one closest to value or, when even close, the last moment
+
+                var m = 0,
+                    n = last_measured_moment,
+                    mid_m, mid_n;
+
+                while (val(m) < value || value < val(n)) {
+                    // lowerbound
+                    mid = Math.floor((n - m) / 2));
+
+                    if (val(mid) < value) {
+                        m = mid + 1;
+                    } else if (value < val(mid)) {
+                        n = mid - 1;
+                    } else {
+
+                    }
+
+
+                    if (val(mid_m) < value) {
+                        m = mid_m;
+                    } else if (val(m) > value) {
+                        m = m - 1;
+                    };
+
+                    mid_n = Math.ceil((n - m) / 2));
+                    if (val(mid_n) > value) {
+                        n = mid_n;
+                    } else {
+                    }
+                    
+                }
+
+
+                while (val(bmax) > val(bmin)) {
+                    bmid = Math.floor((bmax - bmin)/2);
+                    console.log(val(bmid));
+                    if (approx(val(bmid), value)) {
+                        return bmid;
+                    } else if (val(bmid) < value) {
+                        bmin = bmid - 1;
+                    } else if (value < val(bmid)) {
+                        bmax = bmid + 1;
+                    }
+                }
+                return bmid;
+            } else {
+                // decreasing
+                // (∀m: 0≤ m < `last_measured_moment`: `val`(m) >= `val`(m+1))
+                while (bmax >= bmin) {
+                    bmid = Math.round((bmin - bmax)/2);
+                    if (approx(val(bmid), value)) {
+                        return bmid;
+                    } else if (value > val(bmid)) {
+                        bmax = bmid - 1;
+                    } else if (val(bmid) > value) {
+                        bmin = bmid + 1;
+                    }
+                }
+            }
+        }
+    };
+
+    var get = function(quantity) {
+        return quantities[quantity].value;
+    };
+    
+    var set = function(quantity, value) {
+        var q = quantities[quantity];
+        console.log("0");
+
+        if (value < q.minimum) {
+            value = q.minimum;
+        } else if (value > q.maximum) {
+            value = q.maximum;
+        }
+
+        // q.minimum ≤ value ≤ q.maximum
+
+        // has value already been "measured"?
+        // As some quantities can have the same value more often, there are
+        // potentially many moments that fit the bill. There can be an unknown
+        // amount of moments that aren't measured as well.
+        //
+        // However, some quantities will be strictly increasing or decreasing
+        // and no value will appear twice. For example, the internal time will
+        // only increase. Those quantities with property `monotonicity`
+        // `true`, only one value will be searched for
+        
+        var approx = appendix.approximates(),
+            moments_with_value = [];
+        if (q.monotonicity) {
+        console.log("1");
+            var moment = find_moment(quantity, value);
+        console.log("2");
+            if (moment !== -1) {
+                moments_with_value.push(moment);
+            }
+        } else {
+        console.log("3");
+            var has_value = function(element, index, array) {
+                    return approx(element[quantity],value);
+                };
+            moments_with_value = moments.filter(has_value);
+        }
+
+        console.log("4");
+        if (moments_with_value.length === 0) {
+            // not yet "measured"
+        console.log("5");
+            step();
+        console.log("6");
+            while(!approx(moments[now][quantity], value) && !is_finished()) {
+                step();
+        console.log("7");
+            }
+        } else {
+        console.log("8");
+            now = moments_with_value[0];
+        }
+        console.log("9");
+        return moments[now];
+    };
+
+    // ## Appendix H: helper functions
+
+    appendix.approximates = function(epsilon) {
+            var EPSILON = epsilon || 0.001,
+                fn = function(a, b) {
+                    return Math.abs(a - b) <= EPSILON;
+                };
+            fn.EPSILON = EPSILON;
+            return fn;
+        };
+    appendix.quantity_value = function(quantity) {
+            return function(moment) {
+                return moments[moment][quantity];
+            };
+        };
+
 
     return {
         quantities: quantities,

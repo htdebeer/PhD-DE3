@@ -13,7 +13,8 @@ var para = model({
             value: 0,
             unit: "none",
             label: "x",
-            stepsize: 1
+            stepsize: 1,
+            monotonicity: true
             },
         y: {
             minimum: 0,
@@ -33,5 +34,8 @@ console.log(para.get_minimum());
 console.log(para.get_minimum("x"));
 console.log(para.get_maximum());
 console.log(para.get_maximum("x"));
+
+console.log(para.set("x", 50));
+console.log(para.set("x", 5));
 
 
