@@ -20,25 +20,40 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-/*
- *  equation.js is a model based on a simple equation like y = x^2
- */
+var view = function(config) {
+    var _view = {},
+        _appendix = {};
+    
+    // Observer pattern
 
-var equation_model = function(config) {
-    var _model = require("./model")(config),
-        f = config.equation;
-
-    _model.measure_moment =  function(moment) {
-        var x = moment,
-            y = f(x);
-        return {
-            x: x,
-            y: y
-        };
+    var models = [];
+    _view.register = function(model) {
+        var model_found = models.indexOf(model);
+        if (model_found === -1) {
+            models.push(model);
+            model.register(this);
+            _view.update(model);
+        }
     };
 
-    return _model;
+    _view.unregister = function(model) {
+        var model_found = models.indexOf(model);
+        if (model_found !== -1) {
+            models.slice(model_found, 1);
+            model.unregister(this);
+            _view.update(model_found);
+        }
+    };
+
+
+    _view.update = function(model) {
+        // implement in specialized view; called by registered model on
+        // change
+
+        console.log("view: ", model.current_moment());
+    };
+
+    return _view;    
 };
 
-module.exports = equation_model;
-
+module.exports = view;

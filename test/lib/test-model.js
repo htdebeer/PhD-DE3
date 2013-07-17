@@ -1,4 +1,88 @@
 ;(function(e,t,n){function i(n,s){if(!t[n]){if(!e[n]){var o=typeof require=="function"&&require;if(!s&&o)return o(n,!0);if(r)return r(n,!0);throw new Error("Cannot find module '"+n+"'")}var u=t[n]={exports:{}};e[n][0].call(u.exports,function(t){var r=e[n][1][t];return i(r?r:t)},u,u.exports)}return t[n].exports}var r=typeof require=="function"&&require;for(var s=0;s<n.length;s++)i(n[s]);return i})({1:[function(require,module,exports){
+/*
+ * Copyright (C) 2013 Huub de Beer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+var dom = {
+    create: function(spec) {
+        var elt = document.createElement(spec.name),
+            set_attribute = function(attr) {
+                elt.setAttribute(attr.name, attr.value);
+            };
+        if (spec.attributes) {
+            spec.attributes.forEach(set_attribute);
+        }
+        return elt;
+    }
+};
+
+module.exports = dom;
+
+},{}],2:[function(require,module,exports){
+/*
+ * Copyright (C) 2013 Huub de Beer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+/*
+ *  equation.js is a model based on a simple equation like y = x^2
+ */
+
+var equation_model = function(config) {
+    var _model = require("./model")(config),
+        f = config.equation;
+
+    _model.measure_moment =  function(moment) {
+        var x = moment,
+            y = f(x);
+        return {
+            x: x,
+            y: y
+        };
+    };
+
+    return _model;
+};
+
+module.exports = equation_model;
+
+
+},{"./model":3}],3:[function(require,module,exports){
 (function(){/*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -24,7 +108,8 @@
 var model = function(config) {
     "use strict";
 
-    var appendix = {};
+    var _model = {},
+        _appendix = {};
 
 
     // ## Data invariant and initialization
@@ -50,13 +135,15 @@ var model = function(config) {
     // and `moment_to_time`, as well as a shorthand name for these two helper
     // functions, respectively, `t2m` and `m2t`.
 
-    var time_to_moment = function(time) {
+    _model.time_to_moment = function(time) {
         return Math.floor(time / T_STEP); 
-    }, t2m = time_to_moment;
+    };
+    var t2m = _model.time_to_moment;
 
-    var moment_to_time = function(moment) {
+    _model.moment_to_time = function(moment) {
         return moment * T_STEP;
-    },  m2t = moment_to_time;
+    };
+    var m2t = _model.moment_to_time;
 
     // When I use "measured" I mean to denote that the values of the
     // quantities describing the phenomenon have been captured, computed,
@@ -69,35 +156,27 @@ var model = function(config) {
     // between the phenomenon's quantities of interest at each moment during
     // the phenomenon.
 
-    var measure_moment = function(moment) {
+    _model.measure_moment = function(moment) {
         // to be implemented in an object implementing model
-        var x = moment,
-            y = x * x;
-        return {
-            x: x,
-            y: y
-        };
     };
 
 
     // The model has the following data invariant:
     //
-    //   (∀m: 0 ≤ m ≤ `last_measured_moment`: `moment_computed`(`moments`[m]))
+    //   (∀m: 0 ≤ m ≤ |`moments`|: `moment_computed`(`moments`[m]))
     //
     // stating that the phenomenon has been described quantitatively for all
-    // moments up till and including the `last_measured_moment`. These
-    // "measurements" are stored in a list of `moments` and can be accessed
-    // through a moment's order number.
+    // moments. These "measurements" are stored in a list of `moments` and can
+    // be accessed through a moment's order number.
 
-    var moments = [],
-        last_measured_moment = -1;
+    var moments = [];
 
     // A moment can only be inspected if it already has been "measured".
     // Following the data invariant, a moment has been measured when its order
-    // number is smaller or equal to the `last_measured_moment`
+    // number is smaller or equal to the number of measured moments.
     
-    var moment_measured = function(moment) {
-        return (moment <= last_measured_moment);
+    _model.moment_measured = function(moment) {
+        return (moment <= (moments.length - 1));
     };
 
     // Furthermore, the current moment of interest, or `now`, points to an
@@ -114,19 +193,44 @@ var model = function(config) {
     // `reset` function to resets `now` to a moment before the phenomenon
     // started.
 
-    var reset = function() {
+    _model.reset = function() {
         now = t2m(T_START) - 1;
     };
-    reset();
+    _model.reset();
 
 
     // ## Inspecting and running a model
+
+    // Inspection through registerd views
+
+    var views = [];
+    var update_views = function() {
+        var update_view = function(view) {
+            view.update(_model);
+        };
+        views.forEach(update_view);
+    };
+
+    _model.register = function(view) {
+        var view_found = views.indexOf(view);
+        if (view_found === -1) {
+            views.push(view);
+        }
+    };
+
+    _model.unregister = function(view) {
+        var view_found = views.indexOf(view);
+        if (view_found !== -1) {
+            views.slice(view_found, 1);
+        }
+    };
+
 
     // Once a model has been started, the current moment will be measured as
     // well as all moments before since the start. These moments can be
     // inspected.
     //
-    var has_started = function() {
+    _model.has_started = function() {
         return now >= 0;
     };
 
@@ -134,15 +238,17 @@ var model = function(config) {
     // the phenomenon has not been reached yet. If that moment has not been
     // "measured" earlier, "measure" it now.
 
-    var step = function() {
+    _model.step = function(do_not_update_views) {
         if (m2t(now) + T_STEP <= T_END) {
             now++;
-            if (!moment_measured(now)) {
-                var moment = measure_moment(now);
+            if (!_model.moment_measured(now)) {
+                var moment = _model.measure_moment(now);
                 moment._time_ = m2t(now);
                 moments.push(moment);
-                last_measured_moment++;
             }
+        }
+        if (!do_not_update_views) {
+            update_views();
         }
         return now;
     };
@@ -150,7 +256,7 @@ var model = function(config) {
     // If the phenomenon is a finite process or the "measuring" process cannot
     // go further `T_END` will have a value that is not `Infinity`.
 
-    var can_finish = function() {
+    _model.can_finish = function() {
         return Math.abs(T_END) !== Infinity;
     };
 
@@ -158,10 +264,10 @@ var model = function(config) {
     // `finish`ing the model will ensure that all moments during the
     // phenomenon have been "measured".
 
-    var finish = function() {
-        if (can_finish()) {
-            while (last_measured_moment < t2m(T_END)) {
-                step();
+    _model.finish = function() {
+        if (_model.can_finish()) {
+            while ((moments.length - 1) < t2m(T_END)) {
+                _model.step();
             }
         }
         return now;
@@ -170,8 +276,8 @@ var model = function(config) {
     // We call the model finished if the current moment, or `now`, is the
     // phenomenon's last moment.
 
-    var is_finished = function() {
-        return can_finish() && m2t(now) >= T_END;
+    _model.is_finished = function() {
+        return _model.can_finish() && m2t(now) >= T_END;
     };
 
            
@@ -184,8 +290,8 @@ var model = function(config) {
     // internal time is added as quantity `_time_` and, as a result, "_time_"
     // is not allowed as a quantity name.
 
-    var quantities = config.quantities || {};
-    quantities._time_ = {
+    _model.quantities = config.quantities || {};
+    _model.quantities._time_ = {
         minimum: T_START,
         maximum: T_END,
         value: m2t(now),
@@ -195,46 +301,46 @@ var model = function(config) {
         monotonicity: true
     };
 
-    var get_minimum = function(quantity) {
+    _model.get_minimum = function(quantity) {
         if (arguments.length===0) {
             // called without any arguments: return all minima
             var minima = {},
                 add_minimum = function(quantity) {
-                    minima[quantity] = quantities[quantity].minimum;
+                    minima[quantity] = _model.quantities[quantity].minimum;
                 };
 
-            Object.keys(quantities).forEach(add_minimum);
+            Object.keys(_model.quantities).forEach(add_minimum);
             return minima;
         } else {
             // return quantity's minimum
-            return quantities[quantity].minimum;
+            return _model.quantities[quantity].minimum;
         }
     };
                     
-    var get_maximum = function(quantity) {
+    _model.get_maximum = function(quantity) {
         if (arguments.length===0) {
             // called without any arguments: return all minima
             var maxima = {},
                 add_maximum = function(quantity) {
-                    maxima[quantity] = quantities[quantity].maximum;
+                    maxima[quantity] = _model.quantities[quantity].maximum;
                 };
 
-            Object.keys(quantities).forEach(add_maximum);
+            Object.keys(_model.quantities).forEach(add_maximum);
             return maxima;
         } else {
             // return quantity's minimum
-            return quantities[quantity].maximum;
+            return _model.quantities[quantity].maximum;
         }
     };
 
 
-    var find_moment = function(quantity, value, EPSILON) {
-        if (last_measured_moment < 0) {
+    _model.find_moment = function(quantity, value, EPSILON) {
+        if (moments.length === 0) {
             // no moment are measured yet, so there is nothing to be found
 
             return -1;
         } else {
-            var val = appendix.quantity_value(quantity);
+            var val = _appendix.quantity_value(quantity);
 
             // pre: quantity is monotone
             // determine if it is increasing or decreasing
@@ -244,54 +350,80 @@ var model = function(config) {
             // minimum of this quantity, type of monotonicity follows.
 
             var start = val(0),
-                increasing = (start === get_minimum(quantity));
+                INCREASING = (start === _model.get_minimum(quantity));
 
-            // Use a binary search to find the moment that approaches the
+            // Use a stupid linear search to find the moment that approaches the
             // value best
 
 
-            var bmin = 0, 
-                bmid, 
-                bmax = last_measured_moment,
-                approx = appendix.approximates(EPSILON);
-            if (increasing) {
-                // (∀m: 0≤ m < `last_measured_moment`: `val`(m) <= `val`(m+1))
-                while (val(bmax) > val(bmin)) {
-                    bmid = Math.floor((bmax - bmin)/2);
-                    console.log(val(bmid));
-                    if (approx(val(bmid), value)) {
-                        return bmid;
-                    } else if (val(bmid) < value) {
-                        bmin = bmid - 1;
-                    } else if (value < val(bmid)) {
-                        bmax = bmid + 1;
-                    }
-                }
-                return bmid;
+            var m = 0,
+                n = moments.length - 1,
+                approx = _appendix.approximates(EPSILON),
+                lowerbound,
+                upperbound;
+
+            if (INCREASING) {
+                lowerbound = function(moment) {
+                    return val(moment) < value;
+                };
+                upperbound = function(moment) {
+                    return val(moment) > value;
+                };
             } else {
-                // decreasing
-                // (∀m: 0≤ m < `last_measured_moment`: `val`(m) >= `val`(m+1))
-                while (bmax >= bmin) {
-                    bmid = Math.round((bmin - bmax)/2);
-                    if (approx(val(bmid), value)) {
-                        return bmid;
-                    } else if (value > val(bmid)) {
-                        bmax = bmid - 1;
-                    } else if (val(bmid) > value) {
-                        bmin = bmid + 1;
-                    }
+                lowerbound = function(moment) {
+                    return val(moment) > value;
+                };
+                upperbound = function(moment) {
+                    return val(moment) < value;
+                };
+            }
+
+            // Increasing "function", meaning
+            //
+            //  (∀m: 0 ≤ m < |`moments`|: `val`(m) <= `val`(m+1))
+            //
+            // Therefore,
+            //
+            //  (∃m, n: 0 ≤ m < n ≤ |`moments`|: 
+            //      `val`(m) ≤ value ≤ `val`(n) ⋀
+            //      (∀p: m < p < n: `val`(p) = value))
+            //
+            // `find_moment` finds those moments m and n and returns the
+            // one closest to value or, when even close, the last moment
+            // decreasing is reverse.
+            
+
+            while (lowerbound(m)) {
+                m++;
+                if (m>n) {
+                    // 
+                    return -1;
                 }
             }
+            m--;
+            while (upperbound(n)) {
+                n--;
+                if (n<m) {
+                    return -1;
+                }
+            }
+            n++;
+
+            return (Math.abs(val(n)-value) < Math.abs(val(m)-value))?n:m;
         }
     };
 
-    var get = function(quantity) {
-        return quantities[quantity].value;
+
+    _model.get = function(quantity) {
+        if (now < 0) {
+            return undefined;
+        } else {
+            return moments[now][quantity];
+        }
     };
     
-    var set = function(quantity, value) {
-        var q = quantities[quantity];
-        console.log("0");
+    _model.set = function(quantity, value) {
+        var q = _model.quantities[quantity];
 
         if (value < q.minimum) {
             value = q.minimum;
@@ -311,44 +443,48 @@ var model = function(config) {
         // only increase. Those quantities with property `monotonicity`
         // `true`, only one value will be searched for
         
-        var approx = appendix.approximates(),
+        var approx = _appendix.approximates(),
             moments_with_value = [];
         if (q.monotonicity) {
-        console.log("1");
-            var moment = find_moment(quantity, value);
-        console.log("2");
+            var moment = _model.find_moment(quantity, value);
             if (moment !== -1) {
                 moments_with_value.push(moment);
             }
         } else {
-        console.log("3");
+            // This does not work: no guarantee about approximation. Fix this.
             var has_value = function(element, index, array) {
+                    console.log("set: ", element[quantity], value, approx(element[quantity], value));
                     return approx(element[quantity],value);
                 };
             moments_with_value = moments.filter(has_value);
         }
 
-        console.log("4");
         if (moments_with_value.length === 0) {
             // not yet "measured"
-        console.log("5");
-            step();
-        console.log("6");
-            while(!approx(moments[now][quantity], value) && !is_finished()) {
-                step();
-        console.log("7");
+            var DO_NOT_UPDATE_VIEWS = true;
+            _model.step(DO_NOT_UPDATE_VIEWS);
+            while(!approx(moments[now][quantity], value) && !_model.is_finished()) {
+                _model.step(DO_NOT_UPDATE_VIEWS);
             }
         } else {
-        console.log("8");
             now = moments_with_value[0];
         }
-        console.log("9");
+        update_views();
         return moments[now];
     };
 
-    // ## Appendix H: helper functions
+    _model.data = function() {
+        return moments;
+    };
 
-    appendix.approximates = function(epsilon) {
+    _model.current_moment = function() {
+        return moments[now];
+    };
+
+
+    // ## _appendix H: helper functions
+
+    _appendix.approximates = function(epsilon) {
             var EPSILON = epsilon || 0.001,
                 fn = function(a, b) {
                     return Math.abs(a - b) <= EPSILON;
@@ -356,29 +492,144 @@ var model = function(config) {
             fn.EPSILON = EPSILON;
             return fn;
         };
-    appendix.quantity_value = function(quantity) {
+    _appendix.quantity_value = function(quantity) {
             return function(moment) {
                 return moments[moment][quantity];
             };
         };
 
 
-    return {
-        quantities: quantities,
-        set: set,
-        get: get,
-        get_minimum: get_minimum,
-        get_maximum: get_maximum
-    };
+    return _model;
 };    
 
 
 module.exports = model;
 
 })()
-},{}],2:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
+/*
+ * Copyright (C) 2013 Huub de Beer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
 
-var model = require("../src/models/model");
+var dom = require("../dom/dom");
+
+var table = function(config) {
+    var _table = require("./view")(config),
+        _appendix = {};
+
+    var table_fragment = document
+        .createDocumentFragment()
+        .appendChild(dom.create({
+            name: "table",
+            attributes: []
+        }));
+
+    _table.update = function(model) {
+        var row = dom.create({name: "tr"}),
+            moment = model.current_moment(),
+            add_cell = function(quantity) {
+                var cell = dom.create({name: "td"});
+                cell.innerHTML = moment[quantity];
+                row.appendChild(cell);
+            };
+
+        Object.keys(moment).forEach(add_cell);
+
+        table_fragment.appendChild(row);
+
+        console.log("table", model.current_moment());
+    };
+
+    _table.fragment = table_fragment;
+    return _table;
+};
+
+module.exports = table;
+
+},{"../dom/dom":1,"./view":5}],5:[function(require,module,exports){
+/*
+ * Copyright (C) 2013 Huub de Beer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+var view = function(config) {
+    var _view = {},
+        _appendix = {};
+    
+    // Observer pattern
+
+    var models = [];
+    _view.register = function(model) {
+        var model_found = models.indexOf(model);
+        if (model_found === -1) {
+            models.push(model);
+            model.register(this);
+            _view.update(model);
+        }
+    };
+
+    _view.unregister = function(model) {
+        var model_found = models.indexOf(model);
+        if (model_found !== -1) {
+            models.slice(model_found, 1);
+            model.unregister(this);
+            _view.update(model_found);
+        }
+    };
+
+
+    _view.update = function(model) {
+        // implement in specialized view; called by registered model on
+        // change
+
+        console.log("view: ", model.current_moment());
+    };
+
+    return _view;    
+};
+
+module.exports = view;
+
+},{}],6:[function(require,module,exports){
+
+var model = require("../src/models/equation");
+var view = require("../src/views/view");
+var table = require("../src/views/table");
 
 var para = model({
     time: {
@@ -397,27 +648,41 @@ var para = model({
             },
         y: {
             minimum: 0,
-            maximum: 10000,
+            maximum: 1000000,
             value: 0,
             unit: "none",
             label: "y",
-            stepsize: 1
+            stepsize: 1,
+            monotonicity: true
             }
     },
     equation: function(x) {
-        return x*x;
+        return x*x*x;
     }
 });
 
-console.log(para.get_minimum());
-console.log(para.get_minimum("x"));
-console.log(para.get_maximum());
-console.log(para.get_maximum("x"));
+// console.log(para.get_minimum());
+// console.log(para.get_minimum("x"));
+// console.log(para.get_maximum());
+// console.log(para.get_maximum("x"));
+// 
+// console.log(para.get("_time_"));
+// console.log(para.set("x", 50));
+// console.log(para.get("_time_"));
+para.set("x", 5);
+// console.log(para.get("_time_"));
+// 
+// console.log(para.current_moment());
 
-console.log(para.set("x", 50));
-console.log(para.set("x", 5));
+var repr = table();
+var body = document.querySelector("body");
+body.appendChild(repr.fragment);
+repr.register(para);
 
+para.step();
+para.step();
+para.step();
+para.set("y", 30);
 
-
-},{"../src/models/model":1}]},{},[2])
+},{"../src/models/equation":2,"../src/views/table":4,"../src/views/view":5}]},{},[6])
 ;

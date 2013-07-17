@@ -20,25 +20,4 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-/*
- *  equation.js is a model based on a simple equation like y = x^2
- */
-
-var equation_model = function(config) {
-    var _model = require("./model")(config),
-        f = config.equation;
-
-    _model.measure_moment =  function(moment) {
-        var x = moment,
-            y = f(x);
-        return {
-            x: x,
-            y: y
-        };
-    };
-
-    return _model;
-};
-
-module.exports = equation_model;
 

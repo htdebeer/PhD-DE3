@@ -23,7 +23,8 @@
 var model = function(config) {
     "use strict";
 
-    var appendix = {};
+    var _model = {},
+        _appendix = {};
 
 
     // ## Data invariant and initialization
@@ -49,13 +50,15 @@ var model = function(config) {
     // and `moment_to_time`, as well as a shorthand name for these two helper
     // functions, respectively, `t2m` and `m2t`.
 
-    var time_to_moment = function(time) {
+    _model.time_to_moment = function(time) {
         return Math.floor(time / T_STEP); 
-    }, t2m = time_to_moment;
+    };
+    var t2m = _model.time_to_moment;
 
-    var moment_to_time = function(moment) {
+    _model.moment_to_time = function(moment) {
         return moment * T_STEP;
-    },  m2t = moment_to_time;
+    };
+    var m2t = _model.moment_to_time;
 
     // When I use "measured" I mean to denote that the values of the
     // quantities describing the phenomenon have been captured, computed,
@@ -68,35 +71,27 @@ var model = function(config) {
     // between the phenomenon's quantities of interest at each moment during
     // the phenomenon.
 
-    var measure_moment = function(moment) {
+    _model.measure_moment = function(moment) {
         // to be implemented in an object implementing model
-        var x = moment,
-            y = x * x;
-        return {
-            x: x,
-            y: y
-        };
     };
 
 
     // The model has the following data invariant:
     //
-    //   (∀m: 0 ≤ m ≤ `last_measured_moment`: `moment_computed`(`moments`[m]))
+    //   (∀m: 0 ≤ m ≤ |`moments`|: `moment_computed`(`moments`[m]))
     //
     // stating that the phenomenon has been described quantitatively for all
-    // moments up till and including the `last_measured_moment`. These
-    // "measurements" are stored in a list of `moments` and can be accessed
-    // through a moment's order number.
+    // moments. These "measurements" are stored in a list of `moments` and can
+    // be accessed through a moment's order number.
 
-    var moments = [],
-        last_measured_moment = -1;
+    var moments = [];
 
     // A moment can only be inspected if it already has been "measured".
     // Following the data invariant, a moment has been measured when its order
-    // number is smaller or equal to the `last_measured_moment`
+    // number is smaller or equal to the number of measured moments.
     
-    var moment_measured = function(moment) {
-        return (moment <= last_measured_moment);
+    _model.moment_measured = function(moment) {
+        return (moment <= (moments.length - 1));
     };
 
     // Furthermore, the current moment of interest, or `now`, points to an
@@ -113,19 +108,44 @@ var model = function(config) {
     // `reset` function to resets `now` to a moment before the phenomenon
     // started.
 
-    var reset = function() {
+    _model.reset = function() {
         now = t2m(T_START) - 1;
     };
-    reset();
+    _model.reset();
 
 
     // ## Inspecting and running a model
+
+    // Inspection through registerd views
+
+    var views = [];
+    var update_views = function() {
+        var update_view = function(view) {
+            view.update(_model);
+        };
+        views.forEach(update_view);
+    };
+
+    _model.register = function(view) {
+        var view_found = views.indexOf(view);
+        if (view_found === -1) {
+            views.push(view);
+        }
+    };
+
+    _model.unregister = function(view) {
+        var view_found = views.indexOf(view);
+        if (view_found !== -1) {
+            views.slice(view_found, 1);
+        }
+    };
+
 
     // Once a model has been started, the current moment will be measured as
     // well as all moments before since the start. These moments can be
     // inspected.
     //
-    var has_started = function() {
+    _model.has_started = function() {
         return now >= 0;
     };
 
@@ -133,15 +153,17 @@ var model = function(config) {
     // the phenomenon has not been reached yet. If that moment has not been
     // "measured" earlier, "measure" it now.
 
-    var step = function() {
+    _model.step = function(do_not_update_views) {
         if (m2t(now) + T_STEP <= T_END) {
             now++;
-            if (!moment_measured(now)) {
-                var moment = measure_moment(now);
+            if (!_model.moment_measured(now)) {
+                var moment = _model.measure_moment(now);
                 moment._time_ = m2t(now);
                 moments.push(moment);
-                last_measured_moment++;
             }
+        }
+        if (!do_not_update_views) {
+            update_views();
         }
         return now;
     };
@@ -149,7 +171,7 @@ var model = function(config) {
     // If the phenomenon is a finite process or the "measuring" process cannot
     // go further `T_END` will have a value that is not `Infinity`.
 
-    var can_finish = function() {
+    _model.can_finish = function() {
         return Math.abs(T_END) !== Infinity;
     };
 
@@ -157,10 +179,10 @@ var model = function(config) {
     // `finish`ing the model will ensure that all moments during the
     // phenomenon have been "measured".
 
-    var finish = function() {
-        if (can_finish()) {
-            while (last_measured_moment < t2m(T_END)) {
-                step();
+    _model.finish = function() {
+        if (_model.can_finish()) {
+            while ((moments.length - 1) < t2m(T_END)) {
+                _model.step();
             }
         }
         return now;
@@ -169,8 +191,8 @@ var model = function(config) {
     // We call the model finished if the current moment, or `now`, is the
     // phenomenon's last moment.
 
-    var is_finished = function() {
-        return can_finish() && m2t(now) >= T_END;
+    _model.is_finished = function() {
+        return _model.can_finish() && m2t(now) >= T_END;
     };
 
            
@@ -183,8 +205,8 @@ var model = function(config) {
     // internal time is added as quantity `_time_` and, as a result, "_time_"
     // is not allowed as a quantity name.
 
-    var quantities = config.quantities || {};
-    quantities._time_ = {
+    _model.quantities = config.quantities || {};
+    _model.quantities._time_ = {
         minimum: T_START,
         maximum: T_END,
         value: m2t(now),
@@ -194,46 +216,46 @@ var model = function(config) {
         monotonicity: true
     };
 
-    var get_minimum = function(quantity) {
+    _model.get_minimum = function(quantity) {
         if (arguments.length===0) {
             // called without any arguments: return all minima
             var minima = {},
                 add_minimum = function(quantity) {
-                    minima[quantity] = quantities[quantity].minimum;
+                    minima[quantity] = _model.quantities[quantity].minimum;
                 };
 
-            Object.keys(quantities).forEach(add_minimum);
+            Object.keys(_model.quantities).forEach(add_minimum);
             return minima;
         } else {
             // return quantity's minimum
-            return quantities[quantity].minimum;
+            return _model.quantities[quantity].minimum;
         }
     };
                     
-    var get_maximum = function(quantity) {
+    _model.get_maximum = function(quantity) {
         if (arguments.length===0) {
             // called without any arguments: return all minima
             var maxima = {},
                 add_maximum = function(quantity) {
-                    maxima[quantity] = quantities[quantity].maximum;
+                    maxima[quantity] = _model.quantities[quantity].maximum;
                 };
 
-            Object.keys(quantities).forEach(add_maximum);
+            Object.keys(_model.quantities).forEach(add_maximum);
             return maxima;
         } else {
             // return quantity's minimum
-            return quantities[quantity].maximum;
+            return _model.quantities[quantity].maximum;
         }
     };
 
 
-    var find_moment = function(quantity, value, EPSILON) {
-        if (last_measured_moment < 0) {
+    _model.find_moment = function(quantity, value, EPSILON) {
+        if (moments.length === 0) {
             // no moment are measured yet, so there is nothing to be found
 
             return -1;
         } else {
-            var val = appendix.quantity_value(quantity);
+            var val = _appendix.quantity_value(quantity);
 
             // pre: quantity is monotone
             // determine if it is increasing or decreasing
@@ -243,98 +265,80 @@ var model = function(config) {
             // minimum of this quantity, type of monotonicity follows.
 
             var start = val(0),
-                increasing = (start === get_minimum(quantity));
+                INCREASING = (start === _model.get_minimum(quantity));
 
-            // Use a binary search to find the moment that approaches the
+            // Use a stupid linear search to find the moment that approaches the
             // value best
 
 
-            var bmin = 0, 
-                bmid, 
-                bmax = last_measured_moment,
-                approx = appendix.approximates(EPSILON);
-            if (increasing) {
-                // Increasing "function", meaning
-                //
-                //  (∀m: 0 ≤ m < `last_measured_moment`: `val`(m) <= `val`(m+1))
-                //
-                // Therefore,
-                //
-                //  (∃m, n: 0 ≤ m < n ≤ `last_measured_moment`: 
-                //      `val`(m) ≤ value ≤ `val`(n) ⋀
-                //      (∀p: m < p < n: `val`(p) = value))
-                //
-                // `find_moment` finds those moments m and n and returns the
-                // one closest to value or, when even close, the last moment
+            var m = 0,
+                n = moments.length - 1,
+                approx = _appendix.approximates(EPSILON),
+                lowerbound,
+                upperbound;
 
-                var m = 0,
-                    n = last_measured_moment,
-                    mid_m, mid_n;
-
-                while (val(m) < value || value < val(n)) {
-                    // lowerbound
-                    mid = Math.floor((n - m) / 2));
-
-                    if (val(mid) < value) {
-                        m = mid + 1;
-                    } else if (value < val(mid)) {
-                        n = mid - 1;
-                    } else {
-
-                    }
-
-
-                    if (val(mid_m) < value) {
-                        m = mid_m;
-                    } else if (val(m) > value) {
-                        m = m - 1;
-                    };
-
-                    mid_n = Math.ceil((n - m) / 2));
-                    if (val(mid_n) > value) {
-                        n = mid_n;
-                    } else {
-                    }
-                    
-                }
-
-
-                while (val(bmax) > val(bmin)) {
-                    bmid = Math.floor((bmax - bmin)/2);
-                    console.log(val(bmid));
-                    if (approx(val(bmid), value)) {
-                        return bmid;
-                    } else if (val(bmid) < value) {
-                        bmin = bmid - 1;
-                    } else if (value < val(bmid)) {
-                        bmax = bmid + 1;
-                    }
-                }
-                return bmid;
+            if (INCREASING) {
+                lowerbound = function(moment) {
+                    return val(moment) < value;
+                };
+                upperbound = function(moment) {
+                    return val(moment) > value;
+                };
             } else {
-                // decreasing
-                // (∀m: 0≤ m < `last_measured_moment`: `val`(m) >= `val`(m+1))
-                while (bmax >= bmin) {
-                    bmid = Math.round((bmin - bmax)/2);
-                    if (approx(val(bmid), value)) {
-                        return bmid;
-                    } else if (value > val(bmid)) {
-                        bmax = bmid - 1;
-                    } else if (val(bmid) > value) {
-                        bmin = bmid + 1;
-                    }
+                lowerbound = function(moment) {
+                    return val(moment) > value;
+                };
+                upperbound = function(moment) {
+                    return val(moment) < value;
+                };
+            }
+
+            // Increasing "function", meaning
+            //
+            //  (∀m: 0 ≤ m < |`moments`|: `val`(m) <= `val`(m+1))
+            //
+            // Therefore,
+            //
+            //  (∃m, n: 0 ≤ m < n ≤ |`moments`|: 
+            //      `val`(m) ≤ value ≤ `val`(n) ⋀
+            //      (∀p: m < p < n: `val`(p) = value))
+            //
+            // `find_moment` finds those moments m and n and returns the
+            // one closest to value or, when even close, the last moment
+            // decreasing is reverse.
+            
+
+            while (lowerbound(m)) {
+                m++;
+                if (m>n) {
+                    // 
+                    return -1;
                 }
             }
+            m--;
+            while (upperbound(n)) {
+                n--;
+                if (n<m) {
+                    return -1;
+                }
+            }
+            n++;
+
+            return (Math.abs(val(n)-value) < Math.abs(val(m)-value))?n:m;
         }
     };
 
-    var get = function(quantity) {
-        return quantities[quantity].value;
+
+    _model.get = function(quantity) {
+        if (now < 0) {
+            return undefined;
+        } else {
+            return moments[now][quantity];
+        }
     };
     
-    var set = function(quantity, value) {
-        var q = quantities[quantity];
-        console.log("0");
+    _model.set = function(quantity, value) {
+        var q = _model.quantities[quantity];
 
         if (value < q.minimum) {
             value = q.minimum;
@@ -354,44 +358,48 @@ var model = function(config) {
         // only increase. Those quantities with property `monotonicity`
         // `true`, only one value will be searched for
         
-        var approx = appendix.approximates(),
+        var approx = _appendix.approximates(),
             moments_with_value = [];
         if (q.monotonicity) {
-        console.log("1");
-            var moment = find_moment(quantity, value);
-        console.log("2");
+            var moment = _model.find_moment(quantity, value);
             if (moment !== -1) {
                 moments_with_value.push(moment);
             }
         } else {
-        console.log("3");
+            // This does not work: no guarantee about approximation. Fix this.
             var has_value = function(element, index, array) {
+                    console.log("set: ", element[quantity], value, approx(element[quantity], value));
                     return approx(element[quantity],value);
                 };
             moments_with_value = moments.filter(has_value);
         }
 
-        console.log("4");
         if (moments_with_value.length === 0) {
             // not yet "measured"
-        console.log("5");
-            step();
-        console.log("6");
-            while(!approx(moments[now][quantity], value) && !is_finished()) {
-                step();
-        console.log("7");
+            var DO_NOT_UPDATE_VIEWS = true;
+            _model.step(DO_NOT_UPDATE_VIEWS);
+            while(!approx(moments[now][quantity], value) && !_model.is_finished()) {
+                _model.step(DO_NOT_UPDATE_VIEWS);
             }
         } else {
-        console.log("8");
             now = moments_with_value[0];
         }
-        console.log("9");
+        update_views();
         return moments[now];
     };
 
-    // ## Appendix H: helper functions
+    _model.data = function() {
+        return moments;
+    };
 
-    appendix.approximates = function(epsilon) {
+    _model.current_moment = function() {
+        return moments[now];
+    };
+
+
+    // ## _appendix H: helper functions
+
+    _appendix.approximates = function(epsilon) {
             var EPSILON = epsilon || 0.001,
                 fn = function(a, b) {
                     return Math.abs(a - b) <= EPSILON;
@@ -399,20 +407,14 @@ var model = function(config) {
             fn.EPSILON = EPSILON;
             return fn;
         };
-    appendix.quantity_value = function(quantity) {
+    _appendix.quantity_value = function(quantity) {
             return function(moment) {
                 return moments[moment][quantity];
             };
         };
 
 
-    return {
-        quantities: quantities,
-        set: set,
-        get: get,
-        get_minimum: get_minimum,
-        get_maximum: get_maximum
-    };
+    return _model;
 };    
 
 

@@ -20,25 +20,37 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-/*
- *  equation.js is a model based on a simple equation like y = x^2
- */
+var dom = require("../dom/dom");
 
-var equation_model = function(config) {
-    var _model = require("./model")(config),
-        f = config.equation;
+var table = function(config) {
+    var _table = require("./view")(config),
+        _appendix = {};
 
-    _model.measure_moment =  function(moment) {
-        var x = moment,
-            y = f(x);
-        return {
-            x: x,
-            y: y
-        };
+    var table_fragment = document
+        .createDocumentFragment()
+        .appendChild(dom.create({
+            name: "table",
+            attributes: []
+        }));
+
+    _table.update = function(model) {
+        var row = dom.create({name: "tr"}),
+            moment = model.current_moment(),
+            add_cell = function(quantity) {
+                var cell = dom.create({name: "td"});
+                cell.innerHTML = moment[quantity];
+                row.appendChild(cell);
+            };
+
+        Object.keys(moment).forEach(add_cell);
+
+        table_fragment.appendChild(row);
+
+        console.log("table", model.current_moment());
     };
 
-    return _model;
+    _table.fragment = table_fragment;
+    return _table;
 };
 
-module.exports = equation_model;
-
+module.exports = table;
