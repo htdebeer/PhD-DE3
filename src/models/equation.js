@@ -24,8 +24,8 @@
  *  equation.js is a model based on a simple equation like y = x^2
  */
 
-var equation_model = function(config) {
-    var _model = require("./model")(config),
+var equation_model = function(name, config) {
+    var _model = require("./model")(name, config),
         f = config.equation;
 
     _model.measure_moment =  function(moment) {

@@ -1,4 +1,121 @@
 ;(function(e,t,n){function i(n,s){if(!t[n]){if(!e[n]){var o=typeof require=="function"&&require;if(!s&&o)return o(n,!0);if(r)return r(n,!0);throw new Error("Cannot find module '"+n+"'")}var u=t[n]={exports:{}};e[n][0].call(u.exports,function(t){var r=e[n][1][t];return i(r?r:t)},u,u.exports)}return t[n].exports}var r=typeof require=="function"&&require;for(var s=0;s<n.length;s++)i(n[s]);return i})({1:[function(require,module,exports){
+
+
+// add attribution to the icons: "Entypo pictograms by Daniel Bruce — www.entypo.com"
+
+var actions = function(config) {
+    var _actions = {},
+        running_models = {}
+        ;
+
+    var current_speed = config.speed || 500;
+
+    _actions.speed = function( speed ) {
+        if (arguments.length === 1) {
+            current_speed = speed;
+        }
+        return current_speed;
+    };
+
+    var is_running =  function(model) {
+        return running_models[model.name];
+    };
+
+    _actions.start = {
+        name: "start",
+        icon: "icon-play",
+        tooltip: "Start simulation",
+        enabled: true,
+        callback: function(model) {
+           
+            var step = function() {
+                if (!model.is_finished()) {
+                    model.step();
+                } else {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                    model.disable_action("finish");
+                }
+            };
+
+            return function() {
+                    if (!is_running(model)) {
+                        running_models[model.name] = setInterval(step, current_speed);
+                    }
+                    model.disable_action("start");
+                    model.enable_action("pause");
+                    model.enable_action("reset");
+                    model.update_views();
+            };
+        }
+    };
+
+    _actions.pause = {
+            name: "pause",
+            icon: "icon-pause",
+            tooltip: "Pause simulation",
+            enabled: false,
+            callback: function(model) {
+                return function() {
+                    model.enable_action("start");
+                    model.disable_action("pause");
+                    if (is_running(model)) {
+                        clearInterval(running_models[model.name]);
+                        delete running_models[model.name];
+                    }
+                    model.update_views();
+                };
+            }
+    };
+
+    _actions.reset = {
+        name: "reset",
+        icon: "icon-fast-backward",
+        tooltip: "Reset simulation",
+        enabled: true,
+        callback: function(model) {
+            return function() {
+                if (is_running(model)) {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                }
+                model.reset();
+                model.enable_action("start");
+                model.enable_action("finish");
+                model.disable_action("pause");
+                model.disable_action("reset");
+                model.update_views();
+            };
+        }
+    };
+
+    _actions.finish = {
+        name: "finish",
+        icon: "icon-fast-forward",
+        tooltip: "Finish simulation",
+        enabled: true,
+        callback: function(model) {
+            return function() {
+                if (is_running(model)) {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                }
+                model.finish();
+                model.disable_action("pause");
+                model.disable_action("start");
+                model.disable_action("finish");
+                model.enable_action("reset");
+                model.update_views();
+            };
+        }
+    };
+
+    return _actions;
+};
+
+module.exports = actions;
+
+},{}],2:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -27,16 +144,37 @@ var dom = {
             set_attribute = function(attr) {
                 elt.setAttribute(attr.name, attr.value);
             };
+
         if (spec.attributes) {
             spec.attributes.forEach(set_attribute);
         }
+
+        if (spec.children) {
+            var append = function(child) {
+                elt.appendChild(dom.create(child));
+            };
+            spec.children.forEach(append);
+        }
+
+        if (spec.on) {
+            elt.addEventListener( spec.on.type, spec.on.callback );
+        }
+
+        if (spec.value) {
+            if (spec.name === "input") {
+                elt.value = spec.value;
+            } else {
+                elt.innerHTML = spec.value;
+            }
+        }
+
         return elt;
     }
 };
 
 module.exports = dom;
 
-},{}],2:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -63,8 +201,8 @@ module.exports = dom;
  *  equation.js is a model based on a simple equation like y = x^2
  */
 
-var equation_model = function(config) {
-    var _model = require("./model")(config),
+var equation_model = function(name, config) {
+    var _model = require("./model")(name, config),
         f = config.equation;
 
     _model.measure_moment =  function(moment) {
@@ -82,7 +220,7 @@ var equation_model = function(config) {
 module.exports = equation_model;
 
 
-},{"./model":3}],3:[function(require,module,exports){
+},{"./model":4}],4:[function(require,module,exports){
 (function(){/*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -105,10 +243,10 @@ module.exports = equation_model;
  * DEALINGS IN THE SOFTWARE.
  */
 
-var model = function(config) {
+var model = function(name, config) {
     "use strict";
 
-    var _model = {},
+    var _model = {name: name},
         _appendix = {};
 
 
@@ -188,16 +326,9 @@ var model = function(config) {
     var now;
 
     // To ensure this data invariant, `now` is set to a moment before the
-    // phenomenon started. As a model can be inspected repeatedly, as is one
-    // of the reasons to model a phenomenon using a computer, we introduce a
-    // `reset` function to resets `now` to a moment before the phenomenon
-    // started.
+    // phenomenon started. 
 
-    _model.reset = function() {
-        now = t2m(T_START) - 1;
-    };
-    _model.reset();
-
+    now = t2m(T_START) - 1;
 
     // ## Inspecting and running a model
 
@@ -206,10 +337,11 @@ var model = function(config) {
     var views = [];
     var update_views = function() {
         var update_view = function(view) {
-            view.update(_model);
+            view.update(_model.name);
         };
         views.forEach(update_view);
     };
+    _model.update_views = update_views;
 
     _model.register = function(view) {
         var view_found = views.indexOf(view);
@@ -224,6 +356,18 @@ var model = function(config) {
             views.slice(view_found, 1);
         }
     };
+
+    // As a model can be inspected repeatedly, as is one
+    // of the reasons to model a phenomenon using a computer, we introduce a
+    // `reset` function to resets `now` to a moment before the phenomenon
+    // started.
+
+    _model.reset = function() {
+        now = t2m(T_START) - 1;
+        _model.step();
+        update_views();
+    };
+
 
 
     // Once a model has been started, the current moment will be measured as
@@ -278,6 +422,51 @@ var model = function(config) {
 
     _model.is_finished = function() {
         return _model.can_finish() && m2t(now) >= T_END;
+    };
+
+
+    /** 
+     * ## Actions on the model
+     *
+     */
+    _model.actions = {};
+    _model.add_action = function( action ) {
+        _model.actions[action.name] = action;
+        _model.actions[action.name].install = function() {
+            return action.callback(_model);
+        };
+    };
+    if (config.actions) {
+        var add_action = function(action_name) {
+            _model.add_action(config.actions[action_name]);
+        };
+        Object.keys(config.actions).forEach(add_action);
+    }
+    _model.action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            return _model.actions[action_name];
+        }
+    };
+    _model.remove_action = function( action ) {
+        if (_model.actions[action.name]) {
+            delete _model.actions[action.name];
+        }
+    };
+    _model.disable_action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            _model.actions[action_name].enabled = false;
+        }
+    };
+    _model.enable_action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            _model.actions[action_name].enabled = true;
+        }
+    };
+    _model.toggle_action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            _model.actions[action_name].enabled = 
+                !_model.action[action_name].enabled;
+        }
     };
 
            
@@ -453,7 +642,6 @@ var model = function(config) {
         } else {
             // This does not work: no guarantee about approximation. Fix this.
             var has_value = function(element, index, array) {
-                    console.log("set: ", element[quantity], value, approx(element[quantity], value));
                     return approx(element[quantity],value);
                 };
             moments_with_value = moments.filter(has_value);
@@ -506,7 +694,7 @@ var model = function(config) {
 module.exports = model;
 
 })()
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -542,20 +730,176 @@ var table = function(config) {
             attributes: []
         }));
 
-    _table.update = function(model) {
-        var row = dom.create({name: "tr"}),
-            moment = model.current_moment(),
-            add_cell = function(quantity) {
-                var cell = dom.create({name: "td"});
+    var create_head = function() {
+        var table_head = table_fragment
+            .appendChild(dom.create({name: "thead"})),
+            quantities = config.quantities || {},
+            actions = config.actions || {};
+
+        var head = table_head.appendChild(dom.create({name: "tr"}));
+
+        // name column
+        head.appendChild(dom.create({
+            name: "th",
+            attributes: [{
+                name: "class",
+                value: "corner"
+            }]
+        }));
+
+        // quantities, if any
+        var number_of_quantities = Object.keys(quantities).length;
+        if (number_of_quantities > 0) {
+                var add_cell = function(q) {
+                    var quantity = quantities[q],
+                        label = (quantity.unit)?
+                            quantity.label + " (" + quantity.unit + ")":
+                            quantity.label;
+
+                    head.appendChild( dom.create({
+                        name: "th",
+                        value: label
+                    }));
+                };                            
+
+            Object.keys(quantities).forEach(add_cell);
+        }
+
+        // actions, if any
+        head.appendChild(
+            dom.create({
+                name: "th",
+                attributes: [{
+                    name: "class",
+                    value: "corner"
+                }]
+            })
+        );
+
+
+
+
+        
+        
+
+    };
+    create_head();
+
+    // create body
+    var table_body = table_fragment.appendChild(
+            dom.create({name: "tbody"})
+            );
+
+    var add_row = function(model) {
+        var quantities = config.quantities || {},
+            create_quantity_elt = function(quantity) {
+                return {
+                    name: "td",
+                    attributes: [{
+                        name: "data-quantity",
+                        value: quantity
+                    }]
+                };
+            },
+            quantity_elts = Object.keys(quantities).map(create_quantity_elt);
+
+        var create_action_elt = function(action_name) {
+            var action = model.action(action_name);
+                return {
+                    name: "button",
+                    attributes: [{
+                        name: "class",
+                        value: "action"
+                    }, {
+                        name: "data-action",
+                        value: action_name
+                    }],
+                    children: [{
+                        name: "i",
+                        attributes: [{
+                            name: "class",
+                            value: action.icon
+                        }]
+                    }],
+                    on: {
+                        type: "click",
+                        callback: action.install()
+                    }
+                };
+            },
+            actions_elts = Object.keys(model.actions).map(create_action_elt);
+
+        return table_body.appendChild(
+                dom.create( {
+                    name: "tr",
+                    attributes: [{
+                        name: "id",
+                        value: model.name
+                    }],
+                    children: [{
+                        name: "td",
+                        value: model.name,
+                        attributes: [{
+                            name: "class",
+                            value: model.name
+                        }]
+                    }].concat(quantity_elts).concat([{
+                        name: "td",
+                        children: actions_elts
+                    }])
+                }));
+
+
+    };
+
+    var update_row = function(row, model) {
+        var moment = model.current_moment(),
+            update_quantity = function(quantity) {
+                var query = "[data-quantity='" + quantity + "']",
+                    cell = row.querySelector(query);
+                if (!cell) {
+                    cell = dom.create({name: "td",
+                    attributes: [{
+                        name: "data-quantity",
+                        value: quantity
+                    }]});
+                    row.appendChild(cell);
+                }
+
                 cell.innerHTML = moment[quantity];
-                row.appendChild(cell);
+
             };
 
-        Object.keys(moment).forEach(add_cell);
 
-        table_fragment.appendChild(row);
+        Object.keys(moment).forEach(update_quantity);
 
-        console.log("table", model.current_moment());
+        var update_action =  function(action_name) {
+            var query = "button[data-action='" + action_name + "']",
+                button = row.querySelector(query);
+
+            if (button) {
+                var action = model.action(action_name);
+                if (action.enabled) {
+                    button.removeAttribute("disabled");
+                } else {
+                    button.setAttribute("disabled", true);
+                }
+            }
+
+        };
+
+        Object.keys(model.actions).forEach(update_action);
+    };
+
+
+    _table.update = function(model_name) {
+        var model = _table.get_model(model_name);
+
+        if (!model.row) {
+            model.row = add_row(model.model);
+        }
+
+        update_row(model.row, model.model);
     };
 
     _table.fragment = table_fragment;
@@ -564,7 +908,7 @@ var table = function(config) {
 
 module.exports = table;
 
-},{"../dom/dom":1,"./view":5}],5:[function(require,module,exports){
+},{"../dom/dom":2,"./view":6}],6:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -593,31 +937,33 @@ var view = function(config) {
     
     // Observer pattern
 
-    var models = [];
+    var models = {};
+
     _view.register = function(model) {
-        var model_found = models.indexOf(model);
+        var model_found = Object.keys(models).indexOf(model.name);
         if (model_found === -1) {
-            models.push(model);
+            models[model.name] = {
+                model: model
+            };
             model.register(this);
-            _view.update(model);
+            _view.update(model.name);
         }
     };
 
     _view.unregister = function(model) {
-        var model_found = models.indexOf(model);
-        if (model_found !== -1) {
-            models.slice(model_found, 1);
+        if (models[model.name]) {
             model.unregister(this);
-            _view.update(model_found);
+            delete models[model.name];
         }
     };
 
+    _view.get_model = function(model_name) {
+        return models[model_name];
+    };
 
-    _view.update = function(model) {
+    _view.update = function(model_name) {
         // implement in specialized view; called by registered model on
         // change
-
-        console.log("view: ", model.current_moment());
     };
 
     return _view;    
@@ -625,23 +971,25 @@ var view = function(config) {
 
 module.exports = view;
 
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 
 var model = require("../src/models/equation");
 var view = require("../src/views/view");
 var table = require("../src/views/table");
 
-var para = model({
+var actions = require("../src/actions/actions")({speed: 400});
+
+var config =  {
     time: {
         start: 0,
         end: 1000,
         step: 10
-    }, quantities: {
+    },
+    quantities: {
         x: {
             minimum: 0,
             maximum: 100,
             value: 0,
-            unit: "none",
             label: "x",
             stepsize: 1,
             monotonicity: true
@@ -650,7 +998,7 @@ var para = model({
             minimum: 0,
             maximum: 1000000,
             value: 0,
-            unit: "none",
+            unit: "km",
             label: "y",
             stepsize: 1,
             monotonicity: true
@@ -658,8 +1006,14 @@ var para = model({
     },
     equation: function(x) {
         return x*x*x;
+    },
+    actions: {
+        start: actions.start,
+        pause: actions.pause,
+        reset: actions.reset,
+        finish: actions.finish
     }
-});
+}, para = model('longdrinkglas', config);
 
 // console.log(para.get_minimum());
 // console.log(para.get_minimum("x"));
@@ -674,7 +1028,7 @@ para.set("x", 5);
 // 
 // console.log(para.current_moment());
 
-var repr = table();
+var repr = table(config);
 var body = document.querySelector("body");
 body.appendChild(repr.fragment);
 repr.register(para);
@@ -684,5 +1038,16 @@ para.step();
 para.step();
 para.set("y", 30);
 
-},{"../src/models/equation":2,"../src/views/table":4,"../src/views/view":5}]},{},[6])
+var timer, 
+    step = function() {
+        if (!para.is_finished()) {
+            para.step();
+        } else {
+            timer = null;
+        }
+    };
+
+//timer = setInterval(step, 500);
+
+},{"../src/actions/actions":1,"../src/models/equation":3,"../src/views/table":5,"../src/views/view":6}]},{},[7])
 ;

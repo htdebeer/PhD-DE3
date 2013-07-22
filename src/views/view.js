@@ -26,31 +26,33 @@ var view = function(config) {
     
     // Observer pattern
 
-    var models = [];
+    var models = {};
+
     _view.register = function(model) {
-        var model_found = models.indexOf(model);
+        var model_found = Object.keys(models).indexOf(model.name);
         if (model_found === -1) {
-            models.push(model);
+            models[model.name] = {
+                model: model
+            };
             model.register(this);
-            _view.update(model);
+            _view.update(model.name);
         }
     };
 
     _view.unregister = function(model) {
-        var model_found = models.indexOf(model);
-        if (model_found !== -1) {
-            models.slice(model_found, 1);
+        if (models[model.name]) {
             model.unregister(this);
-            _view.update(model_found);
+            delete models[model.name];
         }
     };
 
+    _view.get_model = function(model_name) {
+        return models[model_name];
+    };
 
-    _view.update = function(model) {
+    _view.update = function(model_name) {
         // implement in specialized view; called by registered model on
         // change
-
-        console.log("view: ", model.current_moment());
     };
 
     return _view;    

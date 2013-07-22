@@ -3,4 +3,50 @@ body {
     font-family: "Calibri", "Helvetica", sans-serif;
 }
 
+table {
+    border-collapse: collapse;
+}
 
+td {
+    border: 1px solid gray;
+    text-align: right;
+}
+
+th {
+    border: 1px solid gray;
+    padding-left: 0.5ex;
+    padding-right: 0.5ex;
+}
+
+th.corner {
+    border: none;
+    background: none;
+    color: none;
+}
+
+tr.main_head {
+    font-style: italic;
+}
+
+tr.main_head th {
+    background: gray;
+    color: white;
+}
+
+tr.sub_head {
+}
+
+
+button.action {
+    color: black;
+    padding-right: 2ex;
+    padding-left: 2ex;
+}
+
+button:disabled {
+    opacity: 0.5;
+}
+
+button:enabled {
+    opacity: 1;
+}

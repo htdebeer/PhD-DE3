@@ -20,10 +20,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-var model = function(config) {
+var model = function(name, config) {
     "use strict";
 
-    var _model = {},
+    var _model = {name: name},
         _appendix = {};
 
 
@@ -103,16 +103,9 @@ var model = function(config) {
     var now;
 
     // To ensure this data invariant, `now` is set to a moment before the
-    // phenomenon started. As a model can be inspected repeatedly, as is one
-    // of the reasons to model a phenomenon using a computer, we introduce a
-    // `reset` function to resets `now` to a moment before the phenomenon
-    // started.
+    // phenomenon started. 
 
-    _model.reset = function() {
-        now = t2m(T_START) - 1;
-    };
-    _model.reset();
-
+    now = t2m(T_START) - 1;
 
     // ## Inspecting and running a model
 
@@ -121,10 +114,11 @@ var model = function(config) {
     var views = [];
     var update_views = function() {
         var update_view = function(view) {
-            view.update(_model);
+            view.update(_model.name);
         };
         views.forEach(update_view);
     };
+    _model.update_views = update_views;
 
     _model.register = function(view) {
         var view_found = views.indexOf(view);
@@ -139,6 +133,18 @@ var model = function(config) {
             views.slice(view_found, 1);
         }
     };
+
+    // As a model can be inspected repeatedly, as is one
+    // of the reasons to model a phenomenon using a computer, we introduce a
+    // `reset` function to resets `now` to a moment before the phenomenon
+    // started.
+
+    _model.reset = function() {
+        now = t2m(T_START) - 1;
+        _model.step();
+        update_views();
+    };
+
 
 
     // Once a model has been started, the current moment will be measured as
@@ -193,6 +199,51 @@ var model = function(config) {
 
     _model.is_finished = function() {
         return _model.can_finish() && m2t(now) >= T_END;
+    };
+
+
+    /** 
+     * ## Actions on the model
+     *
+     */
+    _model.actions = {};
+    _model.add_action = function( action ) {
+        _model.actions[action.name] = action;
+        _model.actions[action.name].install = function() {
+            return action.callback(_model);
+        };
+    };
+    if (config.actions) {
+        var add_action = function(action_name) {
+            _model.add_action(config.actions[action_name]);
+        };
+        Object.keys(config.actions).forEach(add_action);
+    }
+    _model.action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            return _model.actions[action_name];
+        }
+    };
+    _model.remove_action = function( action ) {
+        if (_model.actions[action.name]) {
+            delete _model.actions[action.name];
+        }
+    };
+    _model.disable_action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            _model.actions[action_name].enabled = false;
+        }
+    };
+    _model.enable_action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            _model.actions[action_name].enabled = true;
+        }
+    };
+    _model.toggle_action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            _model.actions[action_name].enabled = 
+                !_model.action[action_name].enabled;
+        }
     };
 
            
@@ -368,7 +419,6 @@ var model = function(config) {
         } else {
             // This does not work: no guarantee about approximation. Fix this.
             var has_value = function(element, index, array) {
-                    console.log("set: ", element[quantity], value, approx(element[quantity], value));
                     return approx(element[quantity],value);
                 };
             moments_with_value = moments.filter(has_value);

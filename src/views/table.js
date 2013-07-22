@@ -33,20 +33,176 @@ var table = function(config) {
             attributes: []
         }));
 
-    _table.update = function(model) {
-        var row = dom.create({name: "tr"}),
-            moment = model.current_moment(),
-            add_cell = function(quantity) {
-                var cell = dom.create({name: "td"});
+    var create_head = function() {
+        var table_head = table_fragment
+            .appendChild(dom.create({name: "thead"})),
+            quantities = config.quantities || {},
+            actions = config.actions || {};
+
+        var head = table_head.appendChild(dom.create({name: "tr"}));
+
+        // name column
+        head.appendChild(dom.create({
+            name: "th",
+            attributes: [{
+                name: "class",
+                value: "corner"
+            }]
+        }));
+
+        // quantities, if any
+        var number_of_quantities = Object.keys(quantities).length;
+        if (number_of_quantities > 0) {
+                var add_cell = function(q) {
+                    var quantity = quantities[q],
+                        label = (quantity.unit)?
+                            quantity.label + " (" + quantity.unit + ")":
+                            quantity.label;
+
+                    head.appendChild( dom.create({
+                        name: "th",
+                        value: label
+                    }));
+                };                            
+
+            Object.keys(quantities).forEach(add_cell);
+        }
+
+        // actions, if any
+        head.appendChild(
+            dom.create({
+                name: "th",
+                attributes: [{
+                    name: "class",
+                    value: "corner"
+                }]
+            })
+        );
+
+
+
+
+        
+        
+
+    };
+    create_head();
+
+    // create body
+    var table_body = table_fragment.appendChild(
+            dom.create({name: "tbody"})
+            );
+
+    var add_row = function(model) {
+        var quantities = config.quantities || {},
+            create_quantity_elt = function(quantity) {
+                return {
+                    name: "td",
+                    attributes: [{
+                        name: "data-quantity",
+                        value: quantity
+                    }]
+                };
+            },
+            quantity_elts = Object.keys(quantities).map(create_quantity_elt);
+
+        var create_action_elt = function(action_name) {
+            var action = model.action(action_name);
+                return {
+                    name: "button",
+                    attributes: [{
+                        name: "class",
+                        value: "action"
+                    }, {
+                        name: "data-action",
+                        value: action_name
+                    }],
+                    children: [{
+                        name: "i",
+                        attributes: [{
+                            name: "class",
+                            value: action.icon
+                        }]
+                    }],
+                    on: {
+                        type: "click",
+                        callback: action.install()
+                    }
+                };
+            },
+            actions_elts = Object.keys(model.actions).map(create_action_elt);
+
+        return table_body.appendChild(
+                dom.create( {
+                    name: "tr",
+                    attributes: [{
+                        name: "id",
+                        value: model.name
+                    }],
+                    children: [{
+                        name: "td",
+                        value: model.name,
+                        attributes: [{
+                            name: "class",
+                            value: model.name
+                        }]
+                    }].concat(quantity_elts).concat([{
+                        name: "td",
+                        children: actions_elts
+                    }])
+                }));
+
+
+    };
+
+    var update_row = function(row, model) {
+        var moment = model.current_moment(),
+            update_quantity = function(quantity) {
+                var query = "[data-quantity='" + quantity + "']",
+                    cell = row.querySelector(query);
+                if (!cell) {
+                    cell = dom.create({name: "td",
+                    attributes: [{
+                        name: "data-quantity",
+                        value: quantity
+                    }]});
+                    row.appendChild(cell);
+                }
+
                 cell.innerHTML = moment[quantity];
-                row.appendChild(cell);
+
             };
 
-        Object.keys(moment).forEach(add_cell);
 
-        table_fragment.appendChild(row);
+        Object.keys(moment).forEach(update_quantity);
 
-        console.log("table", model.current_moment());
+        var update_action =  function(action_name) {
+            var query = "button[data-action='" + action_name + "']",
+                button = row.querySelector(query);
+
+            if (button) {
+                var action = model.action(action_name);
+                if (action.enabled) {
+                    button.removeAttribute("disabled");
+                } else {
+                    button.setAttribute("disabled", true);
+                }
+            }
+
+        };
+
+        Object.keys(model.actions).forEach(update_action);
+    };
+
+
+    _table.update = function(model_name) {
+        var model = _table.get_model(model_name);
+
+        if (!model.row) {
+            model.row = add_row(model.model);
+        }
+
+        update_row(model.row, model.model);
     };
 
     _table.fragment = table_fragment;

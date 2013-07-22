@@ -26,9 +26,30 @@ var dom = {
             set_attribute = function(attr) {
                 elt.setAttribute(attr.name, attr.value);
             };
+
         if (spec.attributes) {
             spec.attributes.forEach(set_attribute);
         }
+
+        if (spec.children) {
+            var append = function(child) {
+                elt.appendChild(dom.create(child));
+            };
+            spec.children.forEach(append);
+        }
+
+        if (spec.on) {
+            elt.addEventListener( spec.on.type, spec.on.callback );
+        }
+
+        if (spec.value) {
+            if (spec.name === "input") {
+                elt.value = spec.value;
+            } else {
+                elt.innerHTML = spec.value;
+            }
+        }
+
         return elt;
     }
 };
