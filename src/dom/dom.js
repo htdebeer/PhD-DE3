@@ -24,11 +24,11 @@ var dom = {
     create: function(spec) {
         var elt = document.createElement(spec.name),
             set_attribute = function(attr) {
-                elt.setAttribute(attr.name, attr.value);
+                elt.setAttribute(attr, spec.attributes[attr]);
             };
 
         if (spec.attributes) {
-            spec.attributes.forEach(set_attribute);
+            Object.keys(spec.attributes).forEach(set_attribute);
         }
 
         if (spec.children) {

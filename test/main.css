@@ -7,9 +7,41 @@ table {
     border-collapse: collapse;
 }
 
+tbody tr {
+    background: white;
+}
+
+tbody tr:hover {
+    background: DimGray;
+    color: white;
+}
+
+th[data-list] ol.list {
+    visibility: collapse;
+    display: absolute;
+    z-index: 100;
+    list-style: none;
+    font-weight: lighter;
+    padding-top: 0;
+    margin-top: 0;
+    margin-left: 1ex;
+}
+
+th[data-list]:hover ol.list  {
+    visibility: visible;
+}
+
+th[data-list] ol.list li:hover {
+    background: dimgray;
+    color: white;
+}
+
+
 td {
     border: 1px solid gray;
     text-align: right;
+    padding: 0.5ex;
+    font-size: inherit;
 }
 
 th {
@@ -37,16 +69,89 @@ tr.sub_head {
 }
 
 
+
+
+tfoot th select {
+    padding: 0;
+    border: none;
+    font-family: inherit;
+    font-size: inherit;
+    text-align: right;
+}
+
+input[type='number'] {
+    padding: 0;
+    padding-right: 1ex;
+    border: none;
+    font-family: inherit;
+    font-size: inherit;
+    max-width: 4em;
+    text-align: right;
+}
+
+:invalid {
+    background-color: crimson;
+    color: white;
+}
+
+span.unit {
+    font-size: smaller;
+    padding-left: 1ex;
+    padding-right: 1ex;
+}
+
+span.number {
+}
+
 button.action {
-    color: black;
+    color: inherit;
     padding-right: 2ex;
     padding-left: 2ex;
+    background: inherit;
+    border: 1px solid lightgray;
+}
+
+button.action:hover {
+    border: 1px solid gold;
 }
 
 button:disabled {
-    opacity: 0.5;
+    opacity: 0.25;
 }
 
 button:enabled {
     opacity: 1;
+}
+
+button[data-action='remove'] { 
+    background: crimson;
+    color: white;
+}
+
+button.left-separator {
+    margin-left: 2ex;
+}
+
+
+:not(:disabled)[data-tooltip]::before {
+    content: attr(data-tooltip);
+    font-size: smaller;
+    z-index: 100;
+    padding-right: 1ex;
+    padding-left: 1ex;
+    background: white;
+    color: dimgray;
+    position: absolute;
+    visibility: hidden;
+    opacity:0;
+
+    transition-property: opacity;  
+    transition-duration: 0.25s;
+    transition-timing-function: ease-in;
+    transition-delay: 0.5s;
+}
+
+:not(:disabled)[data-tooltip]:hover::before {
+    opacity: 1;
+    visibility: visible;
 }

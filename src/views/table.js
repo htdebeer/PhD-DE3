@@ -26,17 +26,75 @@ var table = function(config) {
     var _table = require("./view")(config),
         _appendix = {};
 
+    // Use only those quantities that arent't hidden
+    var show = function(quantity) {
+            return !config.quantities[quantity].hidden;
+        },
+        quantities = {},
+        add_quantity = function(quantity) {
+            quantities[quantity] = config.quantities[quantity];
+        };
+    Object.keys(config.quantities).filter(show).forEach(add_quantity);
+
+
     var table_fragment = document
         .createDocumentFragment()
         .appendChild(dom.create({
-            name: "table",
-            attributes: []
+            name: "table"
         }));
+
+    var create_foot = function() {
+        var table_foot = table_fragment
+            .appendChild(dom.create({name: "tfoot"}));
+
+        var model_list = {
+            name: "ol",
+            attributes: {
+                "class": "list"
+            },
+            children: [
+                {
+                    name: "li",
+                    value: "sdfsdf"
+                }, {
+                    name: "li",
+                    value: "sdfsdfsd"
+                }
+            ]
+        };
+
+        table_foot.appendChild(dom.create({
+            name: "tr",
+            children: [
+                {
+                    name: "th",
+                    attributes: {
+                        "class": "corner action",
+                        "data-list": true
+                    },
+                    children: [
+                                {
+                                name: "i",
+                                attributes: {
+                                    "class": "icon-plus"
+                                }
+                            }, model_list]
+                }, {
+                    name: "th",
+                    attributes: {
+                        "class": "corner",
+                        "colspan": Object.keys(quantities).length + 1
+                    }
+                }
+            ]
+        }));
+
+    };
+    create_foot();
 
     var create_head = function() {
         var table_head = table_fragment
             .appendChild(dom.create({name: "thead"})),
-            quantities = config.quantities || {},
             actions = config.actions || {};
 
         var head = table_head.appendChild(dom.create({name: "tr"}));
@@ -44,24 +102,18 @@ var table = function(config) {
         // name column
         head.appendChild(dom.create({
             name: "th",
-            attributes: [{
-                name: "class",
-                value: "corner"
-            }]
+            attributes: { "class": "corner" }
         }));
 
         // quantities, if any
         var number_of_quantities = Object.keys(quantities).length;
         if (number_of_quantities > 0) {
                 var add_cell = function(q) {
-                    var quantity = quantities[q],
-                        label = (quantity.unit)?
-                            quantity.label + " (" + quantity.unit + ")":
-                            quantity.label;
+                    var quantity = quantities[q];
 
                     head.appendChild( dom.create({
                         name: "th",
-                        value: label
+                        value: quantity.label
                     }));
                 };                            
 
@@ -72,10 +124,9 @@ var table = function(config) {
         head.appendChild(
             dom.create({
                 name: "th",
-                attributes: [{
-                    name: "class",
-                    value: "corner"
-                }]
+                attributes: {
+                    "class": "corner"
+                }
             })
         );
 
@@ -94,35 +145,81 @@ var table = function(config) {
             );
 
     var add_row = function(model) {
-        var quantities = config.quantities || {},
-            create_quantity_elt = function(quantity) {
-                return {
-                    name: "td",
-                    attributes: [{
-                        name: "data-quantity",
-                        value: quantity
-                    }]
-                };
+        var row;
+
+        var create_quantity_elt = function(q) {
+                    
+                var quantity = quantities[q],
+                    cell = {
+                        name: "td",
+                        attributes: {
+                            "data-quantity": q
+                        }
+                    };
+                if (quantity.monotone) {
+                    cell.children = [{
+                        name: "input",
+                        attributes: {
+                            "type": "number",                        
+                            "min": quantity.minimum,
+                            "max": quantity.maximum + quantity.stepsize,
+                            "step": quantity.stepsize || "any"
+                        },
+                        on: {
+                            type: "change",
+                            callback: function() {
+                                var query = "[data-quantity='" + q + "']",
+                                    elt = row.querySelector(query),
+                                    value = elt.children[0].value;
+
+                                model.set( q, value );
+                            }
+                        }
+
+                    }];
+                } else {
+                    cell.children = [{
+                        name: "span",
+                        attributes: { "class": "measurement" }
+                    }];
+                }
+
+                if (quantity.unit) {
+                    cell.children.push({
+                        name: "span",
+                        attributes: {
+                            "class": "unit" },
+                        value: quantity.unit
+                    });
+                }
+                return cell;
             },
             quantity_elts = Object.keys(quantities).map(create_quantity_elt);
 
-        var create_action_elt = function(action_name) {
-            var action = model.action(action_name);
+        var group,
+            create_action_elt = function(action_name) {
+
+                var action = model.action(action_name),
+                    classes = "action";
+                if (group && group !== action.group) {
+                    group = action.group;
+                    classes += " left-separator";
+                } else {
+                    group = action.group;
+                }
+
                 return {
                     name: "button",
-                    attributes: [{
-                        name: "class",
-                        value: "action"
-                    }, {
-                        name: "data-action",
-                        value: action_name
-                    }],
+                    attributes: {
+                        "class": classes,
+                        "data-action": action_name,
+                        "data-tooltip": action.tooltip
+                    },
                     children: [{
                         name: "i",
-                        attributes: [{
-                            name: "class",
-                            value: action.icon
-                        }]
+                        attributes: {
+                           "class": action.icon
+                        }
                     }],
                     on: {
                         type: "click",
@@ -132,45 +229,41 @@ var table = function(config) {
             },
             actions_elts = Object.keys(model.actions).map(create_action_elt);
 
-        return table_body.appendChild(
+        row = table_body.appendChild(
                 dom.create( {
                     name: "tr",
-                    attributes: [{
-                        name: "id",
-                        value: model.name
-                    }],
+                    attributes: {
+                        "id": model.name
+                    },
                     children: [{
                         name: "td",
                         value: model.name,
-                        attributes: [{
-                            name: "class",
-                            value: model.name
-                        }]
+                        attributes: { "class": model.name }
                     }].concat(quantity_elts).concat([{
                         name: "td",
                         children: actions_elts
                     }])
                 }));
 
+        return row;
+
 
     };
 
     var update_row = function(row, model) {
         var moment = model.current_moment(),
-            update_quantity = function(quantity) {
-                var query = "[data-quantity='" + quantity + "']",
-                    cell = row.querySelector(query);
-                if (!cell) {
-                    cell = dom.create({name: "td",
-                    attributes: [{
-                        name: "data-quantity",
-                        value: quantity
-                    }]});
-                    row.appendChild(cell);
+            update_quantity = function(q) {
+                var quantity = quantities[q];
+                if (quantity) {
+                    var query = "[data-quantity='" + q + "']",
+                        cell = row.querySelector(query);
+
+                    if (quantity.monotone) {
+                        cell.children[0].value = moment[q].toFixed(quantity.precision || 3);
+                    } else {
+                        cell.children[0].innerHTML = moment[q].toFixed(quantity.precision || 3);
+                    }
                 }
-
-                cell.innerHTML = moment[quantity];
-
             };
 
 

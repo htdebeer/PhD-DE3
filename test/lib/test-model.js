@@ -4,11 +4,13 @@
 // add attribution to the icons: "Entypo pictograms by Daniel Bruce — www.entypo.com"
 
 var actions = function(config) {
-    var _actions = {},
-        running_models = {}
-        ;
+    var _actions = {};
 
-    var current_speed = config.speed || 500;
+
+    // Running model actions
+
+    var running_models = {},
+        current_speed = config.speed || 500;
 
     _actions.speed = function( speed ) {
         if (arguments.length === 1) {
@@ -23,6 +25,7 @@ var actions = function(config) {
 
     _actions.start = {
         name: "start",
+        group: "run_model",
         icon: "icon-play",
         tooltip: "Start simulation",
         enabled: true,
@@ -35,6 +38,9 @@ var actions = function(config) {
                     clearInterval(running_models[model.name]);
                     delete running_models[model.name];
                     model.disable_action("finish");
+                    model.disable_action("pause");
+                    model.disable_action("start");
+                    model.update_views();
                 }
             };
 
@@ -51,25 +57,27 @@ var actions = function(config) {
     };
 
     _actions.pause = {
-            name: "pause",
-            icon: "icon-pause",
-            tooltip: "Pause simulation",
-            enabled: false,
-            callback: function(model) {
-                return function() {
-                    model.enable_action("start");
-                    model.disable_action("pause");
-                    if (is_running(model)) {
-                        clearInterval(running_models[model.name]);
-                        delete running_models[model.name];
-                    }
-                    model.update_views();
-                };
-            }
+        name: "pause",
+        group: "run_model",
+        icon: "icon-pause",
+        tooltip: "Pause simulation",
+        enabled: false,
+        callback: function(model) {
+            return function() {
+                model.enable_action("start");
+                model.disable_action("pause");
+                if (is_running(model)) {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                }
+                model.update_views();
+            };
+        }
     };
 
     _actions.reset = {
         name: "reset",
+        group: "run_model",
         icon: "icon-fast-backward",
         tooltip: "Reset simulation",
         enabled: true,
@@ -91,6 +99,7 @@ var actions = function(config) {
 
     _actions.finish = {
         name: "finish",
+        group: "run_model",
         icon: "icon-fast-forward",
         tooltip: "Finish simulation",
         enabled: true,
@@ -109,6 +118,26 @@ var actions = function(config) {
             };
         }
     };
+
+    // Remove model actions
+    
+    _actions.remove = {
+        name: "remove",
+        group: "edit",
+        icon: "icon-remove",
+        tooltip: "Remove this model",
+        enabled: true,
+        callback: function(model) {
+            return function() {
+                var row = this.parentElement.parentElement;
+                row.parentElement.removeChild(row);
+                model.unregister();
+            };
+        }
+    };
+
+    // Toggle view action
+
 
     return _actions;
 };
@@ -142,11 +171,11 @@ var dom = {
     create: function(spec) {
         var elt = document.createElement(spec.name),
             set_attribute = function(attr) {
-                elt.setAttribute(attr.name, attr.value);
+                elt.setAttribute(attr, spec.attributes[attr]);
             };
 
         if (spec.attributes) {
-            spec.attributes.forEach(set_attribute);
+            Object.keys(spec.attributes).forEach(set_attribute);
         }
 
         if (spec.children) {
@@ -206,11 +235,13 @@ var equation_model = function(name, config) {
         f = config.equation;
 
     _model.measure_moment =  function(moment) {
-        var x = moment,
-            y = f(x);
+        var x = moment / 10,
+            y = f(x),
+            time = _model.moment_to_time(moment) / 1000;
         return {
             x: x,
-            y: y
+            y: y,
+            time: time
         };
     };
 
@@ -351,9 +382,16 @@ var model = function(name, config) {
     };
 
     _model.unregister = function(view) {
-        var view_found = views.indexOf(view);
-        if (view_found !== -1) {
-            views.slice(view_found, 1);
+        if (arguments.length === 0) {
+            var unregister = function(view) {
+                view.unregister(_model.name);
+            };
+            views.forEach(unregister);
+        } else {
+            var view_found = views.indexOf(view);
+            if (view_found !== -1) {
+                views.slice(view_found, 1);
+            }
         }
     };
 
@@ -480,15 +518,18 @@ var model = function(name, config) {
     // is not allowed as a quantity name.
 
     _model.quantities = config.quantities || {};
+    
     _model.quantities._time_ = {
+        hidden: true,
         minimum: T_START,
         maximum: T_END,
         value: m2t(now),
         stepsize: T_STEP,
         unit: "ms",
         label: "internal time",
-        monotonicity: true
+        monotone: true
     };
+
 
     _model.get_minimum = function(quantity) {
         if (arguments.length===0) {
@@ -533,10 +574,10 @@ var model = function(name, config) {
 
             // pre: quantity is monotone
             // determine if it is increasing or decreasing
-            // determine type of monotonicity
+            // determine type of monotone
             //
             // As the first moment has been measured and we do know the
-            // minimum of this quantity, type of monotonicity follows.
+            // minimum of this quantity, type of monotone follows.
 
             var start = val(0),
                 INCREASING = (start === _model.get_minimum(quantity));
@@ -550,6 +591,7 @@ var model = function(name, config) {
                 approx = _appendix.approximates(EPSILON),
                 lowerbound,
                 upperbound;
+
 
             if (INCREASING) {
                 lowerbound = function(moment) {
@@ -589,14 +631,16 @@ var model = function(name, config) {
                     return -1;
                 }
             }
-            m--;
+            return m;
+            //m--;
             while (upperbound(n)) {
                 n--;
                 if (n<m) {
                     return -1;
                 }
             }
-            n++;
+            //n++;
+
 
             return (Math.abs(val(n)-value) < Math.abs(val(m)-value))?n:m;
         }
@@ -629,36 +673,29 @@ var model = function(name, config) {
         //
         // However, some quantities will be strictly increasing or decreasing
         // and no value will appear twice. For example, the internal time will
-        // only increase. Those quantities with property `monotonicity`
+        // only increase. Those quantities with property `monotone`
         // `true`, only one value will be searched for
         
         var approx = _appendix.approximates(),
-            moments_with_value = [];
-        if (q.monotonicity) {
-            var moment = _model.find_moment(quantity, value);
-            if (moment !== -1) {
-                moments_with_value.push(moment);
-            }
-        } else {
-            // This does not work: no guarantee about approximation. Fix this.
-            var has_value = function(element, index, array) {
-                    return approx(element[quantity],value);
-                };
-            moments_with_value = moments.filter(has_value);
-        }
+            moment = -1;
+        if (q.monotone) {
+            moment = _model.find_moment(quantity, value);
 
-        if (moments_with_value.length === 0) {
-            // not yet "measured"
-            var DO_NOT_UPDATE_VIEWS = true;
-            _model.step(DO_NOT_UPDATE_VIEWS);
-            while(!approx(moments[now][quantity], value) && !_model.is_finished()) {
+            if (moment === -1) {
+                // not yet "measured"
+                var DO_NOT_UPDATE_VIEWS = true;
                 _model.step(DO_NOT_UPDATE_VIEWS);
+                // THIS DOES WORK ONLY FOR INCREASING QUANTITIES. CHANGE THIS
+                // ALTER WITH FIND FUNCTION !!!!
+                while((moments[now][quantity] < value) && !_model.is_finished()) {
+                    _model.step(DO_NOT_UPDATE_VIEWS);
+                }
+            } else {
+                now = moment;
             }
-        } else {
-            now = moments_with_value[0];
+            update_views();
+            return moments[now];
         }
-        update_views();
-        return moments[now];
     };
 
     _model.data = function() {
@@ -723,17 +760,75 @@ var table = function(config) {
     var _table = require("./view")(config),
         _appendix = {};
 
+    // Use only those quantities that arent't hidden
+    var show = function(quantity) {
+            return !config.quantities[quantity].hidden;
+        },
+        quantities = {},
+        add_quantity = function(quantity) {
+            quantities[quantity] = config.quantities[quantity];
+        };
+    Object.keys(config.quantities).filter(show).forEach(add_quantity);
+
+
     var table_fragment = document
         .createDocumentFragment()
         .appendChild(dom.create({
-            name: "table",
-            attributes: []
+            name: "table"
         }));
+
+    var create_foot = function() {
+        var table_foot = table_fragment
+            .appendChild(dom.create({name: "tfoot"}));
+
+        var model_list = {
+            name: "ol",
+            attributes: {
+                "class": "list"
+            },
+            children: [
+                {
+                    name: "li",
+                    value: "sdfsdf"
+                }, {
+                    name: "li",
+                    value: "sdfsdfsd"
+                }
+            ]
+        };
+
+        table_foot.appendChild(dom.create({
+            name: "tr",
+            children: [
+                {
+                    name: "th",
+                    attributes: {
+                        "class": "corner action",
+                        "data-list": true
+                    },
+                    children: [
+                                {
+                                name: "i",
+                                attributes: {
+                                    "class": "icon-plus"
+                                }
+                            }, model_list]
+                }, {
+                    name: "th",
+                    attributes: {
+                        "class": "corner",
+                        "colspan": Object.keys(quantities).length + 1
+                    }
+                }
+            ]
+        }));
+
+    };
+    create_foot();
 
     var create_head = function() {
         var table_head = table_fragment
             .appendChild(dom.create({name: "thead"})),
-            quantities = config.quantities || {},
             actions = config.actions || {};
 
         var head = table_head.appendChild(dom.create({name: "tr"}));
@@ -741,24 +836,18 @@ var table = function(config) {
         // name column
         head.appendChild(dom.create({
             name: "th",
-            attributes: [{
-                name: "class",
-                value: "corner"
-            }]
+            attributes: { "class": "corner" }
         }));
 
         // quantities, if any
         var number_of_quantities = Object.keys(quantities).length;
         if (number_of_quantities > 0) {
                 var add_cell = function(q) {
-                    var quantity = quantities[q],
-                        label = (quantity.unit)?
-                            quantity.label + " (" + quantity.unit + ")":
-                            quantity.label;
+                    var quantity = quantities[q];
 
                     head.appendChild( dom.create({
                         name: "th",
-                        value: label
+                        value: quantity.label
                     }));
                 };                            
 
@@ -769,10 +858,9 @@ var table = function(config) {
         head.appendChild(
             dom.create({
                 name: "th",
-                attributes: [{
-                    name: "class",
-                    value: "corner"
-                }]
+                attributes: {
+                    "class": "corner"
+                }
             })
         );
 
@@ -791,35 +879,81 @@ var table = function(config) {
             );
 
     var add_row = function(model) {
-        var quantities = config.quantities || {},
-            create_quantity_elt = function(quantity) {
-                return {
-                    name: "td",
-                    attributes: [{
-                        name: "data-quantity",
-                        value: quantity
-                    }]
-                };
+        var row;
+
+        var create_quantity_elt = function(q) {
+                    
+                var quantity = quantities[q],
+                    cell = {
+                        name: "td",
+                        attributes: {
+                            "data-quantity": q
+                        }
+                    };
+                if (quantity.monotone) {
+                    cell.children = [{
+                        name: "input",
+                        attributes: {
+                            "type": "number",                        
+                            "min": quantity.minimum,
+                            "max": quantity.maximum + quantity.stepsize,
+                            "step": quantity.stepsize || "any"
+                        },
+                        on: {
+                            type: "change",
+                            callback: function() {
+                                var query = "[data-quantity='" + q + "']",
+                                    elt = row.querySelector(query),
+                                    value = elt.children[0].value;
+
+                                model.set( q, value );
+                            }
+                        }
+
+                    }];
+                } else {
+                    cell.children = [{
+                        name: "span",
+                        attributes: { "class": "measurement" }
+                    }];
+                }
+
+                if (quantity.unit) {
+                    cell.children.push({
+                        name: "span",
+                        attributes: {
+                            "class": "unit" },
+                        value: quantity.unit
+                    });
+                }
+                return cell;
             },
             quantity_elts = Object.keys(quantities).map(create_quantity_elt);
 
-        var create_action_elt = function(action_name) {
-            var action = model.action(action_name);
+        var group,
+            create_action_elt = function(action_name) {
+
+                var action = model.action(action_name),
+                    classes = "action";
+                if (group && group !== action.group) {
+                    group = action.group;
+                    classes += " left-separator";
+                } else {
+                    group = action.group;
+                }
+
                 return {
                     name: "button",
-                    attributes: [{
-                        name: "class",
-                        value: "action"
-                    }, {
-                        name: "data-action",
-                        value: action_name
-                    }],
+                    attributes: {
+                        "class": classes,
+                        "data-action": action_name,
+                        "data-tooltip": action.tooltip
+                    },
                     children: [{
                         name: "i",
-                        attributes: [{
-                            name: "class",
-                            value: action.icon
-                        }]
+                        attributes: {
+                           "class": action.icon
+                        }
                     }],
                     on: {
                         type: "click",
@@ -829,45 +963,41 @@ var table = function(config) {
             },
             actions_elts = Object.keys(model.actions).map(create_action_elt);
 
-        return table_body.appendChild(
+        row = table_body.appendChild(
                 dom.create( {
                     name: "tr",
-                    attributes: [{
-                        name: "id",
-                        value: model.name
-                    }],
+                    attributes: {
+                        "id": model.name
+                    },
                     children: [{
                         name: "td",
                         value: model.name,
-                        attributes: [{
-                            name: "class",
-                            value: model.name
-                        }]
+                        attributes: { "class": model.name }
                     }].concat(quantity_elts).concat([{
                         name: "td",
                         children: actions_elts
                     }])
                 }));
 
+        return row;
+
 
     };
 
     var update_row = function(row, model) {
         var moment = model.current_moment(),
-            update_quantity = function(quantity) {
-                var query = "[data-quantity='" + quantity + "']",
-                    cell = row.querySelector(query);
-                if (!cell) {
-                    cell = dom.create({name: "td",
-                    attributes: [{
-                        name: "data-quantity",
-                        value: quantity
-                    }]});
-                    row.appendChild(cell);
+            update_quantity = function(q) {
+                var quantity = quantities[q];
+                if (quantity) {
+                    var query = "[data-quantity='" + q + "']",
+                        cell = row.querySelector(query);
+
+                    if (quantity.monotone) {
+                        cell.children[0].value = moment[q].toFixed(quantity.precision || 3);
+                    } else {
+                        cell.children[0].innerHTML = moment[q].toFixed(quantity.precision || 3);
+                    }
                 }
-
-                cell.innerHTML = moment[quantity];
-
             };
 
 
@@ -977,7 +1107,9 @@ var model = require("../src/models/equation");
 var view = require("../src/views/view");
 var table = require("../src/views/table");
 
-var actions = require("../src/actions/actions")({speed: 400});
+var actions = require("../src/actions/actions")({speed: 10});
+var actions2 = require("../src/actions/actions")({speed: 10});
+
 
 var config =  {
     time: {
@@ -988,21 +1120,30 @@ var config =  {
     quantities: {
         x: {
             minimum: 0,
-            maximum: 100,
+            maximum: 10,
             value: 0,
             label: "x",
-            stepsize: 1,
-            monotonicity: true
+            stepsize: 0.1,
+            monotone: true
             },
         y: {
             minimum: 0,
-            maximum: 1000000,
+            maximum: 1000,
             value: 0,
             unit: "km",
             label: "y",
-            stepsize: 1,
-            monotonicity: true
-            }
+            stepsize: 1
+            },
+        time: {
+            minimum: 0,
+            maximum: 1,
+            value: 0,
+            unit: 'sec',
+            label: "tijd",
+            stepsize: 0.001,
+            monotone: true,
+            precision: 2
+        }
     },
     equation: function(x) {
         return x*x*x;
@@ -1011,9 +1152,56 @@ var config =  {
         start: actions.start,
         pause: actions.pause,
         reset: actions.reset,
-        finish: actions.finish
+        finish: actions.finish,
+        remove: actions.remove
     }
-}, para = model('longdrinkglas', config);
+};
+var config2 =  {
+    time: {
+        start: 0,
+        end: 1000,
+        step: 10
+    },
+    quantities: {
+        x: {
+            minimum: 0,
+            maximum: 10,
+            value: 0,
+            label: "x",
+            stepsize: 0.1,
+            monotone: true
+            },
+        y: {
+            minimum: 0,
+            maximum: 100,
+            value: 0,
+            unit: "km",
+            label: "y",
+            stepsize: 1
+            },
+        time: {
+            minimum: 0,
+            maximum: 1,
+            value: 0,
+            unit: 'sec',
+            label: "tijd",
+            stepsize: 0.001,
+            monotone: true,
+            precision: 2
+        }
+    },
+    equation: function(x) {
+        return x*x;
+    },
+    actions: {
+        start: actions2.start,
+        pause: actions2.pause,
+        reset: actions2.reset,
+        finish: actions2.finish,
+        remove: actions2.remove
+    }
+}, para = model('longdrinkglas', config),
+    para2 = model('cocktailglas', config2);
 
 // console.log(para.get_minimum());
 // console.log(para.get_minimum("x"));
@@ -1028,26 +1216,14 @@ para.set("x", 5);
 // 
 // console.log(para.current_moment());
 
+para2.step();
+
 var repr = table(config);
 var body = document.querySelector("body");
 body.appendChild(repr.fragment);
 repr.register(para);
+repr.register(para2);
 
-para.step();
-para.step();
-para.step();
-para.set("y", 30);
-
-var timer, 
-    step = function() {
-        if (!para.is_finished()) {
-            para.step();
-        } else {
-            timer = null;
-        }
-    };
-
-//timer = setInterval(step, 500);
 
 },{"../src/actions/actions":1,"../src/models/equation":3,"../src/views/table":5,"../src/views/view":6}]},{},[7])
 ;

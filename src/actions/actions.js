@@ -3,11 +3,13 @@
 // add attribution to the icons: "Entypo pictograms by Daniel Bruce — www.entypo.com"
 
 var actions = function(config) {
-    var _actions = {},
-        running_models = {}
-        ;
+    var _actions = {};
 
-    var current_speed = config.speed || 500;
+
+    // Running model actions
+
+    var running_models = {},
+        current_speed = config.speed || 500;
 
     _actions.speed = function( speed ) {
         if (arguments.length === 1) {
@@ -22,6 +24,7 @@ var actions = function(config) {
 
     _actions.start = {
         name: "start",
+        group: "run_model",
         icon: "icon-play",
         tooltip: "Start simulation",
         enabled: true,
@@ -34,6 +37,9 @@ var actions = function(config) {
                     clearInterval(running_models[model.name]);
                     delete running_models[model.name];
                     model.disable_action("finish");
+                    model.disable_action("pause");
+                    model.disable_action("start");
+                    model.update_views();
                 }
             };
 
@@ -50,25 +56,27 @@ var actions = function(config) {
     };
 
     _actions.pause = {
-            name: "pause",
-            icon: "icon-pause",
-            tooltip: "Pause simulation",
-            enabled: false,
-            callback: function(model) {
-                return function() {
-                    model.enable_action("start");
-                    model.disable_action("pause");
-                    if (is_running(model)) {
-                        clearInterval(running_models[model.name]);
-                        delete running_models[model.name];
-                    }
-                    model.update_views();
-                };
-            }
+        name: "pause",
+        group: "run_model",
+        icon: "icon-pause",
+        tooltip: "Pause simulation",
+        enabled: false,
+        callback: function(model) {
+            return function() {
+                model.enable_action("start");
+                model.disable_action("pause");
+                if (is_running(model)) {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                }
+                model.update_views();
+            };
+        }
     };
 
     _actions.reset = {
         name: "reset",
+        group: "run_model",
         icon: "icon-fast-backward",
         tooltip: "Reset simulation",
         enabled: true,
@@ -90,6 +98,7 @@ var actions = function(config) {
 
     _actions.finish = {
         name: "finish",
+        group: "run_model",
         icon: "icon-fast-forward",
         tooltip: "Finish simulation",
         enabled: true,
@@ -108,6 +117,26 @@ var actions = function(config) {
             };
         }
     };
+
+    // Remove model actions
+    
+    _actions.remove = {
+        name: "remove",
+        group: "edit",
+        icon: "icon-remove",
+        tooltip: "Remove this model",
+        enabled: true,
+        callback: function(model) {
+            return function() {
+                var row = this.parentElement.parentElement;
+                row.parentElement.removeChild(row);
+                model.unregister();
+            };
+        }
+    };
+
+    // Toggle view action
+
 
     return _actions;
 };

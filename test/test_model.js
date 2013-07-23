@@ -3,7 +3,9 @@ var model = require("../src/models/equation");
 var view = require("../src/views/view");
 var table = require("../src/views/table");
 
-var actions = require("../src/actions/actions")({speed: 400});
+var actions = require("../src/actions/actions")({speed: 10});
+var actions2 = require("../src/actions/actions")({speed: 10});
+
 
 var config =  {
     time: {
@@ -14,21 +16,30 @@ var config =  {
     quantities: {
         x: {
             minimum: 0,
-            maximum: 100,
+            maximum: 10,
             value: 0,
             label: "x",
-            stepsize: 1,
-            monotonicity: true
+            stepsize: 0.1,
+            monotone: true
             },
         y: {
             minimum: 0,
-            maximum: 1000000,
+            maximum: 1000,
             value: 0,
             unit: "km",
             label: "y",
-            stepsize: 1,
-            monotonicity: true
-            }
+            stepsize: 1
+            },
+        time: {
+            minimum: 0,
+            maximum: 1,
+            value: 0,
+            unit: 'sec',
+            label: "tijd",
+            stepsize: 0.001,
+            monotone: true,
+            precision: 2
+        }
     },
     equation: function(x) {
         return x*x*x;
@@ -37,9 +48,56 @@ var config =  {
         start: actions.start,
         pause: actions.pause,
         reset: actions.reset,
-        finish: actions.finish
+        finish: actions.finish,
+        remove: actions.remove
     }
-}, para = model('longdrinkglas', config);
+};
+var config2 =  {
+    time: {
+        start: 0,
+        end: 1000,
+        step: 10
+    },
+    quantities: {
+        x: {
+            minimum: 0,
+            maximum: 10,
+            value: 0,
+            label: "x",
+            stepsize: 0.1,
+            monotone: true
+            },
+        y: {
+            minimum: 0,
+            maximum: 100,
+            value: 0,
+            unit: "km",
+            label: "y",
+            stepsize: 1
+            },
+        time: {
+            minimum: 0,
+            maximum: 1,
+            value: 0,
+            unit: 'sec',
+            label: "tijd",
+            stepsize: 0.001,
+            monotone: true,
+            precision: 2
+        }
+    },
+    equation: function(x) {
+        return x*x;
+    },
+    actions: {
+        start: actions2.start,
+        pause: actions2.pause,
+        reset: actions2.reset,
+        finish: actions2.finish,
+        remove: actions2.remove
+    }
+}, para = model('longdrinkglas', config),
+    para2 = model('cocktailglas', config2);
 
 // console.log(para.get_minimum());
 // console.log(para.get_minimum("x"));
@@ -54,23 +112,11 @@ para.set("x", 5);
 // 
 // console.log(para.current_moment());
 
+para2.step();
+
 var repr = table(config);
 var body = document.querySelector("body");
 body.appendChild(repr.fragment);
 repr.register(para);
+repr.register(para2);
 
-para.step();
-para.step();
-para.step();
-para.set("y", 30);
-
-var timer, 
-    step = function() {
-        if (!para.is_finished()) {
-            para.step();
-        } else {
-            timer = null;
-        }
-    };
-
-//timer = setInterval(step, 500);

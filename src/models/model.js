@@ -128,9 +128,16 @@ var model = function(name, config) {
     };
 
     _model.unregister = function(view) {
-        var view_found = views.indexOf(view);
-        if (view_found !== -1) {
-            views.slice(view_found, 1);
+        if (arguments.length === 0) {
+            var unregister = function(view) {
+                view.unregister(_model.name);
+            };
+            views.forEach(unregister);
+        } else {
+            var view_found = views.indexOf(view);
+            if (view_found !== -1) {
+                views.slice(view_found, 1);
+            }
         }
     };
 
@@ -257,15 +264,18 @@ var model = function(name, config) {
     // is not allowed as a quantity name.
 
     _model.quantities = config.quantities || {};
+    
     _model.quantities._time_ = {
+        hidden: true,
         minimum: T_START,
         maximum: T_END,
         value: m2t(now),
         stepsize: T_STEP,
         unit: "ms",
         label: "internal time",
-        monotonicity: true
+        monotone: true
     };
+
 
     _model.get_minimum = function(quantity) {
         if (arguments.length===0) {
@@ -310,10 +320,10 @@ var model = function(name, config) {
 
             // pre: quantity is monotone
             // determine if it is increasing or decreasing
-            // determine type of monotonicity
+            // determine type of monotone
             //
             // As the first moment has been measured and we do know the
-            // minimum of this quantity, type of monotonicity follows.
+            // minimum of this quantity, type of monotone follows.
 
             var start = val(0),
                 INCREASING = (start === _model.get_minimum(quantity));
@@ -327,6 +337,7 @@ var model = function(name, config) {
                 approx = _appendix.approximates(EPSILON),
                 lowerbound,
                 upperbound;
+
 
             if (INCREASING) {
                 lowerbound = function(moment) {
@@ -366,14 +377,16 @@ var model = function(name, config) {
                     return -1;
                 }
             }
-            m--;
+            return m;
+            //m--;
             while (upperbound(n)) {
                 n--;
                 if (n<m) {
                     return -1;
                 }
             }
-            n++;
+            //n++;
+
 
             return (Math.abs(val(n)-value) < Math.abs(val(m)-value))?n:m;
         }
@@ -406,36 +419,29 @@ var model = function(name, config) {
         //
         // However, some quantities will be strictly increasing or decreasing
         // and no value will appear twice. For example, the internal time will
-        // only increase. Those quantities with property `monotonicity`
+        // only increase. Those quantities with property `monotone`
         // `true`, only one value will be searched for
         
         var approx = _appendix.approximates(),
-            moments_with_value = [];
-        if (q.monotonicity) {
-            var moment = _model.find_moment(quantity, value);
-            if (moment !== -1) {
-                moments_with_value.push(moment);
-            }
-        } else {
-            // This does not work: no guarantee about approximation. Fix this.
-            var has_value = function(element, index, array) {
-                    return approx(element[quantity],value);
-                };
-            moments_with_value = moments.filter(has_value);
-        }
+            moment = -1;
+        if (q.monotone) {
+            moment = _model.find_moment(quantity, value);
 
-        if (moments_with_value.length === 0) {
-            // not yet "measured"
-            var DO_NOT_UPDATE_VIEWS = true;
-            _model.step(DO_NOT_UPDATE_VIEWS);
-            while(!approx(moments[now][quantity], value) && !_model.is_finished()) {
+            if (moment === -1) {
+                // not yet "measured"
+                var DO_NOT_UPDATE_VIEWS = true;
                 _model.step(DO_NOT_UPDATE_VIEWS);
+                // THIS DOES WORK ONLY FOR INCREASING QUANTITIES. CHANGE THIS
+                // ALTER WITH FIND FUNCTION !!!!
+                while((moments[now][quantity] < value) && !_model.is_finished()) {
+                    _model.step(DO_NOT_UPDATE_VIEWS);
+                }
+            } else {
+                now = moment;
             }
-        } else {
-            now = moments_with_value[0];
+            update_views();
+            return moments[now];
         }
-        update_views();
-        return moments[now];
     };
 
     _model.data = function() {

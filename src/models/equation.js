@@ -29,11 +29,13 @@ var equation_model = function(name, config) {
         f = config.equation;
 
     _model.measure_moment =  function(moment) {
-        var x = moment,
-            y = f(x);
+        var x = moment / 10,
+            y = f(x),
+            time = _model.moment_to_time(moment) / 1000;
         return {
             x: x,
-            y: y
+            y: y,
+            time: time
         };
     };
 
