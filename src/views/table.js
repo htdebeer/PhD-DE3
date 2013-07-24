@@ -26,16 +26,6 @@ var table = function(config) {
     var _table = require("./view")(config),
         _appendix = {};
 
-    // Use only those quantities that arent't hidden
-    var show = function(quantity) {
-            return !config.quantities[quantity].hidden;
-        },
-        quantities = {},
-        add_quantity = function(quantity) {
-            quantities[quantity] = config.quantities[quantity];
-        };
-    Object.keys(config.quantities).filter(show).forEach(add_quantity);
-
 
     var table_fragment = document
         .createDocumentFragment()
@@ -83,7 +73,7 @@ var table = function(config) {
                     name: "th",
                     attributes: {
                         "class": "corner",
-                        "colspan": Object.keys(quantities).length + 1
+                        "colspan": Object.keys(_table.quantities).length + 1
                     }
                 }
             ]
@@ -106,10 +96,10 @@ var table = function(config) {
         }));
 
         // quantities, if any
-        var number_of_quantities = Object.keys(quantities).length;
+        var number_of_quantities = Object.keys(_table.quantities).length;
         if (number_of_quantities > 0) {
                 var add_cell = function(q) {
-                    var quantity = quantities[q];
+                    var quantity = _table.quantities[q];
 
                     head.appendChild( dom.create({
                         name: "th",
@@ -117,7 +107,7 @@ var table = function(config) {
                     }));
                 };                            
 
-            Object.keys(quantities).forEach(add_cell);
+            Object.keys(_table.quantities).forEach(add_cell);
         }
 
         // actions, if any
@@ -149,7 +139,7 @@ var table = function(config) {
 
         var create_quantity_elt = function(q) {
                     
-                var quantity = quantities[q],
+                var quantity = _table.quantities[q],
                     cell = {
                         name: "td",
                         attributes: {
@@ -194,7 +184,7 @@ var table = function(config) {
                 }
                 return cell;
             },
-            quantity_elts = Object.keys(quantities).map(create_quantity_elt);
+            quantity_elts = Object.keys(_table.quantities).map(create_quantity_elt);
 
         var group,
             create_action_elt = function(action_name) {
@@ -253,7 +243,7 @@ var table = function(config) {
     var update_row = function(row, model) {
         var moment = model.current_moment(),
             update_quantity = function(q) {
-                var quantity = quantities[q];
+                var quantity = _table.quantities[q];
                 if (quantity) {
                     var query = "[data-quantity='" + q + "']",
                         cell = row.querySelector(query);

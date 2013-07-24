@@ -20,4 +20,254 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+var view = require("./view"),
+    dom = require("../dom/dom");
 
+var graph = function(config, horizontal, vertical, dimensions_) {
+
+    var _graph = view(config);
+
+
+    var dimensions = dimensions_ || {
+        width: 900,
+        height: 600,
+        margin: {
+            top: 10,
+            right: 20,
+            left: 80,
+            bottom: 80
+        }
+    };
+
+    var CONTAINER = {
+            width: dimensions.width || 900,
+            height: dimensions.height || 600
+        },
+        MARGINS = {
+            top: dimensions.margin.top || 10,
+            right: dimensions.margin.right || 20,
+            left: dimensions.margin.left || 60,
+            bottom: dimensions.margin.bottom || 60
+        },
+        GRAPH = {
+            width: CONTAINER.width - MARGINS.left - MARGINS.right,
+            height: CONTAINER.height - MARGINS.top - MARGINS.bottom
+        };
+
+
+    _graph.fragment = document
+        .createDocumentFragment()
+        .appendChild(dom.create({
+            name: "figure",
+            attributes: {
+                "class": "graph"
+            }
+        }));
+
+    var create_caption = function() {
+        var get_name = function(q) {
+                return _graph.quantities[q].name;
+            },
+            quantity_names = Object.keys(_graph.quantities),
+            horizontal_selected_index = quantity_names.indexOf(
+                    horizontal),
+            vertical_selected_index = quantity_names.indexOf(
+                    vertical),
+            create_option = function(selected_index) {
+                return function(quantity_name, index) {
+                    var option = {
+                        name: "option",
+                        value: quantity_name
+                    };
+                    if (index === selected_index) {
+                        option.attributes = {
+                            selected: true
+                        };
+                    }
+                    return option;
+                };
+            },
+            horizontal_quantity_list = quantity_names.map(
+                    create_option(horizontal_selected_index)),
+            vertical_quantity_list = quantity_names.map(
+                    create_option(vertical_selected_index));
+
+        _graph.fragment.appendChild(dom.create({
+                name: "figcaption",
+                children: [{
+                    name: "select",
+                    attributes: {
+
+                    },
+                    children: vertical_quantity_list,
+                    on: {
+                        type: "change",
+                        callback: function(event) {
+                            var quantity = event.target.value;
+                            set_axis(quantity, "vertical");
+                        }
+                    }
+                },{
+                    name: "textNode",
+                    value: " - "
+                }, {
+                    name: "select",
+                    children: horizontal_quantity_list,
+                    on: {
+                        type: "change",
+                        callback: function(event) {
+                            var quantity = event.target.value;
+                            set_axis(quantity, "horizontal");
+                        }
+                    }
+                }, {
+                    name: "textNode",
+                    value: " grafiek"
+                }            
+                ]
+            }));
+    };
+    create_caption();
+
+    var svg = d3.select(_graph.fragment).append("svg")
+            .attr("width", CONTAINER.width)
+            .attr("height", CONTAINER.height)
+            .append("g")
+                .attr("transform", "translate(" + 
+                        MARGINS.left + "," + 
+                        MARGINS.right + ")");
+
+    var horizontal_axis, vertical_axis;
+    var set_axis = function(quantity_name, orientation) {
+        var quantity = _graph.quantities[quantity_name],
+            create_scale = function(quantity, orientation) {
+                var range;
+                if (orientation === "horizontal") {
+                    range = [0, GRAPH.width];
+                } else {
+                    range = [GRAPH.height, 0];
+                }
+                return d3.scale.linear()
+                    .range(range)
+                    .domain([quantity.minimum, quantity.maximum]);
+            },
+            scale = create_scale(quantity, orientation),
+            create_axis = function(quantity, orientation) {
+                var axis;
+                if (orientation === "horizontal") {
+                    axis = d3.svg.axis()
+                        .scale(scale)
+                        .tickSubdivide(3);
+                } else {
+                    axis = d3.svg.axis()
+                        .scale(scale)
+                        .orient("left")
+                        .tickSubdivide(3);
+                }
+                return axis;
+            },
+            axis = create_axis(quantity, orientation);
+       
+        if (orientation === "horizontal") {
+            //  create axes    
+            var xaxisg = _graph.fragment.querySelector("g.x.axis");
+            if (xaxisg) {
+                xaxisg.parentNode.removeChild(xaxisg);
+            }
+
+            svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", "translate(0," + GRAPH.height + ")")
+                .call(axis);
+
+            var xgridg = _graph.fragment.querySelector("g.x.grid");
+            if (xgridg) {
+                xgridg.parentNode.removeChild(xgridg);
+            }
+
+            svg.append("g")
+                .attr("class", "x grid")
+                .attr("transform", "translate(0," + GRAPH.height + ")")
+                .call(axis.tickSize(- GRAPH.height, 0, 0).tickFormat(""));
+
+            var xlabel = _graph.fragment.querySelector("text.x.label");
+            if (xlabel) {
+                xlabel.parentNode.removeChild(xlabel);
+            }
+
+            svg.append('text')
+                .attr('text-anchor', 'middle')
+                .attr("class", "x label")
+                .text(quantity.label)
+                    .attr('x', GRAPH.width / 2)
+                    .attr('y', CONTAINER.height - (MARGINS.bottom / 2));
+
+            horizontal_axis = {
+                quantity: quantity,
+                scale: scale,
+                axis: axis
+            };
+        } else {
+            // vertical axis
+            var yaxisg = _graph.fragment.querySelector("g.y.axis");
+            if (yaxisg) {
+                yaxisg.parentNode.removeChild(yaxisg);
+            }
+
+            svg.append("g")
+                .attr("class",  "y axis")
+                .call(axis);
+
+            var ygridg = _graph.fragment.querySelector("g.y.grid");
+            if (ygridg) {
+                ygridg.parentNode.removeChild(ygridg);
+            }
+
+            svg.append("g")
+                .attr("class", "y grid")
+                .call(axis.tickSize(- GRAPH.width, 0, 0).tickFormat(""));
+
+            var ylabel = _graph.fragment.querySelector("text.y.label");
+            if (ylabel) {
+                ylabel.parentNode.removeChild(ylabel);
+            }
+
+            svg.append('text')
+                .attr('text-anchor', 'middle')
+                .attr("class", "y label")
+                .text(quantity.label)
+                    .attr('transform', 'rotate(-270,0,0)')
+                    .attr('x', GRAPH.height / 2)
+                    .attr('y', MARGINS.left * (5/6) );
+
+            vertical_axis = {
+                quantity: quantity,
+                scale: scale,
+                axis: axis
+            };
+        }
+    };
+
+
+
+
+
+
+    var create_graph = function() {
+
+        // scales and axes (make all axis pre-made?)
+        set_axis(horizontal, "horizontal");
+        set_axis(vertical, "vertical");
+
+    };
+    var svg_graph = create_graph();
+
+
+    _graph.update = function(model_name) {
+        var model = _graph.get_model(model_name);
+    };
+
+    return _graph;
+};
+
+module.exports = graph;

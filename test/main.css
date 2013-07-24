@@ -53,7 +53,6 @@ th {
 th.corner {
     border: none;
     background: none;
-    color: none;
 }
 
 tr.main_head {
@@ -70,7 +69,6 @@ tr.sub_head {
 
 
 
-
 tfoot th select {
     padding: 0;
     border: none;
@@ -79,19 +77,29 @@ tfoot th select {
     text-align: right;
 }
 
-input[type='number'] {
+input {
     padding: 0;
     padding-right: 1ex;
-    border: none;
+    border: white 1px solid;
     font-family: inherit;
     font-size: inherit;
     max-width: 4em;
     text-align: right;
 }
 
+
 :invalid {
     background-color: crimson;
     color: white;
+}
+
+select {
+    padding: 0;
+    padding-right: 1ex;
+    border: 1px solid dimgray;
+    font-family: inherit;
+    font-size: inherit;
+    text-align: right;
 }
 
 span.unit {
@@ -111,7 +119,9 @@ button.action {
     border: 1px solid lightgray;
 }
 
-button.action:hover {
+input:hover,
+select:hover,
+button:hover {
     border: 1px solid gold;
 }
 
@@ -155,3 +165,54 @@ button.left-separator {
     opacity: 1;
     visibility: visible;
 }
+
+#graph {
+}
+
+.axis {
+    font-size: 10pt;
+    font-family: inherit;
+}
+
+.axis path {
+    fill: none;
+    stroke: black;
+}
+
+.axis .tick {
+    fill: none;
+    stroke: black;
+}
+
+
+.grid path {
+    fill: none;
+}
+
+.grid .tick {
+    fill: none;
+    stroke: black;
+    stroke-opacity: 0.25;
+}
+
+figure.graph {
+    width: 100%;
+}
+
+figure.graph figcaption {
+    text-align: center;
+    font-weight: bolder;
+    padding: 1ex;
+}
+
+figure.graph figcaption:hover {
+    background: dimgray;
+    color: white;
+}
+
+figure.graph figcaption select {
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+}
+

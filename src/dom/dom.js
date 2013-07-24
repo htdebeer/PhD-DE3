@@ -22,8 +22,15 @@
 
 var dom = {
     create: function(spec) {
-        var elt = document.createElement(spec.name),
-            set_attribute = function(attr) {
+        var elt;
+       
+        if (spec.name === "textNode") {
+           elt = document.createTextNode(spec.value);
+        } else {
+           elt = document.createElement(spec.name);
+        }
+
+        var set_attribute = function(attr) {
                 elt.setAttribute(attr, spec.attributes[attr]);
             };
 

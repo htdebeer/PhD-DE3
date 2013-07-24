@@ -23,6 +23,18 @@
 var view = function(config) {
     var _view = {},
         _appendix = {};
+
+    // Quantities to show
+    var show = function(quantity) {
+            return !config.quantities[quantity].hidden;
+        },
+        quantities = {},
+        add_quantity = function(q) {
+            var quantity = config.quantities[q];
+            quantities[quantity.name] = quantity;
+        };
+    Object.keys(config.quantities).filter(show).forEach(add_quantity);
+    _view.quantities = quantities;
     
     // Observer pattern
 
