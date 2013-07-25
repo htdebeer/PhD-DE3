@@ -195,14 +195,19 @@ button.left-separator {
     stroke-opacity: 0.25;
 }
 
+
+
 figure.graph {
-    width: 100%;
+}
+
+figure.graph svg {
 }
 
 figure.graph figcaption {
     text-align: center;
     font-weight: bolder;
-    padding: 1ex;
+    padding-top: 0.5ex;
+    padding-bottom: 0.5ex;
 }
 
 figure.graph figcaption:hover {

@@ -63,12 +63,12 @@ var actions = function(config) {
         enabled: false,
         callback: function(model) {
             return function() {
-                model.enable_action("start");
-                model.disable_action("pause");
                 if (is_running(model)) {
                     clearInterval(running_models[model.name]);
                     delete running_models[model.name];
                 }
+                model.enable_action("start");
+                model.disable_action("pause");
                 model.update_views();
             };
         }

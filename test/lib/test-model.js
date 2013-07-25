@@ -64,12 +64,12 @@ var actions = function(config) {
         enabled: false,
         callback: function(model) {
             return function() {
-                model.enable_action("start");
-                model.disable_action("pause");
                 if (is_running(model)) {
                     clearInterval(running_models[model.name]);
                     delete running_models[model.name];
                 }
+                model.enable_action("start");
+                model.disable_action("pause");
                 model.update_views();
             };
         }
@@ -454,11 +454,13 @@ var model = function(name, config) {
     // phenomenon have been "measured".
 
     _model.finish = function() {
+        var DO_NOT_UPDATE_VIEWS = true;
         if (_model.can_finish()) {
             while ((moments.length - 1) < t2m(T_END)) {
-                _model.step();
+                _model.step(DO_NOT_UPDATE_VIEWS);
             }
         }
+        now = moments.length - 1;
         return now;
     };
 
@@ -640,6 +642,7 @@ var model = function(name, config) {
             }
             return m;
             //m--;
+            /*
             while (upperbound(n)) {
                 n--;
                 if (n<m) {
@@ -650,6 +653,7 @@ var model = function(name, config) {
 
 
             return (Math.abs(val(n)-value) < Math.abs(val(m)-value))?n:m;
+            */
         }
     };
 
@@ -706,7 +710,7 @@ var model = function(name, config) {
     };
 
     _model.data = function() {
-        return moments;
+        return moments.slice(0, now + 1);
     };
 
     _model.current_moment = function() {
@@ -783,14 +787,14 @@ var graph = function(config, horizontal, vertical, dimensions_) {
     var CONTAINER = {
             width: dimensions.width || 900,
             height: dimensions.height || 600
-        },
-        MARGINS = {
-            top: dimensions.margin.top || 10,
-            right: dimensions.margin.right || 20,
-            left: dimensions.margin.left || 60,
-            bottom: dimensions.margin.bottom || 60
-        },
-        GRAPH = {
+        };
+    var MARGINS = {
+            top:dimensions.margin.top || 10,
+            right:dimensions.margin.right || 20,
+            left:dimensions.margin.left || 60,
+            bottom:dimensions.margin.bottom || 60
+        };
+    var GRAPH = {
             width: CONTAINER.width - MARGINS.left - MARGINS.right,
             height: CONTAINER.height - MARGINS.top - MARGINS.bottom
         };
@@ -805,7 +809,60 @@ var graph = function(config, horizontal, vertical, dimensions_) {
             }
         }));
 
-    var create_caption = function() {
+    var svg = d3.select(_graph.fragment).append("svg")
+            .attr("width", CONTAINER.width)
+            .attr("height", CONTAINER.height)
+            .append("g")
+                .attr("transform", "translate(" + 
+                        MARGINS.left + "," + 
+                        MARGINS.right + ")");
+
+    var horizontal_axis, vertical_axis;
+
+    function draw_line(model_name) {
+        var model = _graph.get_model(model_name).model,
+            data = model.data(),
+            x_scale = horizontal_axis.scale,
+            x_quantity = horizontal_axis.quantity,
+            y_scale = vertical_axis.scale,
+            y_quantity = vertical_axis.quantity;
+
+        var line = d3.svg.line()
+                .x(function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .y(function(d) {
+                    return y_scale(d[y_quantity.name]);
+                })
+                .interpolate("cardinal")
+                .tension(0);
+                
+
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.parentNode.removeChild(model_line);
+        }
+
+
+        svg.select("g.lines")
+                .append("g")
+                .attr("class", "line " + model_name)
+                .selectAll("path." + model_name)
+                .data([data])
+                .enter()
+                .append("path")
+                .attr("d", line)
+                .attr("class", "graph")
+                .attr("fill", "none")
+                .attr("stroke", model.color || "red")
+                .style("stroke-width", 3);
+
+
+    }
+
+
+    function create_caption() {
         var get_name = function(q) {
                 return _graph.quantities[q].name;
             },
@@ -867,19 +924,11 @@ var graph = function(config, horizontal, vertical, dimensions_) {
                 }            
                 ]
             }));
-    };
+    }
     create_caption();
 
-    var svg = d3.select(_graph.fragment).append("svg")
-            .attr("width", CONTAINER.width)
-            .attr("height", CONTAINER.height)
-            .append("g")
-                .attr("transform", "translate(" + 
-                        MARGINS.left + "," + 
-                        MARGINS.right + ")");
 
-    var horizontal_axis, vertical_axis;
-    var set_axis = function(quantity_name, orientation) {
+    function set_axis(quantity_name, orientation) {
         var quantity = _graph.quantities[quantity_name],
             create_scale = function(quantity, orientation) {
                 var range;
@@ -987,25 +1036,32 @@ var graph = function(config, horizontal, vertical, dimensions_) {
                 axis: axis
             };
         }
-    };
 
+        update_lines();
+        
+    }
 
+    function update_lines() {
+        Object.keys(_graph.models).forEach(draw_line);
+    }
 
-
-
-
-    var create_graph = function() {
+    function create_graph() {
 
         // scales and axes (make all axis pre-made?)
         set_axis(horizontal, "horizontal");
         set_axis(vertical, "vertical");
+        svg.append("g")
+            .attr("class", "lines");
 
-    };
-    var svg_graph = create_graph();
+    }
+    create_graph();
+
+
 
 
     _graph.update = function(model_name) {
         var model = _graph.get_model(model_name);
+        draw_line(model_name);
     };
 
     return _graph;
@@ -1379,6 +1435,7 @@ var view = function(config) {
         // implement in specialized view; called by registered model on
         // change
     };
+    _view.models = models;
 
     return _view;    
 };
@@ -1514,6 +1571,7 @@ body.appendChild(repr2.fragment);
 repr.register(para);
 repr.register(para2);
 repr2.register(para);
+repr2.register(para2);
 
 
 

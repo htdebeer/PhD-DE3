@@ -193,11 +193,13 @@ var model = function(name, config) {
     // phenomenon have been "measured".
 
     _model.finish = function() {
+        var DO_NOT_UPDATE_VIEWS = true;
         if (_model.can_finish()) {
             while ((moments.length - 1) < t2m(T_END)) {
-                _model.step();
+                _model.step(DO_NOT_UPDATE_VIEWS);
             }
         }
+        now = moments.length - 1;
         return now;
     };
 
@@ -379,6 +381,7 @@ var model = function(name, config) {
             }
             return m;
             //m--;
+            /*
             while (upperbound(n)) {
                 n--;
                 if (n<m) {
@@ -389,6 +392,7 @@ var model = function(name, config) {
 
 
             return (Math.abs(val(n)-value) < Math.abs(val(m)-value))?n:m;
+            */
         }
     };
 
@@ -445,7 +449,7 @@ var model = function(name, config) {
     };
 
     _model.data = function() {
-        return moments;
+        return moments.slice(0, now + 1);
     };
 
     _model.current_moment = function() {

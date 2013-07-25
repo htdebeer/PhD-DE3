@@ -66,6 +66,7 @@ var view = function(config) {
         // implement in specialized view; called by registered model on
         // change
     };
+    _view.models = models;
 
     return _view;    
 };

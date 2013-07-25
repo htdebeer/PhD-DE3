@@ -126,5 +126,6 @@ body.appendChild(repr2.fragment);
 repr.register(para);
 repr.register(para2);
 repr2.register(para);
+repr2.register(para2);
 
 
