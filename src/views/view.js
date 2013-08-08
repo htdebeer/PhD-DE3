@@ -35,10 +35,37 @@ var view = function(config) {
         };
     Object.keys(config.quantities).filter(show).forEach(add_quantity);
     _view.quantities = quantities;
+
     
     // Observer pattern
 
     var models = {};
+
+    _view.compute_extrema = function() {
+        var compute_maximum = function(quantity_name){
+                return function(max, model_name) {
+                    var model = models[model_name].model;
+                    return Math.max(max, model.get_maximum(quantity_name));
+                };
+            },
+            compute_minimum = function(quantity_name){
+                return function(min, model_name) {
+                    var model = models[model_name].model;
+                    return Math.min(min, model.get_minimum(quantity_name));
+                };
+            },
+            compute_quantity_extrema = function(quantity_name) {
+                var quantity = _view.quantities[quantity_name];
+
+                quantity.minimum = Object.keys(models)
+                    .reduce(compute_minimum(quantity_name), Infinity);
+                quantity.maximum = Object.keys(models)
+                    .reduce(compute_maximum(quantity_name), -Infinity);
+            };
+
+        Object.keys(_view.quantities)
+            .forEach(compute_quantity_extrema);
+    };
 
     _view.register = function(model) {
         var model_found = Object.keys(models).indexOf(model.name);
@@ -46,20 +73,32 @@ var view = function(config) {
             models[model.name] = {
                 model: model
             };
+            _view.compute_extrema();
             model.register(this);
             _view.update(model.name);
         }
     };
 
-    _view.unregister = function(model) {
-        if (models[model.name]) {
-            model.unregister(this);
-            delete models[model.name];
+    _view.unregister = function(model_name) {
+        if (models[model_name]) {
+            _view.remove(model_name);
+            models[model_name].model.unregister(this);
+            delete models[model_name];
+            _view.compute_extrema();
+            _view.update_all();
         }
     };
 
     _view.get_model = function(model_name) {
         return models[model_name];
+    };
+
+    _view.remove = function(model_name) {
+        // implement in specialized view; called by unregister
+    };
+
+    _view.update_all = function() {
+        Object.keys(models).forEach(_view.update);
     };
 
     _view.update = function(model_name) {

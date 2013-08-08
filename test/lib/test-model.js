@@ -1056,7 +1056,20 @@ var graph = function(config, horizontal, vertical, dimensions_) {
     }
     create_graph();
 
+    
+    _graph.remove = function(model_name) {
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.parentNode.removeChild(model_line);
+        }
+    };
 
+    _graph.update_all = function() {
+        set_axis(horizontal, "horizontal");
+        set_axis(vertical, "vertical");
+        Object.keys(_graph.models).forEach(_graph.update);
+    };
 
 
     _graph.update = function(model_name) {
@@ -1323,7 +1336,12 @@ var table = function(config) {
                     if (quantity.monotone) {
                         cell.children[0].value = moment[q].toFixed(quantity.precision || 3);
                     } else {
-                        cell.children[0].innerHTML = moment[q].toFixed(quantity.precision || 3);
+                        // Hack to get locale decimal seperator in Chrome.
+                        // Does not work nicely in other browsers as Chrome
+                        // makes the input type=number automatically
+                        // localized
+                        var dec_sep = (1.1).toLocaleString()[1] || ".";
+                        cell.children[0].innerHTML = moment[q].toFixed(quantity.precision || 3).replace(/\./, dec_sep);
                     }
                 }
             };
@@ -1349,6 +1367,12 @@ var table = function(config) {
         Object.keys(model.actions).forEach(update_action);
     };
 
+    _table.remove = function(model_name) {
+        var row = table_body.querySelector("tr#" + model_name);
+        if (row) {
+            table_body.removeChild(row);
+        }
+    };
 
     _table.update = function(model_name) {
         var model = _table.get_model(model_name);
@@ -1404,10 +1428,37 @@ var view = function(config) {
         };
     Object.keys(config.quantities).filter(show).forEach(add_quantity);
     _view.quantities = quantities;
+
     
     // Observer pattern
 
     var models = {};
+
+    _view.compute_extrema = function() {
+        var compute_maximum = function(quantity_name){
+                return function(max, model_name) {
+                    var model = models[model_name].model;
+                    return Math.max(max, model.get_maximum(quantity_name));
+                };
+            },
+            compute_minimum = function(quantity_name){
+                return function(min, model_name) {
+                    var model = models[model_name].model;
+                    return Math.min(min, model.get_minimum(quantity_name));
+                };
+            },
+            compute_quantity_extrema = function(quantity_name) {
+                var quantity = _view.quantities[quantity_name];
+
+                quantity.minimum = Object.keys(models)
+                    .reduce(compute_minimum(quantity_name), Infinity);
+                quantity.maximum = Object.keys(models)
+                    .reduce(compute_maximum(quantity_name), -Infinity);
+            };
+
+        Object.keys(_view.quantities)
+            .forEach(compute_quantity_extrema);
+    };
 
     _view.register = function(model) {
         var model_found = Object.keys(models).indexOf(model.name);
@@ -1415,20 +1466,32 @@ var view = function(config) {
             models[model.name] = {
                 model: model
             };
+            _view.compute_extrema();
             model.register(this);
             _view.update(model.name);
         }
     };
 
-    _view.unregister = function(model) {
-        if (models[model.name]) {
-            model.unregister(this);
-            delete models[model.name];
+    _view.unregister = function(model_name) {
+        if (models[model_name]) {
+            _view.remove(model_name);
+            models[model_name].model.unregister(this);
+            delete models[model_name];
+            _view.compute_extrema();
+            _view.update_all();
         }
     };
 
     _view.get_model = function(model_name) {
         return models[model_name];
+    };
+
+    _view.remove = function(model_name) {
+        // implement in specialized view; called by unregister
+    };
+
+    _view.update_all = function() {
+        Object.keys(models).forEach(_view.update);
     };
 
     _view.update = function(model_name) {

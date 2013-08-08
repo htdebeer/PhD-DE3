@@ -128,8 +128,6 @@ var actions = function(config) {
         enabled: true,
         callback: function(model) {
             return function() {
-                var row = this.parentElement.parentElement;
-                row.parentElement.removeChild(row);
                 model.unregister();
             };
         }

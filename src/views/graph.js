@@ -311,7 +311,20 @@ var graph = function(config, horizontal, vertical, dimensions_) {
     }
     create_graph();
 
+    
+    _graph.remove = function(model_name) {
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.parentNode.removeChild(model_line);
+        }
+    };
 
+    _graph.update_all = function() {
+        set_axis(horizontal, "horizontal");
+        set_axis(vertical, "vertical");
+        Object.keys(_graph.models).forEach(_graph.update);
+    };
 
 
     _graph.update = function(model_name) {

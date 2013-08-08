@@ -251,7 +251,12 @@ var table = function(config) {
                     if (quantity.monotone) {
                         cell.children[0].value = moment[q].toFixed(quantity.precision || 3);
                     } else {
-                        cell.children[0].innerHTML = moment[q].toFixed(quantity.precision || 3);
+                        // Hack to get locale decimal seperator in Chrome.
+                        // Does not work nicely in other browsers as Chrome
+                        // makes the input type=number automatically
+                        // localized
+                        var dec_sep = (1.1).toLocaleString()[1] || ".";
+                        cell.children[0].innerHTML = moment[q].toFixed(quantity.precision || 3).replace(/\./, dec_sep);
                     }
                 }
             };
@@ -277,6 +282,12 @@ var table = function(config) {
         Object.keys(model.actions).forEach(update_action);
     };
 
+    _table.remove = function(model_name) {
+        var row = table_body.querySelector("tr#" + model_name);
+        if (row) {
+            table_body.removeChild(row);
+        }
+    };
 
     _table.update = function(model_name) {
         var model = _table.get_model(model_name);
