@@ -57,6 +57,13 @@ var dom = {
             }
         }
 
+        if (spec.style) {
+            var set_style = function(style_name) {
+                elt.style[style_name] = spec.style[style_name];
+            };
+            Object.keys(spec.style).forEach(set_style);
+        }
+
         return elt;
     }
 };

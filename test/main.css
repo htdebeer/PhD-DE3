@@ -200,9 +200,6 @@ button.left-separator {
 figure.graph {
 }
 
-figure.graph svg {
-}
-
 figure.graph figcaption {
     text-align: center;
     font-weight: bolder;
@@ -219,5 +216,55 @@ figure.graph figcaption select {
     font-family: inherit;
     font-size: inherit;
     font-weight: inherit;
+}
+
+
+figure svg {
+}
+
+figure.temperaturetyper div.container {
+    width: 100%;
+    padding: 0;
+    margin: 0;
+}
+
+figure.temperaturetyper div.container div {
+    margin: 0;
+    float: left;
+}
+
+.temperaturetyper table, .temperaturetyper table tbody, .temperaturetyper table thead, .temperaturetyper table tr, .temperaturetyper table td, .temperaturetyper table th {
+    display: block
+}
+
+.temperaturetyper table tr:after {
+    content: ' ';
+    display: block;
+    visibility: hidden;
+    clear: both;
+}
+
+.temperaturetyper table thead th { 
+    height: 1em;
+    line-height: 1.1;
+                /*text-align: left;*/
+}
+
+.temperaturetyper table tbody {
+    overflow-y: auto;
+}
+
+.temperaturetyper table thead {
+                        /* fallback */
+    width: 97%;
+                        /* minus scroll bar width */
+    width: calc(100% - 17px);
+}
+
+
+.temperaturetyper table tbody td, .temperaturetyper table thead th {
+    width: 40%;
+    float: left;
+    border-right: 1px solid black;
 }
 

@@ -3,6 +3,8 @@ var model = require("../src/models/equation");
 var view = require("../src/views/view");
 var table = require("../src/views/table");
 var graph = require("../src/views/graph");
+var ff = require("../src/views/flaskfiller/flaskfiller");
+var tt = require("../src/views/temperaturetyper/temperaturetyper");
 
 var actions = require("../src/actions/actions")({speed: 10});
 var actions2 = require("../src/actions/actions")({speed: 10});
@@ -120,7 +122,12 @@ para2.step();
 
 var repr = table(config);
 var repr2 = graph(config, "x", "y");
+var repr3 = ff(config);
+var repr4 = tt(config);
 var body = document.querySelector("body");
+body.appendChild(repr4.fragment);
+body.appendChild(repr3.fragment);
+
 body.appendChild(repr.fragment);
 body.appendChild(repr2.fragment);
 repr.register(para);
