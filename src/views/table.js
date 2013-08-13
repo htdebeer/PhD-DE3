@@ -92,7 +92,10 @@ var table = function(config) {
         // name column
         head.appendChild(dom.create({
             name: "th",
-            attributes: { "class": "corner" }
+            attributes: { 
+                "class": "corner",
+                "colspan": 2
+            }
         }));
 
         // quantities, if any
@@ -150,19 +153,21 @@ var table = function(config) {
                     cell.children = [{
                         name: "input",
                         attributes: {
-                            "type": "number",                        
-                            "min": quantity.minimum,
-                            "max": quantity.maximum + quantity.stepsize,
-                            "step": quantity.stepsize || "any"
+                            "type": "text",                        
+                            "pattern": "(\\+|-)?\\d*((\\.|,)\\d+)?"
                         },
                         on: {
                             type: "change",
-                            callback: function() {
-                                var query = "[data-quantity='" + q + "']",
-                                    elt = row.querySelector(query),
-                                    value = elt.children[0].value;
+                            callback: function(event) {
+                                var value = this.value;
 
-                                model.set( q, value );
+                                if (value < model.get_minimum(q)) {
+                                    model.reset();
+                                } else if (model.get_maximum(q) < value) {
+                                    model.finish();
+                                } else {
+                                    model.set( q, value );
+                                }
                             }
                         }
 
@@ -229,6 +234,29 @@ var table = function(config) {
                         name: "td",
                         value: model.name,
                         attributes: { "class": model.name }
+                    },{
+                        name: "td",
+                        attributes: {
+                            "class": "color"
+                        },
+                        children: [{
+                            name: "span",
+                            value: "",
+                            on: {
+                                type: "click",
+                                callback: function(event) {
+                                    model.color("random");
+                                    model.update_views();
+                                }
+                            },
+                            style: {
+                                width: "15px",
+                                height: "15px",
+                                border: "1px solid dimgray",
+                                "background": model.color(),
+                                display: "block"
+                            }
+                        }]
                     }].concat(quantity_elts).concat([{
                         name: "td",
                         children: actions_elts
@@ -241,6 +269,12 @@ var table = function(config) {
     };
 
     var update_row = function(row, model) {
+
+        var color_cell = row.querySelector(".color span");
+        if (color_cell) {
+            color_cell.style.background = model.color();
+        }
+
         var moment = model.current_moment(),
             update_quantity = function(q) {
                 var quantity = _table.quantities[q];

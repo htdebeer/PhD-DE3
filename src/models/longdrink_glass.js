@@ -29,10 +29,9 @@ var model = require("./model");
  * flow_rate in ml/sec
  *
  */
-var longdrink_glass = function(config) {
+var longdrink_glass = function(name, config) {
 
-    var name = config.name,
-        radius = config.radius || 2,
+    var radius = config.radius || 2,
         height = config.height || 7.5,
         flow_rate = config.flow_rate || 50,
         action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
@@ -131,6 +130,24 @@ var longdrink_glass = function(config) {
     };
 
     _model.step();
+    _model.height = function(h) {
+        if (arguments.length === 1) {
+            height = h;
+        }
+        return height;
+    };
+    _model.radius = function(r) {
+        if (arguments.length === 1) {
+            radius = r;
+        }
+        return radius;
+    };
+    _model.flow_rate = function(fr) {
+        if (arguments.length === 1) {
+            flow_rate = fr;
+        }
+        return flow_rate;
+    };
 
     return _model;
 };

@@ -1,5 +1,6 @@
 
 var model = require("../src/models/equation");
+var long_model = require("../src/models/longdrink_glass");
 var view = require("../src/views/view");
 var table = require("../src/views/table");
 var graph = require("../src/views/graph");
@@ -102,8 +103,22 @@ var config2 =  {
         finish: actions2.finish,
         remove: actions2.remove
     }
-}, para = model('longdrinkglas', config),
-    para2 = model('cocktailglas', config2);
+};
+
+//para = model('longdrinkglas', config),
+//    para2 = model('cocktailglas', config2);
+
+var flow_rate = 50; // ml per sec
+var longdrinkglas = long_model("longdrinkglas", {
+    radius: 3,
+    height: 10,
+    flow_rate: flow_rate
+});
+var breedlongdrinkglas = long_model("breedlongdrinkglas", {
+    radius: 6,
+    height: 9,
+    flow_rate: flow_rate
+});
 
 // console.log(para.get_minimum());
 // console.log(para.get_minimum("x"));
@@ -113,26 +128,27 @@ var config2 =  {
 // console.log(para.get("_time_"));
 // console.log(para.set("x", 50));
 // console.log(para.get("_time_"));
-para.set("x", 5);
 // console.log(para.get("_time_"));
 // 
 // console.log(para.current_moment());
 
-para2.step();
 
+config = {
+    quantities: longdrinkglas.quantities
+};
 var repr = table(config);
-var repr2 = graph(config, "x", "y");
-var repr3 = ff(config);
+var repr2 = graph(config, "tijd", "hoogte");
+//var repr3 = ff(config);
 var repr4 = tt(config);
 var body = document.querySelector("body");
 body.appendChild(repr4.fragment);
-body.appendChild(repr3.fragment);
+//body.appendChild(repr3.fragment);
 
 body.appendChild(repr.fragment);
 body.appendChild(repr2.fragment);
-repr.register(para);
-repr.register(para2);
-repr2.register(para);
-repr2.register(para2);
+repr.register(longdrinkglas);
+repr.register(breedlongdrinkglas);
+repr2.register(longdrinkglas);
+repr2.register(breedlongdrinkglas);
 
 

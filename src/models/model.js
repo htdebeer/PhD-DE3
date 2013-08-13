@@ -200,6 +200,7 @@ var model = function(name, config) {
             }
         }
         now = moments.length - 1;
+        _model.update_views();
         return now;
     };
 
@@ -474,6 +475,29 @@ var model = function(name, config) {
         };
 
 
+    function random_color() {
+        var hexes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'],
+            colors = [],
+            i = 0;
+           
+        while (i < 6) {
+            colors.push(hexes[Math.round(Math.random()*(hexes.length - 1))]);
+            i++;
+        }
+        return "#"+ colors.join("");
+    }
+
+    var color = random_color();
+    _model.color = function(c) {
+        if (arguments.length === 1) {
+            if (c === "random") {
+                color = random_color();
+            } else {
+                color = c;
+            }
+        }
+        return color;
+    };
     return _model;
 };    
 

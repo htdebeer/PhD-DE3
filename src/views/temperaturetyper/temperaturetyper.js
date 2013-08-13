@@ -42,6 +42,7 @@ var temperaturetyper = function(config, scale_, dimensions_) {
             }
         }));
 
+
     var message = _temperaturetyper.fragment.appendChild(
             dom.create({
                 name: "div",
@@ -62,7 +63,7 @@ var temperaturetyper = function(config, scale_, dimensions_) {
 
     var measuring_simulation = measuring_container.appendChild(
             dom.create({
-                name: "div",
+                name: "figure",
                 attributes: {
                     "class": "simulation"
                 }
@@ -70,79 +71,24 @@ var temperaturetyper = function(config, scale_, dimensions_) {
 
     var measuring_data = measuring_container.appendChild(
             dom.create({
-                name: "div",
-                children: [{
-                    name: "table",
-                    attributes: {
-                        "class": "data"
-                    },
-                    children: [{
-                        name: "thead",
-                        attributes: {
-                            rows: 20,
-                            cols: 25
-                        },
-                        children: [{
-                            name: "tr",
-                            children: [{
-                                name: "th",
-                                value: "tijd (sec)"
-                            }, {
-                                name: "th",
-                                value: "temperatuur (°C)"
-                            }]
-                        }]
-                    },{
-                        name: "tbody",
-                        attributes: {
-                            "contentEditable": true
-                        },
-                        children: [{
-                            name: "tr",
-                            children: [{
-                                name: "td",
-                                value: "00:00,00"
-                            }, {
-                                name: "td",
-                                value: "22,0"
-                            }]
-                        }],
-                        on: {
-                            type: "keypress",
-                            callback: add_new_measurement
-                        },
-                        style: {
-                            height: CONTAINER.height
-                        }
-                    }]
-                }]
+                name: "textarea",
+                attributes: {
+                    "class": "data",
+                    "cols": 25,
+                    "rows": 20
+                },
+                style: {
+                    "overflow-y": "auto",
+                    "overflow-x": "hidden"
+                },
+                on: {
+                    type: "keydown",
+                    callback: add_new_measurement
+                },
+                value: format_time(0) + "\t"
             }));
 
 
-    var time = 0;
-    function add_new_measurement(event) {
-        var tbody = event.target;
-        var key = event.key || event.keyCode;
-        if (key === 13 || key === 10) {
-            event.preventDefault();
-            time++;
-            var row = dom.create({
-                            name: "tr",
-                            children: [{
-                                name: "td",
-                                value: (time / 10).toFixed(1)
-                            }]
-                });
-            var new_measurement = dom.create({
-                name: "td"
-            });
-            row.appendChild(new_measurement);
-            tbody.appendChild(row);
-            new_measurement.focus();
-        }
-        
-        console.log(event);
-    }
 
 
     // There is a bug in Raphael regarding placing text on the right
@@ -339,6 +285,46 @@ var temperaturetyper = function(config, scale_, dimensions_) {
 
 
         return thermometer;
+    }
+
+    var time = 0;
+    function format_time(time) {
+        // time in 0.1 seconds
+        var seconds,
+            minutes = "00",
+            milliseconds;
+
+        if (time >= 600) {
+            minutes = ("0" + Math.floor((time / 600))).substr(-2);
+        }
+        seconds = ("0" + Math.floor((time % 600) / 10)).substr(-2);
+        milliseconds = ((time % 600) % 10);
+
+        return "" + minutes + ":" + seconds + "," + milliseconds;
+    }
+
+    function add_new_measurement(event) {
+        var key = event.key || event.keyCode;
+        if (key === 13 || key === 10 || key === "Enter") {
+            // enter - key
+            event.preventDefault();
+            time++;
+            var lastline = this.value.substr(this.value.lastIndexOf("\n")+1),
+                temperature = parseFloat(lastline.substr(lastline.lastIndexOf("\t")+1));
+            if (!isNaN(temperature)) {
+                if (-20 <= temperature && temperature <= 100) {
+                    thermometer.set_temperature(temperature);
+                }
+            }
+            
+            this.value += "\n" + format_time(time) + "\t";
+            return false;
+        } else if (key === 9 || key === "Tab") {
+            // tab - key
+            event.preventDefault();
+            this.value += "\t";
+            return false;
+        } 
     }
 
     _temperaturetyper.update = function(model_name) {

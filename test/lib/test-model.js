@@ -191,7 +191,13 @@ var dom = {
         }
 
         if (spec.on) {
-            elt.addEventListener( spec.on.type, spec.on.callback );
+            if (typeof spec.on === "Array") {
+                spec.on.forEach(function(on) {
+                    elt.addEventListener( on.type, on.callback );
+                });
+            } else {
+                elt.addEventListener( spec.on.type, spec.on.callback );
+            }
         }
 
         if (spec.value) {
@@ -263,7 +269,164 @@ var equation_model = function(name, config) {
 module.exports = equation_model;
 
 
-},{"./model":4}],4:[function(require,module,exports){
+},{"./model":5}],4:[function(require,module,exports){
+/*
+ * Copyright (C) 2013 Huub de Beer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+var model = require("./model");
+
+
+/**
+ * height in cm
+ * radius in cm
+ * flow_rate in ml/sec
+ *
+ */
+var longdrink_glass = function(name, config) {
+
+    var radius = config.radius || 2,
+        height = config.height || 7.5,
+        flow_rate = config.flow_rate || 50,
+        action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
+        default_actions = require("../actions/actions")({speed: flow_rate});
+
+    /**
+     * Compute the volume in ml in the longdrink glass given flow_rate and time the
+     * water has flown in seconds.
+     */
+    function compute_volume(time) {
+        return time * flow_rate;
+    }
+    
+
+    /**
+     * Compute the height of the water in cm given the volume of the water in
+     * the glass in ml.
+     */
+    var area = Math.PI * Math.pow(radius, 2);
+    function compute_height(volume) {
+        if (volume > 0) {
+            return volume / area;
+        } else {
+            return 0;
+        }
+    }
+
+    function create_actions(action_list) {
+        var actions = {},
+            create_action = function(action_name) {
+                actions[action_name] = default_actions[action_name];
+            };
+        action_list.forEach(create_action);
+        return actions;
+    }
+
+    var quantities = {
+        hoogte: {
+            minimum: 0,
+            maximum: height,
+            value: 0,
+            unit: 'cm',
+            name: "hoogte",
+            label: "hoogte in cm",
+            stepsize: 0.01,
+            monotone: true,
+            precision: 2
+        },
+        volume: {
+            minimum: 0,
+            maximum: area*height,
+            value: 0,
+            unit: 'ml',
+            name: "volume",
+            label: "volume in ml",
+            stepsize: 0.1,
+            monotone: true,
+            precision: 1
+        },
+        tijd: {
+            minimum: 0,
+            maximum: area*height / flow_rate,
+            value: 0,
+            unit: 'sec',
+            name: "tijd",
+            label: "tijd",
+            stepsize: 0.01,
+            monotone: true,
+            precision: 2
+        }
+    };
+
+    var time = {
+        start: 0,
+        end: quantities.tijd.maximum*1000,
+        step: Math.ceil(1000/flow_rate)
+    };
+
+    var _model = model(name, {
+        time: time,
+        quantities: quantities,
+        actions: create_actions(action_list)
+    });
+
+    _model.measure_moment = function(moment) {
+        var time_in_ms = _model.moment_to_time(moment),
+            tijd = time_in_ms / 1000,
+            volume = compute_volume(tijd),
+            hoogte = compute_height(volume);
+
+        return {
+            tijd: tijd,
+            volume: volume,
+            hoogte: hoogte
+        };
+    };
+
+    _model.step();
+    _model.height = function(h) {
+        if (arguments.length === 1) {
+            height = h;
+        }
+        return height;
+    };
+    _model.radius = function(r) {
+        if (arguments.length === 1) {
+            radius = r;
+        }
+        return radius;
+    };
+    _model.flow_rate = function(fr) {
+        if (arguments.length === 1) {
+            flow_rate = fr;
+        }
+        return flow_rate;
+    };
+
+    return _model;
+};
+
+module.exports = longdrink_glass;
+
+},{"../actions/actions":1,"./model":5}],5:[function(require,module,exports){
 (function(){/*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -466,6 +629,7 @@ var model = function(name, config) {
             }
         }
         now = moments.length - 1;
+        _model.update_views();
         return now;
     };
 
@@ -740,6 +904,29 @@ var model = function(name, config) {
         };
 
 
+    function random_color() {
+        var hexes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'],
+            colors = [],
+            i = 0;
+           
+        while (i < 6) {
+            colors.push(hexes[Math.round(Math.random()*(hexes.length - 1))]);
+            i++;
+        }
+        return "#"+ colors.join("");
+    }
+
+    var color = random_color();
+    _model.color = function(c) {
+        if (arguments.length === 1) {
+            if (c === "random") {
+                color = random_color();
+            } else {
+                color = c;
+            }
+        }
+        return color;
+    };
     return _model;
 };    
 
@@ -747,7 +934,7 @@ var model = function(name, config) {
 module.exports = model;
 
 })()
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 
 var view = require("../view"),
     dom = require("../../dom/dom"),
@@ -866,7 +1053,7 @@ var flaskfiller = function(config, scale_, dimensions_) {
 
 module.exports = flaskfiller;
 
-},{"../../dom/dom":2,"../view":10,"./ruler":6,"raphael-browserify":12}],6:[function(require,module,exports){
+},{"../../dom/dom":2,"../view":11,"./ruler":7,"raphael-browserify":13}],7:[function(require,module,exports){
 
 var ruler = function(canvas, config) {
     var _ruler = canvas.set();
@@ -1020,7 +1207,7 @@ var ruler = function(canvas, config) {
 
 module.exports = ruler;
 
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -1360,7 +1547,7 @@ var graph = function(config, horizontal, vertical, dimensions_) {
 
 module.exports = graph;
 
-},{"../dom/dom":2,"./view":10}],8:[function(require,module,exports){
+},{"../dom/dom":2,"./view":11}],9:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -1455,7 +1642,10 @@ var table = function(config) {
         // name column
         head.appendChild(dom.create({
             name: "th",
-            attributes: { "class": "corner" }
+            attributes: { 
+                "class": "corner",
+                "colspan": 2
+            }
         }));
 
         // quantities, if any
@@ -1513,19 +1703,21 @@ var table = function(config) {
                     cell.children = [{
                         name: "input",
                         attributes: {
-                            "type": "number",                        
-                            "min": quantity.minimum,
-                            "max": quantity.maximum + quantity.stepsize,
-                            "step": quantity.stepsize || "any"
+                            "type": "text",                        
+                            "pattern": "(\\+|-)?\\d*((\\.|,)\\d+)?"
                         },
                         on: {
                             type: "change",
-                            callback: function() {
-                                var query = "[data-quantity='" + q + "']",
-                                    elt = row.querySelector(query),
-                                    value = elt.children[0].value;
+                            callback: function(event) {
+                                var value = this.value;
 
-                                model.set( q, value );
+                                if (value < model.get_minimum(q)) {
+                                    model.reset();
+                                } else if (model.get_maximum(q) < value) {
+                                    model.finish();
+                                } else {
+                                    model.set( q, value );
+                                }
                             }
                         }
 
@@ -1592,6 +1784,29 @@ var table = function(config) {
                         name: "td",
                         value: model.name,
                         attributes: { "class": model.name }
+                    },{
+                        name: "td",
+                        attributes: {
+                            "class": "color"
+                        },
+                        children: [{
+                            name: "span",
+                            value: "",
+                            on: {
+                                type: "click",
+                                callback: function(event) {
+                                    model.color("random");
+                                    model.update_views();
+                                }
+                            },
+                            style: {
+                                width: "15px",
+                                height: "15px",
+                                border: "1px solid dimgray",
+                                "background": model.color(),
+                                display: "block"
+                            }
+                        }]
                     }].concat(quantity_elts).concat([{
                         name: "td",
                         children: actions_elts
@@ -1604,6 +1819,12 @@ var table = function(config) {
     };
 
     var update_row = function(row, model) {
+
+        var color_cell = row.querySelector(".color span");
+        if (color_cell) {
+            color_cell.style.background = model.color();
+        }
+
         var moment = model.current_moment(),
             update_quantity = function(q) {
                 var quantity = _table.quantities[q];
@@ -1668,7 +1889,7 @@ var table = function(config) {
 
 module.exports = table;
 
-},{"../dom/dom":2,"./view":10}],9:[function(require,module,exports){
+},{"../dom/dom":2,"./view":11}],10:[function(require,module,exports){
 
 var view = require("../view"),
     dom = require("../../dom/dom"),
@@ -1713,6 +1934,7 @@ var temperaturetyper = function(config, scale_, dimensions_) {
             }
         }));
 
+
     var message = _temperaturetyper.fragment.appendChild(
             dom.create({
                 name: "div",
@@ -1733,7 +1955,7 @@ var temperaturetyper = function(config, scale_, dimensions_) {
 
     var measuring_simulation = measuring_container.appendChild(
             dom.create({
-                name: "div",
+                name: "figure",
                 attributes: {
                     "class": "simulation"
                 }
@@ -1741,79 +1963,24 @@ var temperaturetyper = function(config, scale_, dimensions_) {
 
     var measuring_data = measuring_container.appendChild(
             dom.create({
-                name: "div",
-                children: [{
-                    name: "table",
-                    attributes: {
-                        "class": "data"
-                    },
-                    children: [{
-                        name: "thead",
-                        attributes: {
-                            rows: 20,
-                            cols: 25
-                        },
-                        children: [{
-                            name: "tr",
-                            children: [{
-                                name: "th",
-                                value: "tijd (sec)"
-                            }, {
-                                name: "th",
-                                value: "temperatuur (°C)"
-                            }]
-                        }]
-                    },{
-                        name: "tbody",
-                        attributes: {
-                            "contentEditable": true
-                        },
-                        children: [{
-                            name: "tr",
-                            children: [{
-                                name: "td",
-                                value: "00:00,00"
-                            }, {
-                                name: "td",
-                                value: "22,0"
-                            }]
-                        }],
-                        on: {
-                            type: "keypress",
-                            callback: add_new_measurement
-                        },
-                        style: {
-                            height: CONTAINER.height
-                        }
-                    }]
-                }]
+                name: "textarea",
+                attributes: {
+                    "class": "data",
+                    "cols": 25,
+                    "rows": 20
+                },
+                style: {
+                    "overflow-y": "auto",
+                    "overflow-x": "hidden"
+                },
+                on: {
+                    type: "keydown",
+                    callback: add_new_measurement
+                },
+                value: format_time(0) + "\t"
             }));
 
 
-    var time = 0;
-    function add_new_measurement(event) {
-        var tbody = event.target;
-        var key = event.key || event.keyCode;
-        if (key === 13 || key === 10) {
-            event.preventDefault();
-            time++;
-            var row = dom.create({
-                            name: "tr",
-                            children: [{
-                                name: "td",
-                                value: (time / 10).toFixed(1)
-                            }]
-                });
-            var new_measurement = dom.create({
-                name: "td"
-            });
-            row.appendChild(new_measurement);
-            tbody.appendChild(row);
-            new_measurement.focus();
-        }
-        
-        console.log(event);
-    }
 
 
     // There is a bug in Raphael regarding placing text on the right
@@ -2012,6 +2179,46 @@ var temperaturetyper = function(config, scale_, dimensions_) {
         return thermometer;
     }
 
+    var time = 0;
+    function format_time(time) {
+        // time in 0.1 seconds
+        var seconds,
+            minutes = "00",
+            milliseconds;
+
+        if (time >= 600) {
+            minutes = ("0" + Math.floor((time / 600))).substr(-2);
+        }
+        seconds = ("0" + Math.floor((time % 600) / 10)).substr(-2);
+        milliseconds = ((time % 600) % 10);
+
+        return "" + minutes + ":" + seconds + "," + milliseconds;
+    }
+
+    function add_new_measurement(event) {
+        var key = event.key || event.keyCode;
+        if (key === 13 || key === 10 || key === "Enter") {
+            // enter - key
+            event.preventDefault();
+            time++;
+            var lastline = this.value.substr(this.value.lastIndexOf("\n")+1),
+                temperature = parseFloat(lastline.substr(lastline.lastIndexOf("\t")+1));
+            if (!isNaN(temperature)) {
+                if (-20 <= temperature && temperature <= 100) {
+                    thermometer.set_temperature(temperature);
+                }
+            }
+            
+            this.value += "\n" + format_time(time) + "\t";
+            return false;
+        } else if (key === 9 || key === "Tab") {
+            // tab - key
+            event.preventDefault();
+            this.value += "\t";
+            return false;
+        } 
+    }
+
     _temperaturetyper.update = function(model_name) {
     };
 
@@ -2030,7 +2237,7 @@ var temperaturetyper = function(config, scale_, dimensions_) {
 
 module.exports = temperaturetyper;
 
-},{"../../dom/dom":2,"../view":10,"raphael-browserify":12}],10:[function(require,module,exports){
+},{"../../dom/dom":2,"../view":11,"raphael-browserify":13}],11:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -2145,9 +2352,10 @@ var view = function(config) {
 
 module.exports = view;
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 
 var model = require("../src/models/equation");
+var long_model = require("../src/models/longdrink_glass");
 var view = require("../src/views/view");
 var table = require("../src/views/table");
 var graph = require("../src/views/graph");
@@ -2250,8 +2458,22 @@ var config2 =  {
         finish: actions2.finish,
         remove: actions2.remove
     }
-}, para = model('longdrinkglas', config),
-    para2 = model('cocktailglas', config2);
+};
+
+//para = model('longdrinkglas', config),
+//    para2 = model('cocktailglas', config2);
+
+var flow_rate = 50; // ml per sec
+var longdrinkglas = long_model("longdrinkglas", {
+    radius: 3,
+    height: 10,
+    flow_rate: flow_rate
+});
+var breedlongdrinkglas = long_model("breedlongdrinkglas", {
+    radius: 6,
+    height: 9,
+    flow_rate: flow_rate
+});
 
 // console.log(para.get_minimum());
 // console.log(para.get_minimum("x"));
@@ -2261,31 +2483,32 @@ var config2 =  {
 // console.log(para.get("_time_"));
 // console.log(para.set("x", 50));
 // console.log(para.get("_time_"));
-para.set("x", 5);
 // console.log(para.get("_time_"));
 // 
 // console.log(para.current_moment());
 
-para2.step();
 
+config = {
+    quantities: longdrinkglas.quantities
+};
 var repr = table(config);
-var repr2 = graph(config, "x", "y");
-var repr3 = ff(config);
+var repr2 = graph(config, "tijd", "hoogte");
+//var repr3 = ff(config);
 var repr4 = tt(config);
 var body = document.querySelector("body");
 body.appendChild(repr4.fragment);
-body.appendChild(repr3.fragment);
+//body.appendChild(repr3.fragment);
 
 body.appendChild(repr.fragment);
 body.appendChild(repr2.fragment);
-repr.register(para);
-repr.register(para2);
-repr2.register(para);
-repr2.register(para2);
+repr.register(longdrinkglas);
+repr.register(breedlongdrinkglas);
+repr2.register(longdrinkglas);
+repr2.register(breedlongdrinkglas);
 
 
 
-},{"../src/actions/actions":1,"../src/models/equation":3,"../src/views/flaskfiller/flaskfiller":5,"../src/views/graph":7,"../src/views/table":8,"../src/views/temperaturetyper/temperaturetyper":9,"../src/views/view":10}],12:[function(require,module,exports){
+},{"../src/actions/actions":1,"../src/models/equation":3,"../src/models/longdrink_glass":4,"../src/views/flaskfiller/flaskfiller":6,"../src/views/graph":8,"../src/views/table":9,"../src/views/temperaturetyper/temperaturetyper":10,"../src/views/view":11}],13:[function(require,module,exports){
 // Browserify modifications by Brenton Partridge, released into the public domain
 
 // BEGIN BROWSERIFY MOD
@@ -8145,5 +8368,5 @@ if (typeof module !== 'undefined') {
     module.exports = Raphael;
 }
 
-},{}]},{},[11])
+},{}]},{},[12])
 ;

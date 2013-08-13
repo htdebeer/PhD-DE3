@@ -46,7 +46,13 @@ var dom = {
         }
 
         if (spec.on) {
-            elt.addEventListener( spec.on.type, spec.on.callback );
+            if (typeof spec.on === "Array") {
+                spec.on.forEach(function(on) {
+                    elt.addEventListener( on.type, on.callback );
+                });
+            } else {
+                elt.addEventListener( spec.on.type, spec.on.callback );
+            }
         }
 
         if (spec.value) {
