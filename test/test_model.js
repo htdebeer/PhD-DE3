@@ -142,8 +142,8 @@ var repr2 = graph(config, "tijd", "hoogte");
 var repr3 = ff(config);
 var repr4 = tt(config);
 var body = document.querySelector("body");
-//body.appendChild(repr4.fragment);
-//body.appendChild(repr3.fragment);
+
+body.appendChild(repr4.fragment);
 
 body.appendChild(repr3.fragment);
 body.appendChild(repr.fragment);

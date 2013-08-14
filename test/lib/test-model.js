@@ -1,227 +1,4 @@
 ;(function(e,t,n){function i(n,s){if(!t[n]){if(!e[n]){var o=typeof require=="function"&&require;if(!s&&o)return o(n,!0);if(r)return r(n,!0);throw new Error("Cannot find module '"+n+"'")}var u=t[n]={exports:{}};e[n][0].call(u.exports,function(t){var r=e[n][1][t];return i(r?r:t)},u,u.exports)}return t[n].exports}var r=typeof require=="function"&&require;for(var s=0;s<n.length;s++)i(n[s]);return i})({1:[function(require,module,exports){
-
-
-// add attribution to the icons: "Entypo pictograms by Daniel Bruce — www.entypo.com"
-
-var actions = function(config) {
-    var _actions = {};
-
-
-    // Running model actions
-
-    var running_models = {},
-        current_speed = config.speed || 500;
-
-    _actions.speed = function( speed ) {
-        if (arguments.length === 1) {
-            current_speed = speed;
-        }
-        return current_speed;
-    };
-
-    var is_running =  function(model) {
-        return running_models[model.name];
-    };
-
-    _actions.start = {
-        name: "start",
-        group: "run_model",
-        icon: "icon-play",
-        tooltip: "Start simulation",
-        enabled: true,
-        callback: function(model) {
-           
-            var step = function() {
-                if (!model.is_finished()) {
-                    model.step();
-                } else {
-                    clearInterval(running_models[model.name]);
-                    delete running_models[model.name];
-                    model.disable_action("finish");
-                    model.disable_action("pause");
-                    model.disable_action("start");
-                    model.update_views();
-                }
-            };
-
-            return function() {
-                    if (!is_running(model)) {
-                        running_models[model.name] = setInterval(step, current_speed);
-                    }
-                    model.disable_action("start");
-                    model.enable_action("pause");
-                    model.enable_action("reset");
-                    model.update_views();
-            };
-        }
-    };
-
-    _actions.pause = {
-        name: "pause",
-        group: "run_model",
-        icon: "icon-pause",
-        tooltip: "Pause simulation",
-        enabled: false,
-        callback: function(model) {
-            return function() {
-                if (is_running(model)) {
-                    clearInterval(running_models[model.name]);
-                    delete running_models[model.name];
-                }
-                model.enable_action("start");
-                model.disable_action("pause");
-                model.update_views();
-            };
-        }
-    };
-
-    _actions.reset = {
-        name: "reset",
-        group: "run_model",
-        icon: "icon-fast-backward",
-        tooltip: "Reset simulation",
-        enabled: true,
-        callback: function(model) {
-            return function() {
-                if (is_running(model)) {
-                    clearInterval(running_models[model.name]);
-                    delete running_models[model.name];
-                }
-                model.reset();
-                model.enable_action("start");
-                model.enable_action("finish");
-                model.disable_action("pause");
-                model.disable_action("reset");
-                model.update_views();
-            };
-        }
-    };
-
-    _actions.finish = {
-        name: "finish",
-        group: "run_model",
-        icon: "icon-fast-forward",
-        tooltip: "Finish simulation",
-        enabled: true,
-        callback: function(model) {
-            return function() {
-                if (is_running(model)) {
-                    clearInterval(running_models[model.name]);
-                    delete running_models[model.name];
-                }
-                model.finish();
-                model.disable_action("pause");
-                model.disable_action("start");
-                model.disable_action("finish");
-                model.enable_action("reset");
-                model.update_views();
-            };
-        }
-    };
-
-    // Remove model actions
-    
-    _actions.remove = {
-        name: "remove",
-        group: "edit",
-        icon: "icon-remove",
-        tooltip: "Remove this model",
-        enabled: true,
-        callback: function(model) {
-            return function() {
-                model.unregister();
-            };
-        }
-    };
-
-    // Toggle view action
-
-
-    return _actions;
-};
-
-module.exports = actions;
-
-},{}],2:[function(require,module,exports){
-/*
- * Copyright (C) 2013 Huub de Beer
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- */
-
-var dom = {
-    create: function(spec) {
-        var elt;
-       
-        if (spec.name === "textNode") {
-           elt = document.createTextNode(spec.value);
-        } else {
-           elt = document.createElement(spec.name);
-        }
-
-        var set_attribute = function(attr) {
-                elt.setAttribute(attr, spec.attributes[attr]);
-            };
-
-        if (spec.attributes) {
-            Object.keys(spec.attributes).forEach(set_attribute);
-        }
-
-        if (spec.children) {
-            var append = function(child) {
-                elt.appendChild(dom.create(child));
-            };
-            spec.children.forEach(append);
-        }
-
-        if (spec.on) {
-            if (typeof spec.on === "Array") {
-                spec.on.forEach(function(on) {
-                    elt.addEventListener( on.type, on.callback );
-                });
-            } else {
-                elt.addEventListener( spec.on.type, spec.on.callback );
-            }
-        }
-
-        if (spec.value) {
-            if (spec.name === "input") {
-                elt.value = spec.value;
-            } else {
-                elt.innerHTML = spec.value;
-            }
-        }
-
-        if (spec.style) {
-            var set_style = function(style_name) {
-                elt.style[style_name] = spec.style[style_name];
-            };
-            Object.keys(spec.style).forEach(set_style);
-        }
-
-        return elt;
-    }
-};
-
-module.exports = dom;
-
-},{}],3:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -269,194 +46,7 @@ var equation_model = function(name, config) {
 module.exports = equation_model;
 
 
-},{"./model":5}],4:[function(require,module,exports){
-/*
- * Copyright (C) 2013 Huub de Beer
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- */
-
-var model = require("./model");
-
-
-/**
- * height in cm
- * radius in cm
- * flow_rate in ml/sec
- *
- */
-var longdrink_glass = function(name, config) {
-
-    var radius = config.radius || 2,
-        height = config.height || 7.5,
-        flow_rate = config.flow_rate || 50,
-        action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
-        default_actions = require("../actions/actions")({speed: flow_rate});
-
-    /**
-     * Compute the volume in ml in the longdrink glass given flow_rate and time the
-     * water has flown in seconds.
-     */
-    function compute_volume(time) {
-        return time * flow_rate;
-    }
-    
-
-    /**
-     * Compute the height of the water in cm given the volume of the water in
-     * the glass in ml.
-     */
-    var area = Math.PI * Math.pow(radius, 2);
-    function compute_height(volume) {
-        if (volume > 0) {
-            return volume / area;
-        } else {
-            return 0;
-        }
-    }
-
-    function create_actions(action_list) {
-        var actions = {},
-            create_action = function(action_name) {
-                actions[action_name] = default_actions[action_name];
-            };
-        action_list.forEach(create_action);
-        return actions;
-    }
-
-
-    var quantities = {
-        hoogte: {
-            minimum: 0,
-            value: 0,
-            unit: 'cm',
-            name: "hoogte",
-            label: "hoogte in cm",
-            stepsize: 0.01,
-            monotone: true,
-            precision: 2
-        },
-        volume: {
-            minimum: 0,
-            value: 0,
-            unit: 'ml',
-            name: "volume",
-            label: "volume in ml",
-            stepsize: 0.1,
-            monotone: true,
-            precision: 0
-        },
-        tijd: {
-            minimum: 0,
-            value: 0,
-            unit: 'sec',
-            name: "tijd",
-            label: "tijd",
-            stepsize: 0.01,
-            monotone: true,
-            precision: 1
-        }
-    };
-
-    var time_max, volume_max, height_max;
-    function compute_maxima() {
-        time_max = Math.floor(area*height*10 / flow_rate)/10;
-        volume_max = time_max * flow_rate;
-        height_max = volume_max / area;
-
-        quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
-        quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
-        quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
-    }
-
-    compute_maxima();
-
-    var time = {
-        start: 0,
-        end: quantities.tijd.maximum*1000,
-        step: Math.ceil(1000/flow_rate)
-    };
-
-    var _model = model(name, {
-        time: time,
-        quantities: quantities,
-        actions: create_actions(action_list)
-    });
-
-    _model.measure_moment = function(moment) {
-        var time_in_ms = _model.moment_to_time(moment),
-            tijd = time_in_ms / 1000,
-            volume = compute_volume(tijd),
-            hoogte = compute_height(volume);
-
-        return {
-            tijd: tijd,
-            volume: volume,
-            hoogte: hoogte
-        };
-    };
-
-    _model.path = function(SCALE, fill) {
-        var h = height * SCALE * 10,
-            y = 0;
-        if (fill) {
-            h = _model.get("hoogte") * SCALE * 10;
-            y = height * SCALE * 10 - h;
-        }
-        var path = "M0," + y;
-        path += "v" + h;
-        path += "h" + radius * 2 * SCALE * 10;
-        path += "v-" + h;
-        return path;
-    };
-
-    _model.step();
-    _model.compute_maxima = compute_maxima;
-    _model.type = "longdrink";
-    _model.height = function(h) {
-        if (arguments.length === 1) {
-            height = h;
-            _model.update_views();
-        }
-        return height;
-    };
-    _model.radius = function(r) {
-        if (arguments.length === 1) {
-            radius = r;
-            _model.update_views();
-        }
-        return radius;
-    };
-    _model.flow_rate = function(fr) {
-        if (arguments.length === 1) {
-            flow_rate = fr;
-            _model.update_views();
-        }
-        return flow_rate;
-    };
-
-    return _model;
-};
-
-module.exports = longdrink_glass;
-
-},{"../actions/actions":1,"./model":5}],5:[function(require,module,exports){
+},{"./model":2}],2:[function(require,module,exports){
 (function(){/*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -964,648 +554,7 @@ var model = function(name, config) {
 module.exports = model;
 
 })()
-},{}],6:[function(require,module,exports){
-
-var view = require("../view"),
-    dom = require("../../dom/dom"),
-    ruler = require("./ruler"),
-    raphael = require("raphael-browserify"),
-    longdrink = require("./longdrink_glass");
-
-var flaskfiller = function(config, scale_, dimensions_) {
-    var _flaskfiller = view(config);
-
-    var scale = scale_ || 4; // px per mm
-
-    var dimensions = dimensions_ || {
-        width: 900,
-        height: 600,
-        ruler_width: 30,
-        margins: {
-            left: 5,
-            right: 5,
-            top: 5,
-            bottom: 5
-        }
-    };
-
-    var CONTAINER = {
-            width: dimensions.width || 900,
-            height: dimensions.height || 600
-        };
-
-    var RULERS = {
-            horizontal: {
-                x:  dimensions.ruler_width + dimensions.margins.left,
-                y:  CONTAINER.height - dimensions.ruler_width - dimensions.margins.top,
-                width: CONTAINER.width - dimensions.ruler_width - dimensions.margins.left - dimensions.margins.right,
-                height: dimensions.ruler_width,
-                scale: scale,
-                orientation: "horizontal"
-            },
-            vertical: {
-                x:  0 + dimensions.margins.left,
-                y:  0 + dimensions.margins.top,
-                width: dimensions.ruler_width,
-                height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom,
-                scale: scale,
-                orientation: "vertical"
-            }
-        };
-
-    var SIMULATION = {
-            x:  dimensions.ruler_width + dimensions.margins.left,
-            y:  0 + dimensions.margins.top,
-            width: CONTAINER.width - dimensions.ruler_width - dimensions.margins.left - dimensions.margins.right,
-            height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom
-        };
-
-
-    _flaskfiller.fragment = document
-        .createDocumentFragment()
-        .appendChild(dom.create({
-            name: "figure",
-            attributes: {
-                "class": "flaskfiller"
-            }
-        }));
-
-    // There is a bug in Raphael regarding placing text on the right
-    // y-coordinate when the canvas isn't part of the DOM
-    document.body.appendChild(_flaskfiller.fragment);
-
-    var canvas = raphael(_flaskfiller.fragment, 
-            CONTAINER.width, 
-            CONTAINER.height);
-
-    var vertical_ruler = ruler(canvas, RULERS.vertical)
-            .style({
-                "background": "white"
-            }),
-        horizontal_ruler = ruler(canvas, RULERS.horizontal)
-            .style({
-                "background": "white"
-            }),
-        cm_label = draw_cm_label();
-
-
-
-    function draw_cm_label() {
-       var x = dimensions.margins.left + (dimensions.ruler_width / 3),
-           y = CONTAINER.height - (dimensions.ruler_width / 2) - dimensions.margins.bottom,
-           cm_label = canvas.text(x, y, "cm");
-
-       cm_label.attr({
-           "font-family": "inherit",
-           "font-size": "18pt",
-           "font-weight": "bolder",
-           "fill": "dimgray"
-       }); 
-
-       return cm_label;
-    }
-
-
-    function add_glass(model) {
-        var glass;
-        if (model.type === "longdrink") {
-            var BOUNDARIES = {
-                left: SIMULATION.x,
-                right: SIMULATION.x + SIMULATION.width,
-                top: SIMULATION.y,
-                bottom: SIMULATION.y + SIMULATION.height
-            };
-            glass = longdrink(canvas, model, scale, BOUNDARIES);
-        } else {
-            // any other kind of glass
-        }
-        return glass;
-    }
-
-    function update_glass(glass) {
-        glass.update_color();        
-        glass.update();
-    }
-
-    _flaskfiller.update = function(model_name) {
-        var model = _flaskfiller.get_model(model_name);
-
-        if (!model.glass) {
-            model.glass = add_glass(model.model);
-        }
-
-        update_glass(model.glass);
-
-    };
-
-    _flaskfiller.remove = function(model_name) {
-    };
-
-
-
-    // There is a bug in Raphael regarding placing text on the right
-    // y-coordinate when the canvas isn't part of the DOM. It has been added
-    // before and now removed again.
-    document.body.removeChild(_flaskfiller.fragment);
-    return _flaskfiller;
-
-};
-
-module.exports = flaskfiller;
-
-},{"../../dom/dom":2,"../view":13,"./longdrink_glass":8,"./ruler":9,"raphael-browserify":15}],7:[function(require,module,exports){
-
-
-
-var glass = function(canvas, model, SCALE, boundaries_) {
-    var _glass = canvas.set();
-
-    var GLASS_BORDER = 3;
-
-    var x = 0, 
-        y = 0, 
-        width, 
-        height;
-
-    var BOUNDARIES = boundaries_ || {
-            left: 0,  
-            right: canvas.width,
-            top: 0,
-            bottom: canvas.height
-    },
-        PADDING = 5;
-
-    var fill, glass_shape, label, glass_pane;
-
-    function update() {
-        style({
-            color: model.color()
-        });
-    }
-
-    function style(config) {
-        if (config.color) {
-            fill.attr("fill", config.color);
-        }
-    }
-
-    function move_by(dx, dy) {
-        var new_x = x + dx,
-            new_y = y + dy;
-        if (new_x <= BOUNDARIES.left) {
-            dx = BOUNDARIES.left - x;
-            new_x = BOUNDARIES.left;
-        }
-        if (new_y <= BOUNDARIES.top) {
-            dy = BOUNDARIES.top - y;
-            new_y = BOUNDARIES.top;
-        }
-        if (BOUNDARIES.right <= (new_x + width)) {
-            dx = BOUNDARIES.right - (x + width);
-            new_x = BOUNDARIES.right - width;
-        }
-        if (BOUNDARIES.bottom <= (new_y + height)) {
-            dy = BOUNDARIES.bottom - (y + height);
-            new_y = BOUNDARIES.bottom - height;
-        }
-        _glass.transform("...T" + dx + "," + dy );
-        x = new_x;
-        y = new_y;
-        return _glass;
-    }
-
-    function move_to(new_x, new_y) {
-        // check x and y
-        var delta_x = new_x - x,
-            delta_y = new_y - y;
-        _glass.transform("...t" + delta_x + "," + delta_y );
-        x += delta_x;
-        y += delta_y;
-        return _glass;
-    }
-    
-    function draw() {
-        label = canvas.text(x, y, model.get_maximum("volume") + " ml");
-        label.attr({
-        });
-        _glass.push(label);
-        fill = canvas.path(model.path(SCALE, true));
-        fill.attr({
-            fill: model.color(),
-            stroke: "none",
-            opacity: 0.4
-        });
-        _glass.push(fill);
-
-        glass_shape = canvas.path(model.path(SCALE));
-        glass_shape.attr({
-            "stroke": "black",
-            "stroke-width": GLASS_BORDER,
-            "fill": "none"
-        });
-        _glass.push(glass_shape);  
-
-
-        glass_pane = canvas.path(model.path(SCALE));
-        glass_pane.attr({
-            fill: "white",
-            opacity: 0,
-            stroke: "white",
-            "stroke-opacity": 0,
-            "stroke-width": GLASS_BORDER
-        });
-        _glass.push(glass_pane);
-        set_label();
-
-        glass_pane.hover(onmovehover, offmovehover);
-        move_by(BOUNDARIES.left - 10, BOUNDARIES.bottom + 10);
-
-    }
-
-    function set_label() {
-        update_size();
-        model.compute_maxima();
-        label.attr({
-            x: width/2,
-            y: height/2,
-            "font-size": compute_font_size(),
-            text: model.get_maximum("volume") + " ml"
-        });
-        function compute_font_size() {
-            return Math.max((((width -2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
-        }
-    }
-    _glass.set_label = set_label;
-
-    function update_size() {
-        var bbox = _glass.getBBox();
-
-        width = bbox.width;
-        height = bbox.height;
-    }
-
-    function make_moveable() {
-        _glass.drag(onmove, onstart, onend);
-    }
-    _glass.make_moveable = make_moveable;
-
-    function make_unmoveable() {
-        _glass.undrag();
-    }
-    _glass.make_unmoveable = make_unmoveable;
-
-    var delta_x, delta_y;
-    function onmove(dx, dy, x, y, event) {
-        var ddx = dx - delta_x,
-            ddy = dy - delta_y;
-
-        move_by(ddx, ddy);
-        delta_x = dx;
-        delta_y = dy;
-    }
-
-    function onstart(x, y, event) {
-        delta_x = delta_y = 0;
-        glass_pane.unhover(onmovehover, offmovehover);
-    }
-
-    function onend(event) {
-        glass_pane.hover(onmovehover, offmovehover);
-    }
-
-    function onmovehover() {
-        _glass.attr({
-            "cursor": "move"
-        });
-        make_moveable();
-    }
-
-    function offmovehover() {
-        make_unmoveable();
-        delta_x = delta_y = 0;
-        _glass.attr({
-            "cursor": "default"
-        });
-    }
-
-
-    function update_color() {
-        fill.attr("fill", model.color());
-    }
-
-
-    draw();
-    _glass.height = height;
-    _glass.width = width;
-    _glass.x = x;
-    _glass.y = y;
-    _glass.draw = draw;
-    _glass.update = update;
-    _glass.update_color = update_color;
-    _glass.fill = fill;
-    _glass.glass_shape = glass_shape;
-    _glass.glass_pane = glass_pane;
-    _glass.move_to = move_to;
-    _glass.move_by = move_by;
-    return _glass;
-};
-
-module.exports = glass;
-
-},{}],8:[function(require,module,exports){
-
-var glass = require("./glass");
-
-var longdrink_glass = function(canvas, model, SCALE, boundaries_) {
-    var _glass = glass(canvas, model, SCALE, boundaries_);
-
-    var HANDLE_SPACE = 5,
-        HANDLE_SIZE = 2.5,
-        handle = canvas.circle( 
-                _glass.x + _glass.width + HANDLE_SPACE, 
-                _glass.y - HANDLE_SPACE, 
-                HANDLE_SIZE);
-    _glass.push(handle);
-
-    handle.attr({
-        fill: "silver",
-        "stroke": "silver"
-    });
-    handle.hover(enable_resizing, disable_resizing);
-
-    function enable_resizing() {
-        handle.attr({
-            fill: "yellow",
-            stroke: "black",
-            "stroke-width": 2,
-            r: HANDLE_SIZE * 1.5,
-            cursor: "nesw-resize"
-        });
-        _glass.glass_pane.attr({
-            fill: "lightyellow",
-            opacity: 0.7
-        });
-        handle.drag(sizemove, sizestart, sizestop); 
-    }
-
-    function disable_resizing() {
-        handle.attr({
-            fill: "silver",
-            stroke: "silver",
-            "stroke-width": 1,
-            r: HANDLE_SIZE,
-            cursor: "default"
-        });
-        _glass.glass_pane.attr({
-            fill: "white",
-            opacity: 0
-        });
-    }
-
-
-
-    var delta_x = 0, delta_y = 0;
-
-    function sizemove(dx, dy, x, y, event) {
-        var ddx = dx - delta_x,
-            ddy = dy - delta_y,
-            d_height = ddy / SCALE / 10,
-            d_radius = ddx / 2 / SCALE / 10,
-            new_radius = model.radius() + d_radius,
-            new_height = model.height()  - d_height,
-            new_y = y + ddy;
-
-
-        if (new_height >= 1 && new_radius >= 1){
-            model.height(new_height);
-            model.radius(new_radius);
-            _glass.move_by(0, ddy);
-            model.update_views();
-        }
-
-        delta_x = dx;
-        delta_y = dy;
-    }
-
-    function sizestart(x, y, event) {
-        delta_x = 0;
-        delta_y = 0;
-    }
-
-    function sizestop(event) {
-        handle.undrag();
-    }
-
-
-    var height = model.height,
-        radius = model.radius,
-        flow_rate = model.flow_rate,
-        color = model.color || "blue";
-
-
-    function set_height(h) {
-        model.height(h);
-        height = h;
-        update();
-    }
-
-    function set_radius(r) {
-        model.radius(r);
-        radius = r;
-        update();
-    }
-
-    function update_size() {
-        var bbox = _glass.glass_pane.getBBox();
-
-        _glass.width = bbox.width;
-        _glass.height = bbox.height;
-    }
-
-    function update() {
-        _glass.glass_shape.attr({
-            path: model.path(SCALE)
-        });
-        _glass.fill.attr({
-            path: model.path(SCALE, true)
-        });
-        _glass.glass_pane.attr({
-            path: model.path(SCALE)
-        });
-        update_size();
-        handle.attr({
-            cx: _glass.x + _glass.width + HANDLE_SPACE, 
-            cy:  _glass.y - HANDLE_SPACE
-        });
-
-        _glass.set_label();
-
-        
-    }
-
-
-    _glass.update = update;
-
-    return _glass;
-};
-
-module.exports = longdrink_glass;
-
-},{"./glass":7}],9:[function(require,module,exports){
-
-var ruler = function(canvas, config) {
-    var _ruler = canvas.set();
-
-    var x = config.x || 0,
-        y = config.y || 0,
-        width = config.width || 50,
-        height = config.height || 500,
-        scale = config.scale || 2,
-        orientation = config.orientation || "vertical";
-
-    var background,
-        ticks,
-        labels,
-        glass_pane;
-
-    draw();
-    style({
-        background: "yellow",
-        stroke: "dimgray",
-        stroke_width: 2,
-        font_size: "12pt"
-    });
-
-
-    
-    function draw() {
-        background = canvas.rect(x, y, width, height);
-        _ruler.push(background);
-        _ruler.push(draw_ticks());
-        _ruler.push(draw_labels());
-        glass_pane = canvas.rect(x, y, width, height);
-        glass_pane.attr({
-            fill: "white",
-            opacity: 0,
-            stroke: "white",
-            "stroke-opacity": 0
-        });
-        _ruler.push(glass_pane);
-
-        function draw_labels() {
-            labels = canvas.set();
-            
-            var ONE_CM_IN_PX = scale * 10,
-                cm = 0;
-
-            if (orientation === "vertical") {
-                var h = y + height,
-                    y_end = y + ONE_CM_IN_PX,
-                    x_start = x + (width/4);
-
-                while (h > y_end) {
-                    h = h - ONE_CM_IN_PX;
-                    cm++;
-                    labels.push(canvas.text(x_start, h, cm));
-                }
-            } else {
-                var w = x,
-                    x_end = x + width - ONE_CM_IN_PX,
-                    y_start = y + (height/(4/3));
-
-                while (w < x_end) {
-                    w = w + ONE_CM_IN_PX;
-                    cm++;
-                    labels.push(canvas.text(w, y_start, cm));
-                }
-            }
-
-
-            return labels;
-        }
-
-        function draw_ticks() {
-            var CM_SIZE = 13,
-                HALF_CM_SIZE = 8,
-                MM_SIZE = 5,
-                cm_ticks = canvas.path(create_ticks_path(0, CM_SIZE)),
-                half_cm_ticks = canvas.path(create_ticks_path(scale*5, HALF_CM_SIZE));
-
-            ticks = canvas.set();
-            cm_ticks.attr("stroke-width", 1);
-            ticks.push(cm_ticks);
-            half_cm_ticks.attr("stroke-width", 1);
-            ticks.push(half_cm_ticks);
-            [1, 2, 3, 4, 6, 7, 8, 9].forEach(draw_mm_ticks);
-
-            function draw_mm_ticks(step) {
-                  var mm_ticks = canvas.path(create_ticks_path(scale*step, MM_SIZE));
-                  mm_ticks.attr("stroke-width", 0.5);
-                  ticks.push(mm_ticks);
-            }
-
-            function create_ticks_path(step, size) {
-                var ONE_CM_IN_PX = scale * 10,
-                    ticks_path;
-                if (orientation === "vertical") {
-                    var h = y + height + step,
-                        y_end = y + ONE_CM_IN_PX,
-                        x_start = x + width;
-
-                    while (h > y_end) {
-                        h = h - ONE_CM_IN_PX;
-                        ticks_path += "M" + x_start + "," + h + "h-" + size;
-                    }
-                } else {
-                    var w = x - step,
-                        x_end = x + width - ONE_CM_IN_PX,
-                        y_start = y;
-
-                    while (w < x_end) {
-                        w = w + ONE_CM_IN_PX;
-                        ticks_path += "M" + w + "," + y_start + "v" + size;
-                    }
-                }
-
-                return ticks_path;
-            }
-
-            return ticks;
-        }
-
-    }
-
-    function style(config) {
-        if (config.background) {
-            background.attr("fill", config.background);
-        }
-        if (config.stroke) {
-            background.attr("stroke", config.stroke);
-            ticks.attr("stroke", config.stroke);
-
-        }
-        if (config.stroke_width) {
-            background.attr("stroke-width", config.stroke_width);
-        }
-        if (config.font_size) {
-            labels.attr("font-size", config.font_size);
-        }
-        if (config.font_family) {
-            labels.attr("font-family", config.font_family);
-        }
-
-        return _ruler;
-    }
-
-    _ruler.style = style;
-
-    return _ruler;
-
-};
-
-module.exports = ruler;
-
-},{}],10:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -1628,324 +577,510 @@ module.exports = ruler;
  * DEALINGS IN THE SOFTWARE.
  */
 
-var view = require("./view"),
-    dom = require("../dom/dom");
-
-var graph = function(config, horizontal, vertical, dimensions_) {
-
-    var _graph = view(config);
+var model = require("./model");
 
 
-    var dimensions = dimensions_ || {
-        width: 900,
-        height: 600,
-        margin: {
-            top: 10,
-            right: 20,
-            left: 80,
-            bottom: 80
-        }
-    };
+/**
+ * height in cm
+ * radius in cm
+ * flow_rate in ml/sec
+ *
+ */
+var longdrink_glass = function(name, config) {
 
-    var CONTAINER = {
-            width: dimensions.width || 900,
-            height: dimensions.height || 600
-        };
-    var MARGINS = {
-            top:dimensions.margin.top || 10,
-            right:dimensions.margin.right || 20,
-            left:dimensions.margin.left || 60,
-            bottom:dimensions.margin.bottom || 60
-        };
-    var GRAPH = {
-            width: CONTAINER.width - MARGINS.left - MARGINS.right,
-            height: CONTAINER.height - MARGINS.top - MARGINS.bottom
-        };
+    var radius = config.radius || 2,
+        height = config.height || 7.5,
+        flow_rate = config.flow_rate || 50,
+        action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
+        default_actions = require("../actions/actions")({speed: flow_rate});
 
-
-    _graph.fragment = document
-        .createDocumentFragment()
-        .appendChild(dom.create({
-            name: "figure",
-            attributes: {
-                "class": "graph"
-            }
-        }));
-
-    var svg = d3.select(_graph.fragment).append("svg")
-            .attr("width", CONTAINER.width)
-            .attr("height", CONTAINER.height)
-            .append("g")
-                .attr("transform", "translate(" + 
-                        MARGINS.left + "," + 
-                        MARGINS.right + ")");
-
-    var horizontal_axis, vertical_axis;
-
-    function draw_line(model_name) {
-        var model = _graph.get_model(model_name).model,
-            data = model.data(),
-            x_scale = horizontal_axis.scale,
-            x_quantity = horizontal_axis.quantity,
-            y_scale = vertical_axis.scale,
-            y_quantity = vertical_axis.quantity;
-
-        var line = d3.svg.line()
-                .x(function(d) {
-                    return x_scale(d[x_quantity.name]);
-                })
-                .y(function(d) {
-                    return y_scale(d[y_quantity.name]);
-                })
-                .interpolate("cardinal")
-                .tension(0);
-                
-
-        var model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
-        if (model_line) {
-            model_line.parentNode.removeChild(model_line);
-        }
-
-
-        svg.select("g.lines")
-                .append("g")
-                .attr("class", "line " + model_name)
-                .selectAll("path." + model_name)
-                .data([data])
-                .enter()
-                .append("path")
-                .attr("d", line)
-                .attr("class", "graph")
-                .attr("fill", "none")
-                .attr("stroke", model.color || "red")
-                .style("stroke-width", 3);
-
-
+    /**
+     * Compute the volume in ml in the longdrink glass given flow_rate and time the
+     * water has flown in seconds.
+     */
+    function compute_volume(time) {
+        return time * flow_rate;
     }
-
-
-    function create_caption() {
-        var get_name = function(q) {
-                return _graph.quantities[q].name;
-            },
-            quantity_names = Object.keys(_graph.quantities),
-            horizontal_selected_index = quantity_names.indexOf(
-                    horizontal),
-            vertical_selected_index = quantity_names.indexOf(
-                    vertical),
-            create_option = function(selected_index) {
-                return function(quantity_name, index) {
-                    var option = {
-                        name: "option",
-                        value: quantity_name
-                    };
-                    if (index === selected_index) {
-                        option.attributes = {
-                            selected: true
-                        };
-                    }
-                    return option;
-                };
-            },
-            horizontal_quantity_list = quantity_names.map(
-                    create_option(horizontal_selected_index)),
-            vertical_quantity_list = quantity_names.map(
-                    create_option(vertical_selected_index));
-
-        _graph.fragment.appendChild(dom.create({
-                name: "figcaption",
-                children: [{
-                    name: "select",
-                    attributes: {
-
-                    },
-                    children: vertical_quantity_list,
-                    on: {
-                        type: "change",
-                        callback: function(event) {
-                            var quantity = event.target.value;
-                            set_axis(quantity, "vertical");
-                        }
-                    }
-                },{
-                    name: "textNode",
-                    value: " - "
-                }, {
-                    name: "select",
-                    children: horizontal_quantity_list,
-                    on: {
-                        type: "change",
-                        callback: function(event) {
-                            var quantity = event.target.value;
-                            set_axis(quantity, "horizontal");
-                        }
-                    }
-                }, {
-                    name: "textNode",
-                    value: " grafiek"
-                }            
-                ]
-            }));
-    }
-    create_caption();
-
-
-    function set_axis(quantity_name, orientation) {
-        var quantity = _graph.quantities[quantity_name],
-            create_scale = function(quantity, orientation) {
-                var range;
-                if (orientation === "horizontal") {
-                    range = [0, GRAPH.width];
-                } else {
-                    range = [GRAPH.height, 0];
-                }
-                return d3.scale.linear()
-                    .range(range)
-                    .domain([quantity.minimum, quantity.maximum]);
-            },
-            scale = create_scale(quantity, orientation),
-            create_axis = function(quantity, orientation) {
-                var axis;
-                if (orientation === "horizontal") {
-                    axis = d3.svg.axis()
-                        .scale(scale)
-                        .tickSubdivide(3);
-                } else {
-                    axis = d3.svg.axis()
-                        .scale(scale)
-                        .orient("left")
-                        .tickSubdivide(3);
-                }
-                return axis;
-            },
-            axis = create_axis(quantity, orientation);
-       
-        if (orientation === "horizontal") {
-            //  create axes    
-            var xaxisg = _graph.fragment.querySelector("g.x.axis");
-            if (xaxisg) {
-                xaxisg.parentNode.removeChild(xaxisg);
-            }
-
-            svg.append("g")
-                .attr("class", "x axis")
-                .attr("transform", "translate(0," + GRAPH.height + ")")
-                .call(axis);
-
-            var xgridg = _graph.fragment.querySelector("g.x.grid");
-            if (xgridg) {
-                xgridg.parentNode.removeChild(xgridg);
-            }
-
-            svg.append("g")
-                .attr("class", "x grid")
-                .attr("transform", "translate(0," + GRAPH.height + ")")
-                .call(axis.tickSize(- GRAPH.height, 0, 0).tickFormat(""));
-
-            var xlabel = _graph.fragment.querySelector("text.x.label");
-            if (xlabel) {
-                xlabel.parentNode.removeChild(xlabel);
-            }
-
-            svg.append('text')
-                .attr('text-anchor', 'middle')
-                .attr("class", "x label")
-                .text(quantity.label)
-                    .attr('x', GRAPH.width / 2)
-                    .attr('y', CONTAINER.height - (MARGINS.bottom / 2));
-
-            horizontal_axis = {
-                quantity: quantity,
-                scale: scale,
-                axis: axis
-            };
-        } else {
-            // vertical axis
-            var yaxisg = _graph.fragment.querySelector("g.y.axis");
-            if (yaxisg) {
-                yaxisg.parentNode.removeChild(yaxisg);
-            }
-
-            svg.append("g")
-                .attr("class",  "y axis")
-                .call(axis);
-
-            var ygridg = _graph.fragment.querySelector("g.y.grid");
-            if (ygridg) {
-                ygridg.parentNode.removeChild(ygridg);
-            }
-
-            svg.append("g")
-                .attr("class", "y grid")
-                .call(axis.tickSize(- GRAPH.width, 0, 0).tickFormat(""));
-
-            var ylabel = _graph.fragment.querySelector("text.y.label");
-            if (ylabel) {
-                ylabel.parentNode.removeChild(ylabel);
-            }
-
-            svg.append('text')
-                .attr('text-anchor', 'middle')
-                .attr("class", "y label")
-                .text(quantity.label)
-                    .attr('transform', 'rotate(-270,0,0)')
-                    .attr('x', GRAPH.height / 2)
-                    .attr('y', MARGINS.left * (5/6) );
-
-            vertical_axis = {
-                quantity: quantity,
-                scale: scale,
-                axis: axis
-            };
-        }
-
-        update_lines();
-        
-    }
-
-    function update_lines() {
-        Object.keys(_graph.models).forEach(draw_line);
-    }
-
-    function create_graph() {
-
-        // scales and axes (make all axis pre-made?)
-        set_axis(horizontal, "horizontal");
-        set_axis(vertical, "vertical");
-        svg.append("g")
-            .attr("class", "lines");
-
-    }
-    create_graph();
-
     
-    _graph.remove = function(model_name) {
-        var model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
-        if (model_line) {
-            model_line.parentNode.removeChild(model_line);
+
+    /**
+     * Compute the height of the water in cm given the volume of the water in
+     * the glass in ml.
+     */
+    var area = Math.PI * Math.pow(radius, 2);
+    function compute_height(volume) {
+        if (volume > 0) {
+            return volume / area;
+        } else {
+            return 0;
+        }
+    }
+
+    function create_actions(action_list) {
+        var actions = {},
+            create_action = function(action_name) {
+                actions[action_name] = default_actions[action_name];
+            };
+        action_list.forEach(create_action);
+        return actions;
+    }
+
+
+    var quantities = {
+        hoogte: {
+            minimum: 0,
+            value: 0,
+            unit: 'cm',
+            name: "hoogte",
+            label: "hoogte in cm",
+            stepsize: 0.01,
+            monotone: true,
+            precision: 2
+        },
+        volume: {
+            minimum: 0,
+            value: 0,
+            unit: 'ml',
+            name: "volume",
+            label: "volume in ml",
+            stepsize: 0.1,
+            monotone: true,
+            precision: 0
+        },
+        tijd: {
+            minimum: 0,
+            value: 0,
+            unit: 'sec',
+            name: "tijd",
+            label: "tijd",
+            stepsize: 0.01,
+            monotone: true,
+            precision: 1
         }
     };
 
-    _graph.update_all = function() {
-        set_axis(horizontal, "horizontal");
-        set_axis(vertical, "vertical");
-        Object.keys(_graph.models).forEach(_graph.update);
+    var time_max, volume_max, height_max;
+    function compute_maxima() {
+        time_max = Math.floor(area*height*10 / flow_rate)/10;
+        volume_max = time_max * flow_rate;
+        height_max = volume_max / area;
+
+        quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
+        quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
+        quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
+    }
+
+    compute_maxima();
+
+    var time = {
+        start: 0,
+        end: quantities.tijd.maximum*1000,
+        step: Math.ceil(1000/flow_rate)
     };
 
+    var _model = model(name, {
+        time: time,
+        quantities: quantities,
+        actions: create_actions(action_list)
+    });
 
-    _graph.update = function(model_name) {
-        var model = _graph.get_model(model_name);
-        draw_line(model_name);
+    _model.measure_moment = function(moment) {
+        var time_in_ms = _model.moment_to_time(moment),
+            tijd = time_in_ms / 1000,
+            volume = compute_volume(tijd),
+            hoogte = compute_height(volume);
+
+        return {
+            tijd: tijd,
+            volume: volume,
+            hoogte: hoogte
+        };
     };
 
-    return _graph;
+    _model.path = function(SCALE, fill) {
+        var h = height * SCALE * 10,
+            y = 0;
+        if (fill) {
+            h = _model.get("hoogte") * SCALE * 10;
+            y = height * SCALE * 10 - h;
+        }
+        var path = "M0," + y;
+        path += "v" + h;
+        path += "h" + radius * 2 * SCALE * 10;
+        path += "v-" + h;
+        return path;
+    };
+
+    _model.step();
+    _model.compute_maxima = compute_maxima;
+    _model.type = "longdrink";
+    _model.height = function(h) {
+        if (arguments.length === 1) {
+            height = h;
+            _model.update_views();
+        }
+        return height;
+    };
+    _model.radius = function(r) {
+        if (arguments.length === 1) {
+            radius = r;
+            _model.update_views();
+        }
+        return radius;
+    };
+    _model.flow_rate = function(fr) {
+        if (arguments.length === 1) {
+            flow_rate = fr;
+            _model.update_views();
+        }
+        return flow_rate;
+    };
+
+    return _model;
 };
 
-module.exports = graph;
+module.exports = longdrink_glass;
 
-},{"../dom/dom":2,"./view":13}],11:[function(require,module,exports){
+},{"./model":2,"../actions/actions":4}],4:[function(require,module,exports){
+
+
+// add attribution to the icons: "Entypo pictograms by Daniel Bruce — www.entypo.com"
+
+var actions = function(config) {
+    var _actions = {};
+
+
+    // Running model actions
+
+    var running_models = {},
+        current_speed = config.speed || 500;
+
+    _actions.speed = function( speed ) {
+        if (arguments.length === 1) {
+            current_speed = speed;
+        }
+        return current_speed;
+    };
+
+    var is_running =  function(model) {
+        return running_models[model.name];
+    };
+
+    _actions.start = {
+        name: "start",
+        group: "run_model",
+        icon: "icon-play",
+        tooltip: "Start simulation",
+        enabled: true,
+        callback: function(model) {
+           
+            var step = function() {
+                if (!model.is_finished()) {
+                    model.step();
+                } else {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                    model.disable_action("finish");
+                    model.disable_action("pause");
+                    model.disable_action("start");
+                    model.update_views();
+                }
+            };
+
+            return function() {
+                    if (!is_running(model)) {
+                        running_models[model.name] = setInterval(step, current_speed);
+                    }
+                    model.disable_action("start");
+                    model.enable_action("pause");
+                    model.enable_action("reset");
+                    model.update_views();
+            };
+        }
+    };
+
+    _actions.pause = {
+        name: "pause",
+        group: "run_model",
+        icon: "icon-pause",
+        tooltip: "Pause simulation",
+        enabled: false,
+        callback: function(model) {
+            return function() {
+                if (is_running(model)) {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                }
+                model.enable_action("start");
+                model.disable_action("pause");
+                model.update_views();
+            };
+        }
+    };
+
+    _actions.reset = {
+        name: "reset",
+        group: "run_model",
+        icon: "icon-fast-backward",
+        tooltip: "Reset simulation",
+        enabled: true,
+        callback: function(model) {
+            return function() {
+                if (is_running(model)) {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                }
+                model.reset();
+                model.enable_action("start");
+                model.enable_action("finish");
+                model.disable_action("pause");
+                model.disable_action("reset");
+                model.update_views();
+            };
+        }
+    };
+
+    _actions.finish = {
+        name: "finish",
+        group: "run_model",
+        icon: "icon-fast-forward",
+        tooltip: "Finish simulation",
+        enabled: true,
+        callback: function(model) {
+            return function() {
+                if (is_running(model)) {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                }
+                model.finish();
+                model.disable_action("pause");
+                model.disable_action("start");
+                model.disable_action("finish");
+                model.enable_action("reset");
+                model.update_views();
+            };
+        }
+    };
+
+    // Remove model actions
+    
+    _actions.remove = {
+        name: "remove",
+        group: "edit",
+        icon: "icon-remove",
+        tooltip: "Remove this model",
+        enabled: true,
+        callback: function(model) {
+            return function() {
+                model.unregister();
+            };
+        }
+    };
+
+    // Toggle view action
+
+
+    return _actions;
+};
+
+module.exports = actions;
+
+},{}],5:[function(require,module,exports){
+/*
+ * Copyright (C) 2013 Huub de Beer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+var view = function(config) {
+    var _view = {},
+        _appendix = {};
+
+    // Quantities to show
+    var show = function(quantity) {
+            return !config.quantities[quantity].hidden;
+        },
+        quantities = {},
+        add_quantity = function(q) {
+            var quantity = config.quantities[q];
+            quantities[quantity.name] = Object.create(quantity);
+        };
+    Object.keys(config.quantities).filter(show).forEach(add_quantity);
+    _view.quantities = quantities;
+
+    
+    // Observer pattern
+
+    var models = {};
+
+    _view.compute_extrema = function() {
+        // WARNING SOMEHOW CHANGES THE QUANTITIES OF THE MODELS ...
+        var compute_maximum = function(quantity_name){
+                return function(max, model_name) {
+                    var model = models[model_name].model;
+                    return Math.max(max, model.get_maximum(quantity_name));
+                };
+            },
+            compute_minimum = function(quantity_name){
+                return function(min, model_name) {
+                    var model = models[model_name].model;
+                    return Math.min(min, model.get_minimum(quantity_name));
+                };
+            },
+            compute_quantity_extrema = function(quantity_name) {
+                var quantity = _view.quantities[quantity_name];
+
+                quantity.minimum = Object.keys(models)
+                    .reduce(compute_minimum(quantity_name), Infinity);
+                quantity.maximum = Object.keys(models)
+                    .reduce(compute_maximum(quantity_name), -Infinity);
+            };
+
+        Object.keys(_view.quantities)
+            .forEach(compute_quantity_extrema);
+    };
+
+    _view.register = function(model) {
+        var model_found = Object.keys(models).indexOf(model.name);
+        if (model_found === -1) {
+            models[model.name] = {
+                model: model
+            };
+            _view.compute_extrema();
+            model.register(this);
+            _view.update(model.name);
+        }
+    };
+
+    _view.unregister = function(model_name) {
+        if (models[model_name]) {
+            _view.remove(model_name);
+            models[model_name].model.unregister(this);
+            delete models[model_name];
+            _view.compute_extrema();
+            _view.update_all();
+        }
+    };
+
+    _view.get_model = function(model_name) {
+        return models[model_name];
+    };
+
+    _view.remove = function(model_name) {
+        // implement in specialized view; called by unregister
+    };
+
+    _view.update_all = function() {
+        Object.keys(models).forEach(_view.update);
+    };
+
+    _view.update = function(model_name) {
+        // implement in specialized view; called by registered model on
+        // change
+    };
+    _view.models = models;
+
+    return _view;    
+};
+
+module.exports = view;
+
+},{}],6:[function(require,module,exports){
+/*
+ * Copyright (C) 2013 Huub de Beer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+var dom = {
+    create: function(spec) {
+        var elt;
+       
+        if (spec.name === "textNode") {
+           elt = document.createTextNode(spec.value);
+        } else {
+           elt = document.createElement(spec.name);
+        }
+
+        var set_attribute = function(attr) {
+                elt.setAttribute(attr, spec.attributes[attr]);
+            };
+
+        if (spec.attributes) {
+            Object.keys(spec.attributes).forEach(set_attribute);
+        }
+
+        if (spec.children) {
+            var append = function(child) {
+                elt.appendChild(dom.create(child));
+            };
+            spec.children.forEach(append);
+        }
+
+        if (spec.on) {
+            if (typeof spec.on === "Array") {
+                spec.on.forEach(function(on) {
+                    elt.addEventListener( on.type, on.callback );
+                });
+            } else {
+                elt.addEventListener( spec.on.type, spec.on.callback );
+            }
+        }
+
+        if (spec.value) {
+            if (spec.name === "input") {
+                elt.value = spec.value;
+            } else {
+                elt.innerHTML = spec.value;
+            }
+        }
+
+        if (spec.style) {
+            var set_style = function(style_name) {
+                elt.style[style_name] = spec.style[style_name];
+            };
+            Object.keys(spec.style).forEach(set_style);
+        }
+
+        return elt;
+    }
+};
+
+module.exports = dom;
+
+},{}],7:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -2287,355 +1422,7 @@ var table = function(config) {
 
 module.exports = table;
 
-},{"../dom/dom":2,"./view":13}],12:[function(require,module,exports){
-
-var view = require("../view"),
-    dom = require("../../dom/dom"),
-    raphael = require("raphael-browserify");
-
-var temperaturetyper = function(config, scale_, dimensions_) {
-    
-    var _temperaturetyper = view(config);
-
-    var scale = scale_ || 4; // px per mm
-
-    var dimensions = dimensions_ || {
-        width: 60,
-        height: 325,
-        margins: {
-            left: 5,
-            right: 5,
-            top: 5,
-            bottom: 5
-        }
-    };
-
-    var CONTAINER = {
-            width: dimensions.width || 100,
-            height: dimensions.height || 320
-        };
-
-    var THERMOMETER = {
-        x: dimensions.margins.top,
-        y: dimensions.margins.left,
-        width: CONTAINER.width - dimensions.margins.left - dimensions.margins.right,
-        height: CONTAINER.height - dimensions.margins.top - dimensions.margins.bottom,
-        rounded_corners: dimensions.margins.top + dimensions.margins.left + dimensions.margins.bottom + dimensions.margins.right
-    };
-
-    _temperaturetyper.fragment = document
-        .createDocumentFragment()
-        .appendChild(dom.create({
-            name: "figure",
-            attributes: {
-                "class": "temperaturetyper"
-            }
-        }));
-
-
-    var message = _temperaturetyper.fragment.appendChild(
-            dom.create({
-                name: "div",
-                attributes: {
-                    "class": "message"
-                },
-                value: "Activate to start measuring"
-            }));
-    var measuring_container = _temperaturetyper.fragment.appendChild(
-            dom.create({
-                name: "div",
-                attributes: {
-                    "class": "container"
-                }
-            }));
-    measuring_container.style.height = CONTAINER.height;
-    measuring_container.style.width = CONTAINER.width;
-
-    var measuring_simulation = measuring_container.appendChild(
-            dom.create({
-                name: "figure",
-                attributes: {
-                    "class": "simulation"
-                }
-            }));
-
-    var measuring_data = measuring_container.appendChild(
-            dom.create({
-                name: "textarea",
-                attributes: {
-                    "class": "data",
-                    "cols": 25,
-                    "rows": 20
-                },
-                style: {
-                    "overflow-y": "auto",
-                    "overflow-x": "hidden"
-                },
-                on: {
-                    type: "keydown",
-                    callback: add_new_measurement
-                },
-                value: format_time(0) + "\t"
-            }));
-
-
-
-
-    // There is a bug in Raphael regarding placing text on the right
-    // y-coordinate when the canvas isn't part of the DOM
-    document.body.appendChild(_temperaturetyper.fragment);
-
-    var canvas = raphael(measuring_simulation, 
-            CONTAINER.width, 
-            CONTAINER.height);
-
-    var thermometer = draw_thermometer();
-
-
-
-    function draw_thermometer() {
-        var thermometer = canvas.set(),
-            background,
-            empty_blob,
-            mercury_blob,
-            empty_bar,
-            mercury_bar,
-            scale;
-
-        var 
-            MERCURY_BAR_WITH = THERMOMETER.width / 8,
-            PADDING = MERCURY_BAR_WITH * 3,
-            BLOB = {
-                x: THERMOMETER.x + THERMOMETER.width / 2,
-                y: THERMOMETER.y + THERMOMETER.height - PADDING,
-                r: MERCURY_BAR_WITH
-            },
-            BAR = {
-                x: THERMOMETER.x + THERMOMETER.width / 2 - MERCURY_BAR_WITH / 2,
-                y: THERMOMETER.y + PADDING,
-                width: MERCURY_BAR_WITH,
-                height: BLOB.y - (THERMOMETER.y + PADDING + BLOB.r),
-                r: MERCURY_BAR_WITH/2
-            },
-            SCALE = BAR.height/120,
-            BORDER = 1;
-            
-
-
-        background = canvas.rect(THERMOMETER.x, THERMOMETER.y, THERMOMETER.width, THERMOMETER.height, THERMOMETER.rounded_corners);
-        background.attr({
-            fill: "white",
-            stroke: "dimgray",
-            "stroke-width": 2
-        });
-        thermometer.push(background);
-
-
-        empty_blob = canvas.circle( BLOB.x, BLOB.y, BLOB.r + BORDER);
-        empty_blob.attr({
-            fill: "none",
-            stroke: "gray",
-            "stroke-width": 0.5
-        });
-        empty_bar = canvas.rect(BAR.x - BORDER, BAR.y - BORDER, BAR.width + BORDER * 2, BAR.height + (2 * BORDER), BAR.r);
-        empty_bar.attr({
-            fill: "none",
-            stroke: "gray",
-            "stroke-width": 0.5
-        });
-
-        mercury_blob = canvas.circle( BLOB.x, BLOB.y, BLOB.r );
-        mercury_blob.attr({
-            "fill": "red",
-            "stroke": "none"
-        });
-        thermometer.push(mercury_blob);
-
-        mercury_bar = canvas.rect( BAR.x, BAR.y, BAR.width, BAR.height + BLOB.r, BAR.r);
-        mercury_bar.attr( {
-            "fill": "red",
-            "stroke": "none"
-        });
-        thermometer.push(mercury_bar);
-
-        function set_temperature( temp ) {
-            if (-20 <= temp && temp <= 100) {
-                var height = SCALE * (temp + 20),
-                    y = BAR.y + BAR.height - height;
-
-                mercury_bar.attr({
-                    y: y,
-                    height: height + BLOB.r
-                });
-            }
-            return thermometer;
-        }
-
-        thermometer.set_temperature = set_temperature;
-        
-        thermometer.set_temperature(22);
-
-
-        scale = draw_scale();
-        thermometer.push(scale);
-
-        function draw_scale() {
-            var scale = canvas.set();
-
-            
-            var TEN_DEGREE_SIZE = (THERMOMETER.width / 2) - BAR.width,
-                FIVE_DEGREE_SIZE = TEN_DEGREE_SIZE / 2,
-                DEGREE_SIZE = FIVE_DEGREE_SIZE / 2,
-                ten_degree_ticks = canvas.path(create_ticks_path(0, TEN_DEGREE_SIZE)),
-                five_degree_ticks = canvas.path(create_ticks_path(SCALE*5, FIVE_DEGREE_SIZE));
-
-            ten_degree_ticks.attr({
-                "stroke-width": 1,
-                "stroke": "dimgray"
-            });
-            scale.push(ten_degree_ticks);
-            five_degree_ticks.attr({
-                "stroke-width": 1,
-                "stroke": "dimgray"
-            });
-            scale.push(five_degree_ticks);
-            [1, 2, 3, 4, 6, 7, 8, 9].forEach(draw_degree_ticks);
-            scale.push(draw_labels());
-            scale.push(draw_unit());
-
-            function draw_unit() {
-                var x = THERMOMETER.x + THERMOMETER.width/2 - PADDING/4,
-                    y = THERMOMETER.y + PADDING/2,
-                    unit_label = canvas.text(x, y, "°C");
-
-                unit_label.attr({
-                    "font-size": PADDING + "px",
-                    "font-family": "inherit"
-                });
-
-                return unit_label;
-            }
-            
-
-            function draw_labels() {
-                var labels = canvas.set();
-
-                
-                var TEN_DEGREES_IN_PX = SCALE * 10,
-                    degrees = -20,
-                    h = BAR.y + BAR.height,
-                    y_end = BAR.y,
-                    x_start = THERMOMETER.x + THERMOMETER.width - BAR.width - PADDING/3,
-                    label;
-
-                while (h > y_end) {
-                    label = canvas.text(x_start, h, degrees);
-                    label.attr({
-                        "text-anchor": "right",
-                        "font-size": "" + PADDING/2 + "px",
-                        "font-family": "inherit"
-                    });
-                    labels.push(label);
-                    h = h - TEN_DEGREES_IN_PX;
-                    degrees += 10;
-                }
-
-                return labels;
-            }
-
-            function draw_degree_ticks(step) {
-                  var degree_ticks = canvas.path(create_ticks_path(SCALE*step, DEGREE_SIZE));
-                  degree_ticks.attr({
-                      "stroke-width": 0.5,
-                      "stroke": "dimgray"
-                  });
-                  scale.push(degree_ticks);
-            }
-
-            function create_ticks_path(step, size) {
-                var TEN_DEGREES_IN_PX = SCALE * 10,
-                    ticks_path;
-
-                var h = BAR.y + BAR.height + step,
-                    y_end = BAR.y + TEN_DEGREES_IN_PX,
-                    x_start = THERMOMETER.x;
-
-                while (h > y_end) {
-                    h = h - TEN_DEGREES_IN_PX;
-                    ticks_path += "M" + x_start + "," + h + "h" + size;
-                }
-
-                return ticks_path;
-            }
-
-            return scale;
-        }
-
-
-
-
-        return thermometer;
-    }
-
-    var time = 0;
-    function format_time(time) {
-        // time in 0.1 seconds
-        var seconds,
-            minutes = "00",
-            milliseconds;
-
-        if (time >= 600) {
-            minutes = ("0" + Math.floor((time / 600))).substr(-2);
-        }
-        seconds = ("0" + Math.floor((time % 600) / 10)).substr(-2);
-        milliseconds = ((time % 600) % 10);
-
-        return "" + minutes + ":" + seconds + "," + milliseconds;
-    }
-
-    function add_new_measurement(event) {
-        var key = event.key || event.keyCode;
-        if (key === 13 || key === 10 || key === "Enter") {
-            // enter - key
-            event.preventDefault();
-            time++;
-            var lastline = this.value.substr(this.value.lastIndexOf("\n")+1),
-                temperature = parseFloat(lastline.substr(lastline.lastIndexOf("\t")+1));
-            if (!isNaN(temperature)) {
-                if (-20 <= temperature && temperature <= 100) {
-                    thermometer.set_temperature(temperature);
-                }
-            }
-            
-            this.value += "\n" + format_time(time) + "\t";
-            return false;
-        } else if (key === 9 || key === "Tab") {
-            // tab - key
-            event.preventDefault();
-            this.value += "\t";
-            return false;
-        } 
-    }
-
-    _temperaturetyper.update = function(model_name) {
-    };
-
-    _temperaturetyper.remove = function(model_name) {
-    };
-
-
-
-    // There is a bug in Raphael regarding placing text on the right
-    // y-coordinate when the canvas isn't part of the DOM. It has been added
-    // before and now removed again.
-    document.body.removeChild(_temperaturetyper.fragment);
-    return _temperaturetyper;
-
-};
-
-module.exports = temperaturetyper;
-
-},{"../../dom/dom":2,"../view":13,"raphael-browserify":15}],13:[function(require,module,exports){
+},{"../dom/dom":6,"./view":5}],8:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -2658,263 +1445,965 @@ module.exports = temperaturetyper;
  * DEALINGS IN THE SOFTWARE.
  */
 
-var view = function(config) {
-    var _view = {},
-        _appendix = {};
+var view = require("./view"),
+    dom = require("../dom/dom");
 
-    // Quantities to show
-    var show = function(quantity) {
-            return !config.quantities[quantity].hidden;
-        },
-        quantities = {},
-        add_quantity = function(q) {
-            var quantity = config.quantities[q];
-            quantities[quantity.name] = Object.create(quantity);
+var graph = function(config, horizontal, vertical, dimensions_) {
+
+    var _graph = view(config);
+
+
+    var dimensions = dimensions_ || {
+        width: 900,
+        height: 600,
+        margin: {
+            top: 10,
+            right: 20,
+            left: 80,
+            bottom: 80
+        }
+    };
+
+    var CONTAINER = {
+            width: dimensions.width || 900,
+            height: dimensions.height || 600
         };
-    Object.keys(config.quantities).filter(show).forEach(add_quantity);
-    _view.quantities = quantities;
+    var MARGINS = {
+            top:dimensions.margin.top || 10,
+            right:dimensions.margin.right || 20,
+            left:dimensions.margin.left || 60,
+            bottom:dimensions.margin.bottom || 60
+        };
+    var GRAPH = {
+            width: CONTAINER.width - MARGINS.left - MARGINS.right,
+            height: CONTAINER.height - MARGINS.top - MARGINS.bottom
+        };
+
+
+    _graph.fragment = document
+        .createDocumentFragment()
+        .appendChild(dom.create({
+            name: "figure",
+            attributes: {
+                "class": "graph"
+            }
+        }));
+
+    var svg = d3.select(_graph.fragment).append("svg")
+            .attr("width", CONTAINER.width)
+            .attr("height", CONTAINER.height)
+            .append("g")
+                .attr("transform", "translate(" + 
+                        MARGINS.left + "," + 
+                        MARGINS.right + ")");
+
+    var horizontal_axis, vertical_axis;
+
+    function draw_line(model_name) {
+        var model = _graph.get_model(model_name).model,
+            data = model.data(),
+            x_scale = horizontal_axis.scale,
+            x_quantity = horizontal_axis.quantity,
+            y_scale = vertical_axis.scale,
+            y_quantity = vertical_axis.quantity;
+
+        var line = d3.svg.line()
+                .x(function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .y(function(d) {
+                    return y_scale(d[y_quantity.name]);
+                })
+                .interpolate("cardinal")
+                .tension(0);
+                
+
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.parentNode.removeChild(model_line);
+        }
+
+
+        svg.select("g.lines")
+                .append("g")
+                .attr("class", "line " + model_name)
+                .selectAll("path." + model_name)
+                .data([data])
+                .enter()
+                .append("path")
+                .attr("d", line)
+                .attr("class", "graph")
+                .attr("fill", "none")
+                .attr("stroke", model.color || "red")
+                .style("stroke-width", 3);
+
+
+    }
+
+
+    function create_caption() {
+        var get_name = function(q) {
+                return _graph.quantities[q].name;
+            },
+            quantity_names = Object.keys(_graph.quantities),
+            horizontal_selected_index = quantity_names.indexOf(
+                    horizontal),
+            vertical_selected_index = quantity_names.indexOf(
+                    vertical),
+            create_option = function(selected_index) {
+                return function(quantity_name, index) {
+                    var option = {
+                        name: "option",
+                        value: quantity_name
+                    };
+                    if (index === selected_index) {
+                        option.attributes = {
+                            selected: true
+                        };
+                    }
+                    return option;
+                };
+            },
+            horizontal_quantity_list = quantity_names.map(
+                    create_option(horizontal_selected_index)),
+            vertical_quantity_list = quantity_names.map(
+                    create_option(vertical_selected_index));
+
+        _graph.fragment.appendChild(dom.create({
+                name: "figcaption",
+                children: [{
+                    name: "select",
+                    attributes: {
+
+                    },
+                    children: vertical_quantity_list,
+                    on: {
+                        type: "change",
+                        callback: function(event) {
+                            var quantity = event.target.value;
+                            set_axis(quantity, "vertical");
+                        }
+                    }
+                },{
+                    name: "textNode",
+                    value: " - "
+                }, {
+                    name: "select",
+                    children: horizontal_quantity_list,
+                    on: {
+                        type: "change",
+                        callback: function(event) {
+                            var quantity = event.target.value;
+                            set_axis(quantity, "horizontal");
+                        }
+                    }
+                }, {
+                    name: "textNode",
+                    value: " grafiek"
+                }            
+                ]
+            }));
+    }
+    create_caption();
+
+
+    function set_axis(quantity_name, orientation) {
+        var quantity = _graph.quantities[quantity_name],
+            create_scale = function(quantity, orientation) {
+                var range;
+                if (orientation === "horizontal") {
+                    range = [0, GRAPH.width];
+                } else {
+                    range = [GRAPH.height, 0];
+                }
+                return d3.scale.linear()
+                    .range(range)
+                    .domain([quantity.minimum, quantity.maximum]);
+            },
+            scale = create_scale(quantity, orientation),
+            create_axis = function(quantity, orientation) {
+                var axis;
+                if (orientation === "horizontal") {
+                    axis = d3.svg.axis()
+                        .scale(scale)
+                        .tickSubdivide(3);
+                } else {
+                    axis = d3.svg.axis()
+                        .scale(scale)
+                        .orient("left")
+                        .tickSubdivide(3);
+                }
+                return axis;
+            },
+            axis = create_axis(quantity, orientation);
+       
+        if (orientation === "horizontal") {
+            //  create axes    
+            var xaxisg = _graph.fragment.querySelector("g.x.axis");
+            if (xaxisg) {
+                xaxisg.parentNode.removeChild(xaxisg);
+            }
+
+            svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", "translate(0," + GRAPH.height + ")")
+                .call(axis);
+
+            var xgridg = _graph.fragment.querySelector("g.x.grid");
+            if (xgridg) {
+                xgridg.parentNode.removeChild(xgridg);
+            }
+
+            svg.append("g")
+                .attr("class", "x grid")
+                .attr("transform", "translate(0," + GRAPH.height + ")")
+                .call(axis.tickSize(- GRAPH.height, 0, 0).tickFormat(""));
+
+            var xlabel = _graph.fragment.querySelector("text.x.label");
+            if (xlabel) {
+                xlabel.parentNode.removeChild(xlabel);
+            }
+
+            svg.append('text')
+                .attr('text-anchor', 'middle')
+                .attr("class", "x label")
+                .text(quantity.label)
+                    .attr('x', GRAPH.width / 2)
+                    .attr('y', CONTAINER.height - (MARGINS.bottom / 2));
+
+            horizontal_axis = {
+                quantity: quantity,
+                scale: scale,
+                axis: axis
+            };
+        } else {
+            // vertical axis
+            var yaxisg = _graph.fragment.querySelector("g.y.axis");
+            if (yaxisg) {
+                yaxisg.parentNode.removeChild(yaxisg);
+            }
+
+            svg.append("g")
+                .attr("class",  "y axis")
+                .call(axis);
+
+            var ygridg = _graph.fragment.querySelector("g.y.grid");
+            if (ygridg) {
+                ygridg.parentNode.removeChild(ygridg);
+            }
+
+            svg.append("g")
+                .attr("class", "y grid")
+                .call(axis.tickSize(- GRAPH.width, 0, 0).tickFormat(""));
+
+            var ylabel = _graph.fragment.querySelector("text.y.label");
+            if (ylabel) {
+                ylabel.parentNode.removeChild(ylabel);
+            }
+
+            svg.append('text')
+                .attr('text-anchor', 'middle')
+                .attr("class", "y label")
+                .text(quantity.label)
+                    .attr('transform', 'rotate(-270,0,0)')
+                    .attr('x', GRAPH.height / 2)
+                    .attr('y', MARGINS.left * (5/6) );
+
+            vertical_axis = {
+                quantity: quantity,
+                scale: scale,
+                axis: axis
+            };
+        }
+
+        update_lines();
+        
+    }
+
+    function update_lines() {
+        Object.keys(_graph.models).forEach(draw_line);
+    }
+
+    function create_graph() {
+
+        // scales and axes (make all axis pre-made?)
+        set_axis(horizontal, "horizontal");
+        set_axis(vertical, "vertical");
+        svg.append("g")
+            .attr("class", "lines");
+
+    }
+    create_graph();
 
     
-    // Observer pattern
-
-    var models = {};
-
-    _view.compute_extrema = function() {
-        // WARNING SOMEHOW CHANGES THE QUANTITIES OF THE MODELS ...
-        var compute_maximum = function(quantity_name){
-                return function(max, model_name) {
-                    var model = models[model_name].model;
-                    return Math.max(max, model.get_maximum(quantity_name));
-                };
-            },
-            compute_minimum = function(quantity_name){
-                return function(min, model_name) {
-                    var model = models[model_name].model;
-                    return Math.min(min, model.get_minimum(quantity_name));
-                };
-            },
-            compute_quantity_extrema = function(quantity_name) {
-                var quantity = _view.quantities[quantity_name];
-
-                quantity.minimum = Object.keys(models)
-                    .reduce(compute_minimum(quantity_name), Infinity);
-                quantity.maximum = Object.keys(models)
-                    .reduce(compute_maximum(quantity_name), -Infinity);
-            };
-
-        Object.keys(_view.quantities)
-            .forEach(compute_quantity_extrema);
-    };
-
-    _view.register = function(model) {
-        var model_found = Object.keys(models).indexOf(model.name);
-        if (model_found === -1) {
-            models[model.name] = {
-                model: model
-            };
-            _view.compute_extrema();
-            model.register(this);
-            _view.update(model.name);
+    _graph.remove = function(model_name) {
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.parentNode.removeChild(model_line);
         }
     };
 
-    _view.unregister = function(model_name) {
-        if (models[model_name]) {
-            _view.remove(model_name);
-            models[model_name].model.unregister(this);
-            delete models[model_name];
-            _view.compute_extrema();
-            _view.update_all();
-        }
+    _graph.update_all = function() {
+        set_axis(horizontal, "horizontal");
+        set_axis(vertical, "vertical");
+        Object.keys(_graph.models).forEach(_graph.update);
     };
 
-    _view.get_model = function(model_name) {
-        return models[model_name];
+
+    _graph.update = function(model_name) {
+        var model = _graph.get_model(model_name);
+        draw_line(model_name);
     };
 
-    _view.remove = function(model_name) {
-        // implement in specialized view; called by unregister
-    };
-
-    _view.update_all = function() {
-        Object.keys(models).forEach(_view.update);
-    };
-
-    _view.update = function(model_name) {
-        // implement in specialized view; called by registered model on
-        // change
-    };
-    _view.models = models;
-
-    return _view;    
+    return _graph;
 };
 
-module.exports = view;
+module.exports = graph;
 
-},{}],14:[function(require,module,exports){
+},{"./view":5,"../dom/dom":6}],9:[function(require,module,exports){
 
-var model = require("../src/models/equation");
-var long_model = require("../src/models/longdrink_glass");
-var view = require("../src/views/view");
-var table = require("../src/views/table");
-var graph = require("../src/views/graph");
-var ff = require("../src/views/flaskfiller/flaskfiller");
-var tt = require("../src/views/temperaturetyper/temperaturetyper");
+var ruler = function(canvas, config) {
+    var _ruler = canvas.set();
 
-var actions = require("../src/actions/actions")({speed: 10});
-var actions2 = require("../src/actions/actions")({speed: 10});
+    var x = config.x || 0,
+        y = config.y || 0,
+        width = config.width || 50,
+        height = config.height || 500,
+        scale = config.scale || 2,
+        orientation = config.orientation || "vertical";
+
+    var background,
+        ticks,
+        labels,
+        glass_pane;
+
+    draw();
+    style({
+        background: "yellow",
+        stroke: "dimgray",
+        stroke_width: 2,
+        font_size: "12pt"
+    });
 
 
-var config =  {
-    time: {
-        start: 0,
-        end: 1000,
-        step: 10
-    },
-    quantities: {
-        x: {
-            minimum: 0,
-            maximum: 10,
-            value: 0,
-            name: "x",
-            label: "x in aantallen x-en",
-            stepsize: 0.1,
-            monotone: true
-            },
-        y: {
-            minimum: 0,
-            maximum: 1000,
-            value: 0,
-            unit: "km",
-            name: "y",
-            label: "afstand in km",
-            stepsize: 1
-            },
-        time: {
-            minimum: 0,
-            maximum: 1,
-            value: 0,
-            unit: 'sec',
-            name: "time",
-            label: "tijd",
-            stepsize: 0.001,
-            monotone: true,
-            precision: 2
+    
+    function draw() {
+        background = canvas.rect(x, y, width, height);
+        _ruler.push(background);
+        _ruler.push(draw_ticks());
+        _ruler.push(draw_labels());
+        glass_pane = canvas.rect(x, y, width, height);
+        glass_pane.attr({
+            fill: "white",
+            opacity: 0,
+            stroke: "white",
+            "stroke-opacity": 0
+        });
+        _ruler.push(glass_pane);
+
+        function draw_labels() {
+            labels = canvas.set();
+            
+            var ONE_CM_IN_PX = scale * 10,
+                cm = 0;
+
+            if (orientation === "vertical") {
+                var h = y + height,
+                    y_end = y + ONE_CM_IN_PX,
+                    x_start = x + (width/4);
+
+                while (h > y_end) {
+                    h = h - ONE_CM_IN_PX;
+                    cm++;
+                    labels.push(canvas.text(x_start, h, cm));
+                }
+            } else {
+                var w = x,
+                    x_end = x + width - ONE_CM_IN_PX,
+                    y_start = y + (height/(4/3));
+
+                while (w < x_end) {
+                    w = w + ONE_CM_IN_PX;
+                    cm++;
+                    labels.push(canvas.text(w, y_start, cm));
+                }
+            }
+
+
+            return labels;
         }
-    },
-    equation: function(x) {
-        return x*x*x;
-    },
-    actions: {
-        start: actions.start,
-        pause: actions.pause,
-        reset: actions.reset,
-        finish: actions.finish,
-        remove: actions.remove
+
+        function draw_ticks() {
+            var CM_SIZE = 13,
+                HALF_CM_SIZE = 8,
+                MM_SIZE = 5,
+                cm_ticks = canvas.path(create_ticks_path(0, CM_SIZE)),
+                half_cm_ticks = canvas.path(create_ticks_path(scale*5, HALF_CM_SIZE));
+
+            ticks = canvas.set();
+            cm_ticks.attr("stroke-width", 1);
+            ticks.push(cm_ticks);
+            half_cm_ticks.attr("stroke-width", 1);
+            ticks.push(half_cm_ticks);
+            [1, 2, 3, 4, 6, 7, 8, 9].forEach(draw_mm_ticks);
+
+            function draw_mm_ticks(step) {
+                  var mm_ticks = canvas.path(create_ticks_path(scale*step, MM_SIZE));
+                  mm_ticks.attr("stroke-width", 0.5);
+                  ticks.push(mm_ticks);
+            }
+
+            function create_ticks_path(step, size) {
+                var ONE_CM_IN_PX = scale * 10,
+                    ticks_path;
+                if (orientation === "vertical") {
+                    var h = y + height + step,
+                        y_end = y + ONE_CM_IN_PX,
+                        x_start = x + width;
+
+                    while (h > y_end) {
+                        h = h - ONE_CM_IN_PX;
+                        ticks_path += "M" + x_start + "," + h + "h-" + size;
+                    }
+                } else {
+                    var w = x - step,
+                        x_end = x + width - ONE_CM_IN_PX,
+                        y_start = y;
+
+                    while (w < x_end) {
+                        w = w + ONE_CM_IN_PX;
+                        ticks_path += "M" + w + "," + y_start + "v" + size;
+                    }
+                }
+
+                return ticks_path;
+            }
+
+            return ticks;
+        }
+
     }
-};
-var config2 =  {
-    time: {
-        start: 0,
-        end: 1000,
-        step: 10
-    },
-    quantities: {
-        x: {
-            minimum: 0,
-            maximum: 10,
-            value: 0,
-            label: "x",
-            stepsize: 0.1,
-            monotone: true
-            },
-        y: {
-            minimum: 0,
-            maximum: 100,
-            value: 0,
-            unit: "km",
-            label: "y",
-            stepsize: 1
-            },
-        time: {
-            minimum: 0,
-            maximum: 1,
-            value: 0,
-            unit: 'sec',
-            label: "tijd",
-            stepsize: 0.001,
-            monotone: true,
-            precision: 2
+
+    function style(config) {
+        if (config.background) {
+            background.attr("fill", config.background);
         }
-    },
-    equation: function(x) {
-        return x*x;
-    },
-    actions: {
-        start: actions2.start,
-        pause: actions2.pause,
-        reset: actions2.reset,
-        finish: actions2.finish,
-        remove: actions2.remove
+        if (config.stroke) {
+            background.attr("stroke", config.stroke);
+            ticks.attr("stroke", config.stroke);
+
+        }
+        if (config.stroke_width) {
+            background.attr("stroke-width", config.stroke_width);
+        }
+        if (config.font_size) {
+            labels.attr("font-size", config.font_size);
+        }
+        if (config.font_family) {
+            labels.attr("font-family", config.font_family);
+        }
+
+        return _ruler;
     }
+
+    _ruler.style = style;
+
+    return _ruler;
+
 };
 
-//para = model('longdrinkglas', config),
-//    para2 = model('cocktailglas', config2);
+module.exports = ruler;
 
-var flow_rate = 50; // ml per sec
-var longdrinkglas = long_model("longdrinkglas", {
-    radius: 1.7,
-    height: 7.8,
-    flow_rate: flow_rate
-});
+},{}],10:[function(require,module,exports){
 
-var breedlongdrinkglas = long_model("breedlongdrinkglas", {
-    radius: 1.3,
-    height: 2,
-    flow_rate: flow_rate
-});
+var glass = require("./glass");
 
-// console.log(para.get_minimum());
-// console.log(para.get_minimum("x"));
-// console.log(para.get_maximum());
-// console.log(para.get_maximum("x"));
-// 
-// console.log(para.get("_time_"));
-// console.log(para.set("x", 50));
-// console.log(para.get("_time_"));
-// console.log(para.get("_time_"));
-// 
-// console.log(para.current_moment());
+var longdrink_glass = function(canvas, model, SCALE, boundaries_) {
+    var _glass = glass(canvas, model, SCALE, boundaries_);
+
+    var HANDLE_SPACE = 5,
+        HANDLE_SIZE = 2.5,
+        handle = canvas.circle( 
+                _glass.x + _glass.width + HANDLE_SPACE, 
+                _glass.y - HANDLE_SPACE, 
+                HANDLE_SIZE);
+    _glass.push(handle);
+
+    handle.attr({
+        fill: "silver",
+        "stroke": "silver"
+    });
+    handle.hover(enable_resizing, disable_resizing);
+
+    function enable_resizing() {
+        handle.attr({
+            fill: "yellow",
+            stroke: "black",
+            "stroke-width": 2,
+            r: HANDLE_SIZE * 1.5,
+            cursor: "nesw-resize"
+        });
+        _glass.glass_pane.attr({
+            fill: "lightyellow",
+            opacity: 0.7
+        });
+        handle.drag(sizemove, sizestart, sizestop); 
+    }
+
+    function disable_resizing() {
+        handle.attr({
+            fill: "silver",
+            stroke: "silver",
+            "stroke-width": 1,
+            r: HANDLE_SIZE,
+            cursor: "default"
+        });
+        _glass.glass_pane.attr({
+            fill: "white",
+            opacity: 0
+        });
+    }
 
 
-config = {
-    quantities: longdrinkglas.quantities
+
+    var delta_x = 0, delta_y = 0;
+
+    function sizemove(dx, dy, x, y, event) {
+        var ddx = dx - delta_x,
+            ddy = dy - delta_y,
+            d_height = ddy / SCALE / 10,
+            d_radius = ddx / 2 / SCALE / 10,
+            new_radius = model.radius() + d_radius,
+            new_height = model.height()  - d_height,
+            new_y = y + ddy;
+
+
+        if (new_height >= 1 && new_radius >= 1){
+            model.height(new_height);
+            model.radius(new_radius);
+            _glass.move_by(0, ddy);
+            model.update_views();
+        }
+
+        delta_x = dx;
+        delta_y = dy;
+    }
+
+    function sizestart(x, y, event) {
+        delta_x = 0;
+        delta_y = 0;
+    }
+
+    function sizestop(event) {
+        handle.undrag();
+    }
+
+
+    var height = model.height,
+        radius = model.radius,
+        flow_rate = model.flow_rate,
+        color = model.color || "blue";
+
+
+    function set_height(h) {
+        model.height(h);
+        height = h;
+        update();
+    }
+
+    function set_radius(r) {
+        model.radius(r);
+        radius = r;
+        update();
+    }
+
+    function update_size() {
+        var bbox = _glass.glass_pane.getBBox();
+
+        _glass.width = bbox.width;
+        _glass.height = bbox.height;
+    }
+
+    function update() {
+        _glass.glass_shape.attr({
+            path: model.path(SCALE)
+        });
+        _glass.fill.attr({
+            path: model.path(SCALE, true)
+        });
+        _glass.glass_pane.attr({
+            path: model.path(SCALE)
+        });
+        update_size();
+        handle.attr({
+            cx: _glass.x + _glass.width + HANDLE_SPACE, 
+            cy:  _glass.y - HANDLE_SPACE
+        });
+
+        _glass.set_label();
+
+        
+    }
+
+
+    _glass.update = update;
+
+    return _glass;
 };
-var repr = table(config);
-var repr2 = graph(config, "tijd", "hoogte");
-var repr3 = ff(config);
-var repr4 = tt(config);
-var body = document.querySelector("body");
-//body.appendChild(repr4.fragment);
-//body.appendChild(repr3.fragment);
 
-body.appendChild(repr3.fragment);
-body.appendChild(repr.fragment);
-body.appendChild(repr2.fragment);
+module.exports = longdrink_glass;
+
+},{"./glass":11}],11:[function(require,module,exports){
 
 
-repr.register(longdrinkglas);
-repr.register(breedlongdrinkglas);
 
-repr2.register(longdrinkglas);
-repr2.register(breedlongdrinkglas);
+var glass = function(canvas, model, SCALE, boundaries_) {
+    var _glass = canvas.set();
 
-repr3.register(longdrinkglas);
-repr3.register(breedlongdrinkglas);
+    var GLASS_BORDER = 3;
+
+    var x = 0, 
+        y = 0, 
+        width, 
+        height;
+
+    var BOUNDARIES = boundaries_ || {
+            left: 0,  
+            right: canvas.width,
+            top: 0,
+            bottom: canvas.height
+    },
+        PADDING = 5;
+
+    var fill, glass_shape, label, glass_pane;
+
+    function update() {
+        style({
+            color: model.color()
+        });
+    }
+
+    function style(config) {
+        if (config.color) {
+            fill.attr("fill", config.color);
+        }
+    }
+
+    function move_by(dx, dy) {
+        var new_x = x + dx,
+            new_y = y + dy;
+        if (new_x <= BOUNDARIES.left) {
+            dx = BOUNDARIES.left - x;
+            new_x = BOUNDARIES.left;
+        }
+        if (new_y <= BOUNDARIES.top) {
+            dy = BOUNDARIES.top - y;
+            new_y = BOUNDARIES.top;
+        }
+        if (BOUNDARIES.right <= (new_x + width)) {
+            dx = BOUNDARIES.right - (x + width);
+            new_x = BOUNDARIES.right - width;
+        }
+        if (BOUNDARIES.bottom <= (new_y + height)) {
+            dy = BOUNDARIES.bottom - (y + height);
+            new_y = BOUNDARIES.bottom - height;
+        }
+        _glass.transform("...T" + dx + "," + dy );
+        x = new_x;
+        y = new_y;
+        return _glass;
+    }
+
+    function move_to(new_x, new_y) {
+        // check x and y
+        var delta_x = new_x - x,
+            delta_y = new_y - y;
+        _glass.transform("...t" + delta_x + "," + delta_y );
+        x += delta_x;
+        y += delta_y;
+        return _glass;
+    }
+    
+    function draw() {
+        label = canvas.text(x, y, model.get_maximum("volume") + " ml");
+        label.attr({
+        });
+        _glass.push(label);
+        fill = canvas.path(model.path(SCALE, true));
+        fill.attr({
+            fill: model.color(),
+            stroke: "none",
+            opacity: 0.4
+        });
+        _glass.push(fill);
+
+        glass_shape = canvas.path(model.path(SCALE));
+        glass_shape.attr({
+            "stroke": "black",
+            "stroke-width": GLASS_BORDER,
+            "fill": "none"
+        });
+        _glass.push(glass_shape);  
 
 
-},{"../src/actions/actions":1,"../src/models/equation":3,"../src/models/longdrink_glass":4,"../src/views/flaskfiller/flaskfiller":6,"../src/views/graph":10,"../src/views/table":11,"../src/views/temperaturetyper/temperaturetyper":12,"../src/views/view":13}],15:[function(require,module,exports){
+        glass_pane = canvas.path(model.path(SCALE));
+        glass_pane.attr({
+            fill: "white",
+            opacity: 0,
+            stroke: "white",
+            "stroke-opacity": 0,
+            "stroke-width": GLASS_BORDER
+        });
+        _glass.push(glass_pane);
+        set_label();
+
+        glass_pane.hover(onmovehover, offmovehover);
+        move_by(BOUNDARIES.left - 10, BOUNDARIES.bottom + 10);
+
+    }
+
+    function set_label() {
+        update_size();
+        model.compute_maxima();
+        label.attr({
+            x: width/2,
+            y: height/2,
+            "font-size": compute_font_size(),
+            text: model.get_maximum("volume") + " ml"
+        });
+        function compute_font_size() {
+            return Math.max((((width -2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
+        }
+    }
+    _glass.set_label = set_label;
+
+    function update_size() {
+        var bbox = _glass.getBBox();
+
+        width = bbox.width;
+        height = bbox.height;
+    }
+
+    function make_moveable() {
+        _glass.drag(onmove, onstart, onend);
+    }
+    _glass.make_moveable = make_moveable;
+
+    function make_unmoveable() {
+        _glass.undrag();
+    }
+    _glass.make_unmoveable = make_unmoveable;
+
+    var delta_x, delta_y;
+    function onmove(dx, dy, x, y, event) {
+        var ddx = dx - delta_x,
+            ddy = dy - delta_y;
+
+        move_by(ddx, ddy);
+        delta_x = dx;
+        delta_y = dy;
+    }
+
+    function onstart(x, y, event) {
+        delta_x = delta_y = 0;
+        glass_pane.unhover(onmovehover, offmovehover);
+    }
+
+    function onend(event) {
+        glass_pane.hover(onmovehover, offmovehover);
+    }
+
+    function onmovehover() {
+        _glass.attr({
+            "cursor": "move"
+        });
+        make_moveable();
+    }
+
+    function offmovehover() {
+        make_unmoveable();
+        delta_x = delta_y = 0;
+        _glass.attr({
+            "cursor": "default"
+        });
+    }
+
+
+    function update_color() {
+        fill.attr("fill", model.color());
+    }
+
+
+    draw();
+    _glass.height = height;
+    _glass.width = width;
+    _glass.x = x;
+    _glass.y = y;
+    _glass.draw = draw;
+    _glass.update = update;
+    _glass.update_color = update_color;
+    _glass.fill = fill;
+    _glass.glass_shape = glass_shape;
+    _glass.glass_pane = glass_pane;
+    _glass.move_to = move_to;
+    _glass.move_by = move_by;
+    return _glass;
+};
+
+module.exports = glass;
+
+},{}],12:[function(require,module,exports){
+
+var view = require("../view"),
+    dom = require("../../dom/dom"),
+    ruler = require("./ruler"),
+    raphael = require("raphael-browserify"),
+    longdrink = require("./longdrink_glass");
+
+var flaskfiller = function(config, scale_, dimensions_) {
+    var _flaskfiller = view(config);
+
+    var scale = scale_ || 4; // px per mm
+
+    var dimensions = dimensions_ || {
+        width: 900,
+        height: 600,
+        ruler_width: 30,
+        margins: {
+            left: 5,
+            right: 5,
+            top: 5,
+            bottom: 5
+        }
+    };
+
+    var CONTAINER = {
+            width: dimensions.width || 900,
+            height: dimensions.height || 600
+        };
+
+    var RULERS = {
+            horizontal: {
+                x:  dimensions.ruler_width + dimensions.margins.left,
+                y:  CONTAINER.height - dimensions.ruler_width - dimensions.margins.top,
+                width: CONTAINER.width - dimensions.ruler_width - dimensions.margins.left - dimensions.margins.right,
+                height: dimensions.ruler_width,
+                scale: scale,
+                orientation: "horizontal"
+            },
+            vertical: {
+                x:  0 + dimensions.margins.left,
+                y:  0 + dimensions.margins.top,
+                width: dimensions.ruler_width,
+                height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom,
+                scale: scale,
+                orientation: "vertical"
+            }
+        };
+
+    var SIMULATION = {
+            x:  dimensions.ruler_width + dimensions.margins.left,
+            y:  0 + dimensions.margins.top,
+            width: CONTAINER.width - dimensions.ruler_width - dimensions.margins.left - dimensions.margins.right,
+            height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom
+        };
+
+
+    _flaskfiller.fragment = document
+        .createDocumentFragment()
+        .appendChild(dom.create({
+            name: "figure",
+            attributes: {
+                "class": "flaskfiller"
+            }
+        }));
+
+    // There is a bug in Raphael regarding placing text on the right
+    // y-coordinate when the canvas isn't part of the DOM
+    document.body.appendChild(_flaskfiller.fragment);
+
+    var canvas = raphael(_flaskfiller.fragment, 
+            CONTAINER.width, 
+            CONTAINER.height);
+
+    var vertical_ruler = ruler(canvas, RULERS.vertical)
+            .style({
+                "background": "white"
+            }),
+        horizontal_ruler = ruler(canvas, RULERS.horizontal)
+            .style({
+                "background": "white"
+            }),
+        cm_label = draw_cm_label();
+
+
+
+    function draw_cm_label() {
+       var x = dimensions.margins.left + (dimensions.ruler_width / 3),
+           y = CONTAINER.height - (dimensions.ruler_width / 2) - dimensions.margins.bottom,
+           cm_label = canvas.text(x, y, "cm");
+
+       cm_label.attr({
+           "font-family": "inherit",
+           "font-size": "18pt",
+           "font-weight": "bolder",
+           "fill": "dimgray"
+       }); 
+
+       return cm_label;
+    }
+
+
+    function add_glass(model) {
+        var glass;
+        if (model.type === "longdrink") {
+            var BOUNDARIES = {
+                left: SIMULATION.x,
+                right: SIMULATION.x + SIMULATION.width,
+                top: SIMULATION.y,
+                bottom: SIMULATION.y + SIMULATION.height
+            };
+            glass = longdrink(canvas, model, scale, BOUNDARIES);
+        } else {
+            // any other kind of glass
+        }
+        return glass;
+    }
+
+    function update_glass(glass) {
+        glass.update_color();        
+        glass.update();
+    }
+
+    _flaskfiller.update = function(model_name) {
+        var model = _flaskfiller.get_model(model_name);
+
+        if (!model.glass) {
+            model.glass = add_glass(model.model);
+        }
+
+        update_glass(model.glass);
+
+    };
+
+    _flaskfiller.remove = function(model_name) {
+    };
+
+
+
+    // There is a bug in Raphael regarding placing text on the right
+    // y-coordinate when the canvas isn't part of the DOM. It has been added
+    // before and now removed again.
+    document.body.removeChild(_flaskfiller.fragment);
+    return _flaskfiller;
+
+};
+
+module.exports = flaskfiller;
+
+},{"../view":5,"../../dom/dom":6,"./ruler":9,"./longdrink_glass":10,"raphael-browserify":13}],13:[function(require,module,exports){
 // Browserify modifications by Brenton Partridge, released into the public domain
 
 // BEGIN BROWSERIFY MOD
@@ -8774,5 +8263,533 @@ if (typeof module !== 'undefined') {
     module.exports = Raphael;
 }
 
-},{}]},{},[14])
+},{}],14:[function(require,module,exports){
+
+var model = require("../src/models/equation");
+var long_model = require("../src/models/longdrink_glass");
+var view = require("../src/views/view");
+var table = require("../src/views/table");
+var graph = require("../src/views/graph");
+var ff = require("../src/views/flaskfiller/flaskfiller");
+var tt = require("../src/views/temperaturetyper/temperaturetyper");
+
+var actions = require("../src/actions/actions")({speed: 10});
+var actions2 = require("../src/actions/actions")({speed: 10});
+
+
+var config =  {
+    time: {
+        start: 0,
+        end: 1000,
+        step: 10
+    },
+    quantities: {
+        x: {
+            minimum: 0,
+            maximum: 10,
+            value: 0,
+            name: "x",
+            label: "x in aantallen x-en",
+            stepsize: 0.1,
+            monotone: true
+            },
+        y: {
+            minimum: 0,
+            maximum: 1000,
+            value: 0,
+            unit: "km",
+            name: "y",
+            label: "afstand in km",
+            stepsize: 1
+            },
+        time: {
+            minimum: 0,
+            maximum: 1,
+            value: 0,
+            unit: 'sec',
+            name: "time",
+            label: "tijd",
+            stepsize: 0.001,
+            monotone: true,
+            precision: 2
+        }
+    },
+    equation: function(x) {
+        return x*x*x;
+    },
+    actions: {
+        start: actions.start,
+        pause: actions.pause,
+        reset: actions.reset,
+        finish: actions.finish,
+        remove: actions.remove
+    }
+};
+var config2 =  {
+    time: {
+        start: 0,
+        end: 1000,
+        step: 10
+    },
+    quantities: {
+        x: {
+            minimum: 0,
+            maximum: 10,
+            value: 0,
+            label: "x",
+            stepsize: 0.1,
+            monotone: true
+            },
+        y: {
+            minimum: 0,
+            maximum: 100,
+            value: 0,
+            unit: "km",
+            label: "y",
+            stepsize: 1
+            },
+        time: {
+            minimum: 0,
+            maximum: 1,
+            value: 0,
+            unit: 'sec',
+            label: "tijd",
+            stepsize: 0.001,
+            monotone: true,
+            precision: 2
+        }
+    },
+    equation: function(x) {
+        return x*x;
+    },
+    actions: {
+        start: actions2.start,
+        pause: actions2.pause,
+        reset: actions2.reset,
+        finish: actions2.finish,
+        remove: actions2.remove
+    }
+};
+
+//para = model('longdrinkglas', config),
+//    para2 = model('cocktailglas', config2);
+
+var flow_rate = 50; // ml per sec
+var longdrinkglas = long_model("longdrinkglas", {
+    radius: 1.7,
+    height: 7.8,
+    flow_rate: flow_rate
+});
+
+var breedlongdrinkglas = long_model("breedlongdrinkglas", {
+    radius: 1.3,
+    height: 2,
+    flow_rate: flow_rate
+});
+
+// console.log(para.get_minimum());
+// console.log(para.get_minimum("x"));
+// console.log(para.get_maximum());
+// console.log(para.get_maximum("x"));
+// 
+// console.log(para.get("_time_"));
+// console.log(para.set("x", 50));
+// console.log(para.get("_time_"));
+// console.log(para.get("_time_"));
+// 
+// console.log(para.current_moment());
+
+
+config = {
+    quantities: longdrinkglas.quantities
+};
+var repr = table(config);
+var repr2 = graph(config, "tijd", "hoogte");
+var repr3 = ff(config);
+var repr4 = tt(config);
+var body = document.querySelector("body");
+
+body.appendChild(repr4.fragment);
+
+body.appendChild(repr3.fragment);
+body.appendChild(repr.fragment);
+body.appendChild(repr2.fragment);
+
+
+repr.register(longdrinkglas);
+repr.register(breedlongdrinkglas);
+
+repr2.register(longdrinkglas);
+repr2.register(breedlongdrinkglas);
+
+repr3.register(longdrinkglas);
+repr3.register(breedlongdrinkglas);
+
+
+},{"../src/models/equation":1,"../src/models/longdrink_glass":3,"../src/views/view":5,"../src/views/table":7,"../src/views/graph":8,"../src/views/flaskfiller/flaskfiller":12,"../src/views/temperaturetyper/temperaturetyper":15,"../src/actions/actions":4}],16:[function(require,module,exports){
+
+var thermometer = function(canvas, dimensions_) {
+
+    var dimensions = dimensions_ || {
+        width: 60,
+        height: 325,
+        margins: {
+            left: 5,
+            right: 5,
+            top: 5,
+            bottom: 5
+        }
+    };
+    
+    var THERMOMETER = {
+        x: dimensions.margins.top,
+        y: dimensions.margins.left,
+        width: dimensions.width - dimensions.margins.left - dimensions.margins.right,
+        height: dimensions.height - dimensions.margins.top - dimensions.margins.bottom,
+        rounded_corners: dimensions.margins.top + dimensions.margins.left + dimensions.margins.bottom + dimensions.margins.right
+    };
+
+    var _thermometer = canvas.set(),
+        background,
+        empty_blob,
+        mercury_blob,
+        empty_bar,
+        mercury_bar,
+        scale;
+
+    var 
+        MERCURY_BAR_WIDTH = THERMOMETER.width / 8,
+        PADDING = MERCURY_BAR_WIDTH * 3,
+        BLOB = {
+            x: THERMOMETER.x + THERMOMETER.width / 2,
+            y: THERMOMETER.y + THERMOMETER.height - PADDING,
+            r: MERCURY_BAR_WIDTH
+        },
+        BAR = {
+            x: THERMOMETER.x + THERMOMETER.width / 2 - MERCURY_BAR_WIDTH / 2,
+            y: THERMOMETER.y + PADDING,
+            width: MERCURY_BAR_WIDTH,
+            height: BLOB.y - (THERMOMETER.y + PADDING + BLOB.r),
+            r: MERCURY_BAR_WIDTH/2
+        },
+        SCALE = BAR.height/120,
+        BORDER = 1;
+        
+
+
+    background = canvas.rect(THERMOMETER.x, THERMOMETER.y, THERMOMETER.width, THERMOMETER.height, THERMOMETER.rounded_corners);
+    background.attr({
+        fill: "white",
+        stroke: "dimgray",
+        "stroke-width": 2
+    });
+    _thermometer.push(background);
+
+
+    empty_blob = canvas.circle( BLOB.x, BLOB.y, BLOB.r + BORDER);
+    empty_blob.attr({
+        fill: "none",
+        stroke: "gray",
+        "stroke-width": 0.5
+    });
+    empty_bar = canvas.rect(BAR.x - BORDER, BAR.y - BORDER, BAR.width + BORDER * 2, BAR.height + (2 * BORDER), BAR.r);
+    empty_bar.attr({
+        fill: "none",
+        stroke: "gray",
+        "stroke-width": 0.5
+    });
+
+    mercury_blob = canvas.circle( BLOB.x, BLOB.y, BLOB.r );
+    mercury_blob.attr({
+        "fill": "red",
+        "stroke": "none"
+    });
+    _thermometer.push(mercury_blob);
+
+    mercury_bar = canvas.rect( BAR.x, BAR.y, BAR.width, BAR.height + BLOB.r, BAR.r);
+    mercury_bar.attr( {
+        "fill": "red",
+        "stroke": "none"
+    });
+    _thermometer.push(mercury_bar);
+
+    function set_temperature( temp ) {
+        if (-20 <= temp && temp <= 100) {
+            var height = SCALE * (temp + 20),
+                y = BAR.y + BAR.height - height;
+
+            mercury_bar.attr({
+                y: y,
+                height: height + BLOB.r
+            });
+        }
+        return _thermometer;
+    }
+
+    _thermometer.set_temperature = set_temperature;
+    
+    _thermometer.set_temperature(22);
+
+
+    scale = draw_scale();
+    _thermometer.push(scale);
+
+    function draw_scale() {
+        var scale = canvas.set();
+
+        
+        var TEN_DEGREE_SIZE = (THERMOMETER.width / 2) - BAR.width,
+            FIVE_DEGREE_SIZE = TEN_DEGREE_SIZE / 2,
+            DEGREE_SIZE = FIVE_DEGREE_SIZE / 2,
+            ten_degree_ticks = canvas.path(create_ticks_path(0, TEN_DEGREE_SIZE)),
+            five_degree_ticks = canvas.path(create_ticks_path(SCALE*5, FIVE_DEGREE_SIZE));
+
+        ten_degree_ticks.attr({
+            "stroke-width": 1,
+            "stroke": "dimgray"
+        });
+        scale.push(ten_degree_ticks);
+        five_degree_ticks.attr({
+            "stroke-width": 1,
+            "stroke": "dimgray"
+        });
+        scale.push(five_degree_ticks);
+        [1, 2, 3, 4, 6, 7, 8, 9].forEach(draw_degree_ticks);
+        scale.push(draw_labels());
+        scale.push(draw_unit());
+
+        function draw_unit() {
+            var x = THERMOMETER.x + THERMOMETER.width/2 - PADDING/4,
+                y = THERMOMETER.y + PADDING/2,
+                unit_label = canvas.text(x, y, "°C");
+
+            unit_label.attr({
+                "font-size": PADDING + "px",
+                "font-family": "inherit"
+            });
+
+            return unit_label;
+        }
+        
+
+        function draw_labels() {
+            var labels = canvas.set();
+
+            
+            var TEN_DEGREES_IN_PX = SCALE * 10,
+                degrees = -20,
+                h = BAR.y + BAR.height,
+                y_end = BAR.y,
+                x_start = THERMOMETER.x + THERMOMETER.width - BAR.width - PADDING/3,
+                label;
+
+            while (h > y_end) {
+                label = canvas.text(x_start, h, degrees);
+                label.attr({
+                    "text-anchor": "right",
+                    "font-size": "" + PADDING/2 + "px",
+                    "font-family": "inherit"
+                });
+                labels.push(label);
+                h = h - TEN_DEGREES_IN_PX;
+                degrees += 10;
+            }
+
+            return labels;
+        }
+
+        function draw_degree_ticks(step) {
+              var degree_ticks = canvas.path(create_ticks_path(SCALE*step, DEGREE_SIZE));
+              degree_ticks.attr({
+                  "stroke-width": 0.5,
+                  "stroke": "dimgray"
+              });
+              scale.push(degree_ticks);
+        }
+
+        function create_ticks_path(step, size) {
+            var TEN_DEGREES_IN_PX = SCALE * 10,
+                ticks_path;
+
+            var h = BAR.y + BAR.height + step,
+                y_end = BAR.y + TEN_DEGREES_IN_PX,
+                x_start = THERMOMETER.x;
+
+            while (h > y_end) {
+                h = h - TEN_DEGREES_IN_PX;
+                ticks_path += "M" + x_start + "," + h + "h" + size;
+            }
+
+            return ticks_path;
+        }
+
+        return scale;
+    }
+
+
+    _thermometer.set_temperature = set_temperature;
+
+    return _thermometer;
+
+};
+
+module.exports = thermometer;
+
+},{}],15:[function(require,module,exports){
+
+var view = require("../view"),
+    draw_thermometer = require("./thermometer"),
+    dom = require("../../dom/dom"),
+    raphael = require("raphael-browserify");
+
+var temperaturetyper = function(config, scale_, dimensions_) {
+    
+    var _temperaturetyper = view(config);
+
+    var scale = scale_ || 4; // px per mm
+
+    var dimensions = dimensions_ || {
+        width: 300,
+        height: 350,
+        margins: {
+            left: 5,
+            right: 5,
+            top: 5,
+            bottom: 5
+        }
+    };
+
+    var CONTAINER = {
+            width: dimensions.width || 300,
+            height: dimensions.height || 350
+        };
+
+    _temperaturetyper.fragment = document
+        .createDocumentFragment()
+        .appendChild(dom.create({
+            name: "figure",
+            attributes: {
+                "class": "temperaturetyper"
+            }
+        }));
+
+
+    var message = _temperaturetyper.fragment.appendChild(
+            dom.create({
+                name: "div",
+                attributes: {
+                    "class": "message"
+                },
+                value: "Activate to start measuring"
+            }));
+    var measuring_container = _temperaturetyper.fragment.appendChild(
+            dom.create({
+                name: "div",
+                attributes: {
+                    "class": "container"
+                }
+            }));
+    measuring_container.style.height = CONTAINER.height;
+    measuring_container.style.width = CONTAINER.width;
+
+    var measuring_simulation = measuring_container.appendChild(
+            dom.create({
+                name: "figure",
+                attributes: {
+                    "class": "simulation"
+                }
+            }));
+
+    var measuring_data = measuring_container.appendChild(
+            dom.create({
+                name: "textarea",
+                attributes: {
+                    "class": "data",
+                    "cols": 25,
+                    "rows": 20
+                },
+                style: {
+                    "overflow-y": "auto",
+                    "overflow-x": "hidden"
+                },
+                on: {
+                    type: "keydown",
+                    callback: add_new_measurement
+                },
+                value: format_time(0) + "\t\t"
+            }));
+
+
+
+
+    // There is a bug in Raphael regarding placing text on the right
+    // y-coordinate when the canvas isn't part of the DOM
+    document.body.appendChild(_temperaturetyper.fragment);
+
+    var canvas = raphael(measuring_simulation, 
+            CONTAINER.width, 
+            CONTAINER.height);
+    
+    var thermometer = draw_thermometer(canvas);
+
+
+    var time = 0;
+    function format_time(time) {
+        // time in 0.1 seconds
+        var seconds,
+            minutes = "00",
+            milliseconds;
+
+        if (time >= 600) {
+            minutes = ("0" + Math.floor((time / 600))).substr(-2);
+        }
+        seconds = ("0" + Math.floor((time % 600) / 10)).substr(-2);
+        milliseconds = ((time % 600) % 10);
+
+        return "" + minutes + ":" + seconds + "," + milliseconds;
+    }
+
+    function add_new_measurement(event) {
+        var key = event.key || event.keyCode;
+        if (key === 13 || key === 10 || key === "Enter") {
+            // enter - key
+            event.preventDefault();
+            time++;
+            var lastline = this.value.substr(this.value.lastIndexOf("\n")+1),
+                temperature = parseFloat(lastline.substr(lastline.lastIndexOf("\t")+1));
+            if (!isNaN(temperature)) {
+                if (-20 <= temperature && temperature <= 100) {
+                    thermometer.set_temperature(temperature);
+                }
+            }
+            
+            this.value += "\n" + format_time(time) + "\t\t";
+            return false;
+        } else if (key === 9 || key === "Tab") {
+            // tab - key
+            event.preventDefault();
+            this.value += "\t";
+            return false;
+        } 
+    }
+
+    _temperaturetyper.update = function(model_name) {
+    };
+
+    _temperaturetyper.remove = function(model_name) {
+    };
+
+
+
+    // There is a bug in Raphael regarding placing text on the right
+    // y-coordinate when the canvas isn't part of the DOM. It has been added
+    // before and now removed again.
+    document.body.removeChild(_temperaturetyper.fragment);
+    return _temperaturetyper;
+
+};
+
+module.exports = temperaturetyper;
+
+},{"../view":5,"./thermometer":16,"../../dom/dom":6,"raphael-browserify":13}]},{},[14])
 ;
