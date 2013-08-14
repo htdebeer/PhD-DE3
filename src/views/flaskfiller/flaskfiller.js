@@ -2,7 +2,8 @@
 var view = require("../view"),
     dom = require("../../dom/dom"),
     ruler = require("./ruler"),
-    raphael = require("raphael-browserify");
+    raphael = require("raphael-browserify"),
+    longdrink = require("./longdrink_glass");
 
 var flaskfiller = function(config, scale_, dimensions_) {
     var _flaskfiller = view(config);
@@ -98,7 +99,36 @@ var flaskfiller = function(config, scale_, dimensions_) {
     }
 
 
+    function add_glass(model) {
+        var glass;
+        if (model.type === "longdrink") {
+            var BOUNDARIES = {
+                left: SIMULATION.x,
+                right: SIMULATION.x + SIMULATION.width,
+                top: SIMULATION.y,
+                bottom: SIMULATION.y + SIMULATION.height
+            };
+            glass = longdrink(canvas, model, scale, BOUNDARIES);
+        } else {
+            // any other kind of glass
+        }
+        return glass;
+    }
+
+    function update_glass(glass) {
+        glass.update_color();        
+        glass.update();
+    }
+
     _flaskfiller.update = function(model_name) {
+        var model = _flaskfiller.get_model(model_name);
+
+        if (!model.glass) {
+            model.glass = add_glass(model.model);
+        }
+
+        update_glass(model.glass);
+
     };
 
     _flaskfiller.remove = function(model_name) {

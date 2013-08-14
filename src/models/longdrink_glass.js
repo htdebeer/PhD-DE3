@@ -68,10 +68,10 @@ var longdrink_glass = function(name, config) {
         return actions;
     }
 
+
     var quantities = {
         hoogte: {
             minimum: 0,
-            maximum: height,
             value: 0,
             unit: 'cm',
             name: "hoogte",
@@ -82,27 +82,38 @@ var longdrink_glass = function(name, config) {
         },
         volume: {
             minimum: 0,
-            maximum: area*height,
             value: 0,
             unit: 'ml',
             name: "volume",
             label: "volume in ml",
             stepsize: 0.1,
             monotone: true,
-            precision: 1
+            precision: 0
         },
         tijd: {
             minimum: 0,
-            maximum: area*height / flow_rate,
             value: 0,
             unit: 'sec',
             name: "tijd",
             label: "tijd",
             stepsize: 0.01,
             monotone: true,
-            precision: 2
+            precision: 1
         }
     };
+
+    var time_max, volume_max, height_max;
+    function compute_maxima() {
+        time_max = Math.floor(area*height*10 / flow_rate)/10;
+        volume_max = time_max * flow_rate;
+        height_max = volume_max / area;
+
+        quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
+        quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
+        quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
+    }
+
+    compute_maxima();
 
     var time = {
         start: 0,
@@ -129,22 +140,41 @@ var longdrink_glass = function(name, config) {
         };
     };
 
+    _model.path = function(SCALE, fill) {
+        var h = height * SCALE * 10,
+            y = 0;
+        if (fill) {
+            h = _model.get("hoogte") * SCALE * 10;
+            y = height * SCALE * 10 - h;
+        }
+        var path = "M0," + y;
+        path += "v" + h;
+        path += "h" + radius * 2 * SCALE * 10;
+        path += "v-" + h;
+        return path;
+    };
+
     _model.step();
+    _model.compute_maxima = compute_maxima;
+    _model.type = "longdrink";
     _model.height = function(h) {
         if (arguments.length === 1) {
             height = h;
+            _model.update_views();
         }
         return height;
     };
     _model.radius = function(r) {
         if (arguments.length === 1) {
             radius = r;
+            _model.update_views();
         }
         return radius;
     };
     _model.flow_rate = function(fr) {
         if (arguments.length === 1) {
             flow_rate = fr;
+            _model.update_views();
         }
         return flow_rate;
     };

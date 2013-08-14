@@ -283,14 +283,14 @@ var table = function(config) {
                         cell = row.querySelector(query);
 
                     if (quantity.monotone) {
-                        cell.children[0].value = moment[q].toFixed(quantity.precision || 3);
+                        cell.children[0].value = moment[q].toFixed(quantity.precision || 0);
                     } else {
                         // Hack to get locale decimal seperator in Chrome.
                         // Does not work nicely in other browsers as Chrome
                         // makes the input type=number automatically
                         // localized
                         var dec_sep = (1.1).toLocaleString()[1] || ".";
-                        cell.children[0].innerHTML = moment[q].toFixed(quantity.precision || 3).replace(/\./, dec_sep);
+                        cell.children[0].innerHTML = moment[q].toFixed(quantity.precision || 0).replace(/\./, dec_sep);
                     }
                 }
             };

@@ -110,13 +110,14 @@ var config2 =  {
 
 var flow_rate = 50; // ml per sec
 var longdrinkglas = long_model("longdrinkglas", {
-    radius: 3,
-    height: 10,
+    radius: 1.7,
+    height: 7.8,
     flow_rate: flow_rate
 });
+
 var breedlongdrinkglas = long_model("breedlongdrinkglas", {
-    radius: 6,
-    height: 9,
+    radius: 1.3,
+    height: 2,
     flow_rate: flow_rate
 });
 
@@ -138,17 +139,23 @@ config = {
 };
 var repr = table(config);
 var repr2 = graph(config, "tijd", "hoogte");
-//var repr3 = ff(config);
+var repr3 = ff(config);
 var repr4 = tt(config);
 var body = document.querySelector("body");
-body.appendChild(repr4.fragment);
+//body.appendChild(repr4.fragment);
 //body.appendChild(repr3.fragment);
 
+body.appendChild(repr3.fragment);
 body.appendChild(repr.fragment);
 body.appendChild(repr2.fragment);
+
+
 repr.register(longdrinkglas);
 repr.register(breedlongdrinkglas);
+
 repr2.register(longdrinkglas);
 repr2.register(breedlongdrinkglas);
 
+repr3.register(longdrinkglas);
+repr3.register(breedlongdrinkglas);
 

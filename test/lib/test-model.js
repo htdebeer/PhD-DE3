@@ -340,10 +340,10 @@ var longdrink_glass = function(name, config) {
         return actions;
     }
 
+
     var quantities = {
         hoogte: {
             minimum: 0,
-            maximum: height,
             value: 0,
             unit: 'cm',
             name: "hoogte",
@@ -354,27 +354,38 @@ var longdrink_glass = function(name, config) {
         },
         volume: {
             minimum: 0,
-            maximum: area*height,
             value: 0,
             unit: 'ml',
             name: "volume",
             label: "volume in ml",
             stepsize: 0.1,
             monotone: true,
-            precision: 1
+            precision: 0
         },
         tijd: {
             minimum: 0,
-            maximum: area*height / flow_rate,
             value: 0,
             unit: 'sec',
             name: "tijd",
             label: "tijd",
             stepsize: 0.01,
             monotone: true,
-            precision: 2
+            precision: 1
         }
     };
+
+    var time_max, volume_max, height_max;
+    function compute_maxima() {
+        time_max = Math.floor(area*height*10 / flow_rate)/10;
+        volume_max = time_max * flow_rate;
+        height_max = volume_max / area;
+
+        quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
+        quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
+        quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
+    }
+
+    compute_maxima();
 
     var time = {
         start: 0,
@@ -401,22 +412,41 @@ var longdrink_glass = function(name, config) {
         };
     };
 
+    _model.path = function(SCALE, fill) {
+        var h = height * SCALE * 10,
+            y = 0;
+        if (fill) {
+            h = _model.get("hoogte") * SCALE * 10;
+            y = height * SCALE * 10 - h;
+        }
+        var path = "M0," + y;
+        path += "v" + h;
+        path += "h" + radius * 2 * SCALE * 10;
+        path += "v-" + h;
+        return path;
+    };
+
     _model.step();
+    _model.compute_maxima = compute_maxima;
+    _model.type = "longdrink";
     _model.height = function(h) {
         if (arguments.length === 1) {
             height = h;
+            _model.update_views();
         }
         return height;
     };
     _model.radius = function(r) {
         if (arguments.length === 1) {
             radius = r;
+            _model.update_views();
         }
         return radius;
     };
     _model.flow_rate = function(fr) {
         if (arguments.length === 1) {
             flow_rate = fr;
+            _model.update_views();
         }
         return flow_rate;
     };
@@ -939,7 +969,8 @@ module.exports = model;
 var view = require("../view"),
     dom = require("../../dom/dom"),
     ruler = require("./ruler"),
-    raphael = require("raphael-browserify");
+    raphael = require("raphael-browserify"),
+    longdrink = require("./longdrink_glass");
 
 var flaskfiller = function(config, scale_, dimensions_) {
     var _flaskfiller = view(config);
@@ -1035,7 +1066,36 @@ var flaskfiller = function(config, scale_, dimensions_) {
     }
 
 
+    function add_glass(model) {
+        var glass;
+        if (model.type === "longdrink") {
+            var BOUNDARIES = {
+                left: SIMULATION.x,
+                right: SIMULATION.x + SIMULATION.width,
+                top: SIMULATION.y,
+                bottom: SIMULATION.y + SIMULATION.height
+            };
+            glass = longdrink(canvas, model, scale, BOUNDARIES);
+        } else {
+            // any other kind of glass
+        }
+        return glass;
+    }
+
+    function update_glass(glass) {
+        glass.update_color();        
+        glass.update();
+    }
+
     _flaskfiller.update = function(model_name) {
+        var model = _flaskfiller.get_model(model_name);
+
+        if (!model.glass) {
+            model.glass = add_glass(model.model);
+        }
+
+        update_glass(model.glass);
+
     };
 
     _flaskfiller.remove = function(model_name) {
@@ -1053,7 +1113,345 @@ var flaskfiller = function(config, scale_, dimensions_) {
 
 module.exports = flaskfiller;
 
-},{"../../dom/dom":2,"../view":11,"./ruler":7,"raphael-browserify":13}],7:[function(require,module,exports){
+},{"../../dom/dom":2,"../view":13,"./longdrink_glass":8,"./ruler":9,"raphael-browserify":15}],7:[function(require,module,exports){
+
+
+
+var glass = function(canvas, model, SCALE, boundaries_) {
+    var _glass = canvas.set();
+
+    var GLASS_BORDER = 3;
+
+    var x = 0, 
+        y = 0, 
+        width, 
+        height;
+
+    var BOUNDARIES = boundaries_ || {
+            left: 0,  
+            right: canvas.width,
+            top: 0,
+            bottom: canvas.height
+    },
+        PADDING = 5;
+
+    var fill, glass_shape, label, glass_pane;
+
+    function update() {
+        style({
+            color: model.color()
+        });
+    }
+
+    function style(config) {
+        if (config.color) {
+            fill.attr("fill", config.color);
+        }
+    }
+
+    function move_by(dx, dy) {
+        var new_x = x + dx,
+            new_y = y + dy;
+        if (new_x <= BOUNDARIES.left) {
+            dx = BOUNDARIES.left - x;
+            new_x = BOUNDARIES.left;
+        }
+        if (new_y <= BOUNDARIES.top) {
+            dy = BOUNDARIES.top - y;
+            new_y = BOUNDARIES.top;
+        }
+        if (BOUNDARIES.right <= (new_x + width)) {
+            dx = BOUNDARIES.right - (x + width);
+            new_x = BOUNDARIES.right - width;
+        }
+        if (BOUNDARIES.bottom <= (new_y + height)) {
+            dy = BOUNDARIES.bottom - (y + height);
+            new_y = BOUNDARIES.bottom - height;
+        }
+        _glass.transform("...T" + dx + "," + dy );
+        x = new_x;
+        y = new_y;
+        return _glass;
+    }
+
+    function move_to(new_x, new_y) {
+        // check x and y
+        var delta_x = new_x - x,
+            delta_y = new_y - y;
+        _glass.transform("...t" + delta_x + "," + delta_y );
+        x += delta_x;
+        y += delta_y;
+        return _glass;
+    }
+    
+    function draw() {
+        label = canvas.text(x, y, model.get_maximum("volume") + " ml");
+        label.attr({
+        });
+        _glass.push(label);
+        fill = canvas.path(model.path(SCALE, true));
+        fill.attr({
+            fill: model.color(),
+            stroke: "none",
+            opacity: 0.4
+        });
+        _glass.push(fill);
+
+        glass_shape = canvas.path(model.path(SCALE));
+        glass_shape.attr({
+            "stroke": "black",
+            "stroke-width": GLASS_BORDER,
+            "fill": "none"
+        });
+        _glass.push(glass_shape);  
+
+
+        glass_pane = canvas.path(model.path(SCALE));
+        glass_pane.attr({
+            fill: "white",
+            opacity: 0,
+            stroke: "white",
+            "stroke-opacity": 0,
+            "stroke-width": GLASS_BORDER
+        });
+        _glass.push(glass_pane);
+        set_label();
+
+        glass_pane.hover(onmovehover, offmovehover);
+        move_by(BOUNDARIES.left - 10, BOUNDARIES.bottom + 10);
+
+    }
+
+    function set_label() {
+        update_size();
+        model.compute_maxima();
+        label.attr({
+            x: width/2,
+            y: height/2,
+            "font-size": compute_font_size(),
+            text: model.get_maximum("volume") + " ml"
+        });
+        function compute_font_size() {
+            return Math.max((((width -2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
+        }
+    }
+    _glass.set_label = set_label;
+
+    function update_size() {
+        var bbox = _glass.getBBox();
+
+        width = bbox.width;
+        height = bbox.height;
+    }
+
+    function make_moveable() {
+        _glass.drag(onmove, onstart, onend);
+    }
+    _glass.make_moveable = make_moveable;
+
+    function make_unmoveable() {
+        _glass.undrag();
+    }
+    _glass.make_unmoveable = make_unmoveable;
+
+    var delta_x, delta_y;
+    function onmove(dx, dy, x, y, event) {
+        var ddx = dx - delta_x,
+            ddy = dy - delta_y;
+
+        move_by(ddx, ddy);
+        delta_x = dx;
+        delta_y = dy;
+    }
+
+    function onstart(x, y, event) {
+        delta_x = delta_y = 0;
+        glass_pane.unhover(onmovehover, offmovehover);
+    }
+
+    function onend(event) {
+        glass_pane.hover(onmovehover, offmovehover);
+    }
+
+    function onmovehover() {
+        _glass.attr({
+            "cursor": "move"
+        });
+        make_moveable();
+    }
+
+    function offmovehover() {
+        make_unmoveable();
+        delta_x = delta_y = 0;
+        _glass.attr({
+            "cursor": "default"
+        });
+    }
+
+
+    function update_color() {
+        fill.attr("fill", model.color());
+    }
+
+
+    draw();
+    _glass.height = height;
+    _glass.width = width;
+    _glass.x = x;
+    _glass.y = y;
+    _glass.draw = draw;
+    _glass.update = update;
+    _glass.update_color = update_color;
+    _glass.fill = fill;
+    _glass.glass_shape = glass_shape;
+    _glass.glass_pane = glass_pane;
+    _glass.move_to = move_to;
+    _glass.move_by = move_by;
+    return _glass;
+};
+
+module.exports = glass;
+
+},{}],8:[function(require,module,exports){
+
+var glass = require("./glass");
+
+var longdrink_glass = function(canvas, model, SCALE, boundaries_) {
+    var _glass = glass(canvas, model, SCALE, boundaries_);
+
+    var HANDLE_SPACE = 5,
+        HANDLE_SIZE = 2.5,
+        handle = canvas.circle( 
+                _glass.x + _glass.width + HANDLE_SPACE, 
+                _glass.y - HANDLE_SPACE, 
+                HANDLE_SIZE);
+    _glass.push(handle);
+
+    handle.attr({
+        fill: "silver",
+        "stroke": "silver"
+    });
+    handle.hover(enable_resizing, disable_resizing);
+
+    function enable_resizing() {
+        handle.attr({
+            fill: "yellow",
+            stroke: "black",
+            "stroke-width": 2,
+            r: HANDLE_SIZE * 1.5,
+            cursor: "nesw-resize"
+        });
+        _glass.glass_pane.attr({
+            fill: "lightyellow",
+            opacity: 0.7
+        });
+        handle.drag(sizemove, sizestart, sizestop); 
+    }
+
+    function disable_resizing() {
+        handle.attr({
+            fill: "silver",
+            stroke: "silver",
+            "stroke-width": 1,
+            r: HANDLE_SIZE,
+            cursor: "default"
+        });
+        _glass.glass_pane.attr({
+            fill: "white",
+            opacity: 0
+        });
+    }
+
+
+
+    var delta_x = 0, delta_y = 0;
+
+    function sizemove(dx, dy, x, y, event) {
+        var ddx = dx - delta_x,
+            ddy = dy - delta_y,
+            d_height = ddy / SCALE / 10,
+            d_radius = ddx / 2 / SCALE / 10,
+            new_radius = model.radius() + d_radius,
+            new_height = model.height()  - d_height,
+            new_y = y + ddy;
+
+
+        if (new_height >= 1 && new_radius >= 1){
+            model.height(new_height);
+            model.radius(new_radius);
+            _glass.move_by(0, ddy);
+            model.update_views();
+        }
+
+        delta_x = dx;
+        delta_y = dy;
+    }
+
+    function sizestart(x, y, event) {
+        delta_x = 0;
+        delta_y = 0;
+    }
+
+    function sizestop(event) {
+        handle.undrag();
+    }
+
+
+    var height = model.height,
+        radius = model.radius,
+        flow_rate = model.flow_rate,
+        color = model.color || "blue";
+
+
+    function set_height(h) {
+        model.height(h);
+        height = h;
+        update();
+    }
+
+    function set_radius(r) {
+        model.radius(r);
+        radius = r;
+        update();
+    }
+
+    function update_size() {
+        var bbox = _glass.glass_pane.getBBox();
+
+        _glass.width = bbox.width;
+        _glass.height = bbox.height;
+    }
+
+    function update() {
+        _glass.glass_shape.attr({
+            path: model.path(SCALE)
+        });
+        _glass.fill.attr({
+            path: model.path(SCALE, true)
+        });
+        _glass.glass_pane.attr({
+            path: model.path(SCALE)
+        });
+        update_size();
+        handle.attr({
+            cx: _glass.x + _glass.width + HANDLE_SPACE, 
+            cy:  _glass.y - HANDLE_SPACE
+        });
+
+        _glass.set_label();
+
+        
+    }
+
+
+    _glass.update = update;
+
+    return _glass;
+};
+
+module.exports = longdrink_glass;
+
+},{"./glass":7}],9:[function(require,module,exports){
 
 var ruler = function(canvas, config) {
     var _ruler = canvas.set();
@@ -1207,7 +1605,7 @@ var ruler = function(canvas, config) {
 
 module.exports = ruler;
 
-},{}],8:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -1547,7 +1945,7 @@ var graph = function(config, horizontal, vertical, dimensions_) {
 
 module.exports = graph;
 
-},{"../dom/dom":2,"./view":11}],9:[function(require,module,exports){
+},{"../dom/dom":2,"./view":13}],11:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -1833,14 +2231,14 @@ var table = function(config) {
                         cell = row.querySelector(query);
 
                     if (quantity.monotone) {
-                        cell.children[0].value = moment[q].toFixed(quantity.precision || 3);
+                        cell.children[0].value = moment[q].toFixed(quantity.precision || 0);
                     } else {
                         // Hack to get locale decimal seperator in Chrome.
                         // Does not work nicely in other browsers as Chrome
                         // makes the input type=number automatically
                         // localized
                         var dec_sep = (1.1).toLocaleString()[1] || ".";
-                        cell.children[0].innerHTML = moment[q].toFixed(quantity.precision || 3).replace(/\./, dec_sep);
+                        cell.children[0].innerHTML = moment[q].toFixed(quantity.precision || 0).replace(/\./, dec_sep);
                     }
                 }
             };
@@ -1889,7 +2287,7 @@ var table = function(config) {
 
 module.exports = table;
 
-},{"../dom/dom":2,"./view":11}],10:[function(require,module,exports){
+},{"../dom/dom":2,"./view":13}],12:[function(require,module,exports){
 
 var view = require("../view"),
     dom = require("../../dom/dom"),
@@ -2237,7 +2635,7 @@ var temperaturetyper = function(config, scale_, dimensions_) {
 
 module.exports = temperaturetyper;
 
-},{"../../dom/dom":2,"../view":11,"raphael-browserify":13}],11:[function(require,module,exports){
+},{"../../dom/dom":2,"../view":13,"raphael-browserify":15}],13:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -2271,7 +2669,7 @@ var view = function(config) {
         quantities = {},
         add_quantity = function(q) {
             var quantity = config.quantities[q];
-            quantities[quantity.name] = quantity;
+            quantities[quantity.name] = Object.create(quantity);
         };
     Object.keys(config.quantities).filter(show).forEach(add_quantity);
     _view.quantities = quantities;
@@ -2282,6 +2680,7 @@ var view = function(config) {
     var models = {};
 
     _view.compute_extrema = function() {
+        // WARNING SOMEHOW CHANGES THE QUANTITIES OF THE MODELS ...
         var compute_maximum = function(quantity_name){
                 return function(max, model_name) {
                     var model = models[model_name].model;
@@ -2352,7 +2751,7 @@ var view = function(config) {
 
 module.exports = view;
 
-},{}],12:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 
 var model = require("../src/models/equation");
 var long_model = require("../src/models/longdrink_glass");
@@ -2465,13 +2864,14 @@ var config2 =  {
 
 var flow_rate = 50; // ml per sec
 var longdrinkglas = long_model("longdrinkglas", {
-    radius: 3,
-    height: 10,
+    radius: 1.7,
+    height: 7.8,
     flow_rate: flow_rate
 });
+
 var breedlongdrinkglas = long_model("breedlongdrinkglas", {
-    radius: 6,
-    height: 9,
+    radius: 1.3,
+    height: 2,
     flow_rate: flow_rate
 });
 
@@ -2493,22 +2893,28 @@ config = {
 };
 var repr = table(config);
 var repr2 = graph(config, "tijd", "hoogte");
-//var repr3 = ff(config);
+var repr3 = ff(config);
 var repr4 = tt(config);
 var body = document.querySelector("body");
-body.appendChild(repr4.fragment);
+//body.appendChild(repr4.fragment);
 //body.appendChild(repr3.fragment);
 
+body.appendChild(repr3.fragment);
 body.appendChild(repr.fragment);
 body.appendChild(repr2.fragment);
+
+
 repr.register(longdrinkglas);
 repr.register(breedlongdrinkglas);
+
 repr2.register(longdrinkglas);
 repr2.register(breedlongdrinkglas);
 
+repr3.register(longdrinkglas);
+repr3.register(breedlongdrinkglas);
 
 
-},{"../src/actions/actions":1,"../src/models/equation":3,"../src/models/longdrink_glass":4,"../src/views/flaskfiller/flaskfiller":6,"../src/views/graph":8,"../src/views/table":9,"../src/views/temperaturetyper/temperaturetyper":10,"../src/views/view":11}],13:[function(require,module,exports){
+},{"../src/actions/actions":1,"../src/models/equation":3,"../src/models/longdrink_glass":4,"../src/views/flaskfiller/flaskfiller":6,"../src/views/graph":10,"../src/views/table":11,"../src/views/temperaturetyper/temperaturetyper":12,"../src/views/view":13}],15:[function(require,module,exports){
 // Browserify modifications by Brenton Partridge, released into the public domain
 
 // BEGIN BROWSERIFY MOD
@@ -8368,5 +8774,5 @@ if (typeof module !== 'undefined') {
     module.exports = Raphael;
 }
 
-},{}]},{},[12])
+},{}]},{},[14])
 ;

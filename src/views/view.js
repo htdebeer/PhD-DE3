@@ -31,7 +31,7 @@ var view = function(config) {
         quantities = {},
         add_quantity = function(q) {
             var quantity = config.quantities[q];
-            quantities[quantity.name] = quantity;
+            quantities[quantity.name] = Object.create(quantity);
         };
     Object.keys(config.quantities).filter(show).forEach(add_quantity);
     _view.quantities = quantities;
@@ -42,6 +42,7 @@ var view = function(config) {
     var models = {};
 
     _view.compute_extrema = function() {
+        // WARNING SOMEHOW CHANGES THE QUANTITIES OF THE MODELS ...
         var compute_maximum = function(quantity_name){
                 return function(max, model_name) {
                     var model = models[model_name].model;
