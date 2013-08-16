@@ -140,14 +140,16 @@ var longdrink_glass = function(name, config) {
         };
     };
 
-    _model.path = function(SCALE, fill) {
-        var h = height * SCALE * 10,
-            y = 0;
+    _model.path = function(SCALE, fill, x_, y_) {
+        var x = x_ || 0,
+            y = y_ || 0,
+            h = height * SCALE * 10;
         if (fill) {
             h = _model.get("hoogte") * SCALE * 10;
-            y = height * SCALE * 10 - h;
+            y += height * SCALE * 10 - h;
         }
-        var path = "M0," + y;
+
+        var path = "M" + x + "," + y;
         path += "v" + h;
         path += "h" + radius * 2 * SCALE * 10;
         path += "v-" + h;
