@@ -50,9 +50,9 @@ var longdrink_glass = function(name, config) {
      * Compute the height of the water in cm given the volume of the water in
      * the glass in ml.
      */
-    var area = Math.PI * Math.pow(radius, 2);
     function compute_height(volume) {
-        if (volume > 0) {
+        var area = Math.PI * Math.pow(radius, 2);
+        if (area > 0) {
             return volume / area;
         } else {
             return 0;
@@ -72,6 +72,7 @@ var longdrink_glass = function(name, config) {
     var quantities = {
         hoogte: {
             minimum: 0,
+            maximum: 0,
             value: 0,
             unit: 'cm',
             name: "hoogte",
@@ -82,6 +83,7 @@ var longdrink_glass = function(name, config) {
         },
         volume: {
             minimum: 0,
+            maximum: 0,
             value: 0,
             unit: 'ml',
             name: "volume",
@@ -92,6 +94,7 @@ var longdrink_glass = function(name, config) {
         },
         tijd: {
             minimum: 0,
+            maximum: 0,
             value: 0,
             unit: 'sec',
             name: "tijd",
@@ -102,18 +105,6 @@ var longdrink_glass = function(name, config) {
         }
     };
 
-    var time_max, volume_max, height_max;
-    function compute_maxima() {
-        time_max = Math.floor(area*height*10 / flow_rate)/10;
-        volume_max = time_max * flow_rate;
-        height_max = volume_max / area;
-
-        quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
-        quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
-        quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
-    }
-
-    compute_maxima();
 
     var time = {
         start: 0,
@@ -126,6 +117,21 @@ var longdrink_glass = function(name, config) {
         quantities: quantities,
         actions: create_actions(action_list)
     });
+
+    function compute_maxima() {
+        var area = Math.PI * Math.pow(radius, 2),
+            time_max = Math.floor(area*height*10 / flow_rate)/10,
+            volume_max = time_max * flow_rate,
+            height_max = volume_max / area;
+
+        _model.set_end(time_max);
+
+        _model.quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
+        _model.quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
+        _model.quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
+    }
+
+    compute_maxima();
 
     _model.measure_moment = function(moment) {
         var time_in_ms = _model.moment_to_time(moment),
@@ -140,7 +146,7 @@ var longdrink_glass = function(name, config) {
         };
     };
 
-    _model.path = function(SCALE, fill, x_, y_) {
+    _model.bowl_path = function(SCALE, fill, x_, y_) {
         var x = x_ || 0,
             y = y_ || 0,
             h = height * SCALE * 10;
@@ -155,6 +161,10 @@ var longdrink_glass = function(name, config) {
         path += "v-" + h;
         return path;
     };
+    _model.base_path = function(SCALE, fill, x_, y_) {
+        return "M0,0";
+    };
+    _model.path = _model.bowl_path;
 
     _model.step();
     _model.compute_maxima = compute_maxima;
@@ -162,6 +172,8 @@ var longdrink_glass = function(name, config) {
     _model.height = function(h) {
         if (arguments.length === 1) {
             height = h;
+            _model.reset_model();
+            compute_maxima();
             _model.update_views();
         }
         return height;
@@ -169,6 +181,8 @@ var longdrink_glass = function(name, config) {
     _model.radius = function(r) {
         if (arguments.length === 1) {
             radius = r;
+            _model.reset_model();
+            compute_maxima();
             _model.update_views();
         }
         return radius;
@@ -176,6 +190,8 @@ var longdrink_glass = function(name, config) {
     _model.flow_rate = function(fr) {
         if (arguments.length === 1) {
             flow_rate = fr;
+            _model.reset_model();
+            compute_maxima();
             _model.update_views();
         }
         return flow_rate;

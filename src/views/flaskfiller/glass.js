@@ -1,7 +1,7 @@
 
 
 
-var glass = function(canvas, model, SCALE, boundaries_) {
+var glass = function(canvas, model, SCALE) {
     var _glass = canvas.set();
 
     var GLASS_BORDER = 3;
@@ -11,17 +11,11 @@ var glass = function(canvas, model, SCALE, boundaries_) {
         width, 
         height;
 
-    var BOUNDARIES = boundaries_ || {
-            left: 0,  
-            right: canvas.width,
-            top: 0,
-            bottom: canvas.height
-    },
-        PADDING = 5;
+    var PADDING = 5;
     var HANDLE_SPACE = 15,
         HANDLE_SIZE = 2.5;
 
-    var fill, glass_shape, label, glass_pane, handle;
+    var fill, base_shape, bowl_shape, max_line, max_label, label, glass_pane, handle;
 
     function update() {
         style({
@@ -36,37 +30,12 @@ var glass = function(canvas, model, SCALE, boundaries_) {
         }
     }
 
-    function move_by(dx, dy) {
-        var new_x = x + dx,
-            new_y = y + dy;
-        if (new_x <= BOUNDARIES.left) {
-            dx = BOUNDARIES.left - x;
-            new_x = BOUNDARIES.left;
-        }
-        if (new_y <= BOUNDARIES.top) {
-            dy = BOUNDARIES.top - y;
-            new_y = BOUNDARIES.top;
-        }
-        if (BOUNDARIES.right <= (new_x + width)) {
-            dx = BOUNDARIES.right - (x + width);
-            new_x = BOUNDARIES.right - width;
-        }
-        if (BOUNDARIES.bottom <= (new_y + height)) {
-            dy = BOUNDARIES.bottom - (y + height);
-            new_y = BOUNDARIES.bottom - height;
-        }
-        _glass.transform("...t" + dx + "," + dy );
-        x = new_x;
-        y = new_y;
-        return _glass;
-    }
-
     function draw() {
         label = canvas.text(x, y, model.get_maximum("volume") + " ml");
         label.attr({
         });
         _glass.push(label);
-        fill = canvas.path(model.path(SCALE, true));
+        fill = canvas.path(model.bowl_path(SCALE, true));
         fill.attr({
             fill: model.color(),
             stroke: "none",
@@ -74,14 +43,37 @@ var glass = function(canvas, model, SCALE, boundaries_) {
         });
         _glass.push(fill);
 
-        glass_shape = canvas.path(model.path(SCALE));
-        glass_shape.attr({
+        max_line = canvas.path("M0,0");
+        max_line.attr({
+            stroke: "dimgray",
+            "stroke-width": 1
+        });
+        _glass.push(max_line);
+
+        max_label = canvas.text(x, y, "max");
+        max_label.attr({
+            stroke: "none",
+            fill: "dimgray",
+            "font-family": "inherit",
+            "font-size": "10pt"
+        });
+        _glass.push(max_label);
+
+        bowl_shape = canvas.path(model.bowl_path(SCALE));
+        bowl_shape.attr({
             "stroke": "black",
             "stroke-width": GLASS_BORDER,
             "fill": "none"
         });
-        _glass.push(glass_shape);  
+        _glass.push(bowl_shape);  
 
+        base_shape = canvas.path(model.base_path(SCALE));
+        base_shape.attr({
+            "stroke": "black",
+            "stroke-width": GLASS_BORDER,
+            "fill": "dimgray"
+        });
+        _glass.push(base_shape);  
 
         glass_pane = canvas.path(model.path(SCALE));
         glass_pane.attr({
@@ -92,6 +84,8 @@ var glass = function(canvas, model, SCALE, boundaries_) {
             "stroke-width": GLASS_BORDER
         });
         _glass.push(glass_pane);
+
+
         update_size();
 
         handle = canvas.circle( 
@@ -113,10 +107,22 @@ var glass = function(canvas, model, SCALE, boundaries_) {
 
         glass_pane.hover(onhover, offhover);
         glass_pane.drag(onmove, onstart, onend);
+
+        glass_pane.dblclick(run_pause);
+    }
+
+    function run_pause() {
+        if (model.is_finished()) {
+            model.action("reset").callback(model)();
+        } else {
+            model.action("start").callback(model)();
+        }
     }
 
     function set_label(x, y) {
-        model.compute_maxima();
+        if (model.type === "longdrinkglas") {
+            model.compute_maxima();
+        }
         label.attr({
             x: x + width/2,
             y: y + height/2,
@@ -146,6 +152,7 @@ var glass = function(canvas, model, SCALE, boundaries_) {
     }
 
     function onstart(x, y, event) {
+        model.action("pause").callback(model)();
         delta_x = 0;
         delta_y = 0;
     }
@@ -172,14 +179,17 @@ var glass = function(canvas, model, SCALE, boundaries_) {
     function sizemove(dx, dy) {
         var 
             d_height = dy / SCALE / 10,
-            d_radius = dx / 2 / SCALE ,
+            d_radius = dx / 2 / SCALE / 10,
             new_radius = old_radius + d_radius,
-            new_height = old_height - d_height;
+            new_height = old_height - d_height,
+            area = Math.PI * new_radius * new_radius;
 
-        if (new_height >= 1 && new_radius >= 1){
+
+        if (area*new_height >= 5){
+            delta_y = dy;
             model.height(new_height);
             model.radius(new_radius);
-            model.update_views();
+            draw_at(x, y+dy);
         }
 
     }
@@ -189,9 +199,11 @@ var glass = function(canvas, model, SCALE, boundaries_) {
         delta_y = 0;
         old_height = model.height();
         old_radius = model.radius();
+        model.action("reset").callback(model)();
     }
 
-    function sizestop(event) {
+    function sizestop() {
+        y += delta_y;
     }
 
 
@@ -224,10 +236,23 @@ var glass = function(canvas, model, SCALE, boundaries_) {
     }
 
     function draw_at(x, y) {
-        _glass.fill.attr({path: model.path(SCALE, true, x, y)});
-        _glass.glass_shape.attr({path: model.path(SCALE, false, x, y)});
+
+        _glass.fill.attr({path: model.bowl_path(SCALE, true, x, y)});
+        _glass.bowl_shape.attr({path: model.bowl_path(SCALE, false, x, y)});
+        _glass.base_shape.attr({path: model.base_path(SCALE, false, x, y)});
         _glass.glass_pane.attr({path: model.path(SCALE, false, x, y)});
         update_size();
+        var MAX_LINE_WIDTH = Math.min(30, width / 2),
+            MAX_LINE_SKIP = 5,
+            MAX_LINE_Y = y + height - model.get_maximum("hoogte") * 10 * SCALE;
+        _glass.max_line.attr({
+            path: "M" + x + "," + MAX_LINE_Y + 
+                "h" + MAX_LINE_WIDTH
+        });
+        _glass.max_label.attr({
+            x: x + MAX_LINE_WIDTH / 1.5,
+            y: MAX_LINE_Y - MAX_LINE_SKIP            
+        });
         _glass.handle.attr({
             cx: x + width + HANDLE_SPACE, 
             cy: y - HANDLE_SPACE
@@ -250,7 +275,10 @@ var glass = function(canvas, model, SCALE, boundaries_) {
     _glass.update = update;
     _glass.update_color = update_color;
     _glass.fill = fill;
-    _glass.glass_shape = glass_shape;
+    _glass.bowl_shape = bowl_shape;
+    _glass.base_shape = base_shape;
+    _glass.max_line = max_line;
+    _glass.max_label = max_label;
     _glass.glass_pane = glass_pane;
     _glass.handle = handle;
     return _glass;

@@ -1,6 +1,7 @@
 
 var model = require("../src/models/equation");
 var long_model = require("../src/models/longdrink_glass");
+var glass_model = require("../src/models/glass");
 var view = require("../src/views/view");
 var table = require("../src/views/table");
 var graph = require("../src/views/graph");
@@ -115,11 +116,14 @@ var longdrinkglas = long_model("longdrinkglas", {
     flow_rate: flow_rate
 });
 
-var breedlongdrinkglas = long_model("breedlongdrinkglas", {
-    radius: 1.3,
-    height: 2,
-    flow_rate: flow_rate
-});
+var cocktailglas = glass_model("cocktailglas", {
+        flow_rate: flow_rate,
+        shape: {
+            base_path: "M10,110v100l50,10",
+            bowl_path: "M100,200L10,0",
+            scale: 10    
+        }
+    });
 
 // console.log(para.get_minimum());
 // console.log(para.get_minimum("x"));
@@ -143,7 +147,7 @@ var repr3 = ff(config);
 var repr4 = tt(config);
 var body = document.querySelector("body");
 
-body.appendChild(repr4.fragment);
+//body.appendChild(repr4.fragment);
 
 body.appendChild(repr3.fragment);
 body.appendChild(repr.fragment);
@@ -151,11 +155,11 @@ body.appendChild(repr2.fragment);
 
 
 repr.register(longdrinkglas);
-repr.register(breedlongdrinkglas);
+repr.register(cocktailglas);
 
 repr2.register(longdrinkglas);
-repr2.register(breedlongdrinkglas);
+repr2.register(cocktailglas);
 
 repr3.register(longdrinkglas);
-repr3.register(breedlongdrinkglas);
+repr3.register(cocktailglas);
 

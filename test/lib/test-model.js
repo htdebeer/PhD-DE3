@@ -6129,7 +6129,185 @@ var equation_model = function(name, config) {
 module.exports = equation_model;
 
 
-},{"./model":6}],5:[function(require,module,exports){
+},{"./model":7}],5:[function(require,module,exports){
+
+
+var model = require("./model.js");
+
+var glass = function(name, config) {
+    var 
+        flow_rate = config.flow_rate || 50,
+        shape = config.shape || {
+            base_path: "",
+            bowl_path: "",
+            scale: 1
+        },
+        action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
+        default_actions = require("../actions/actions")({speed: flow_rate});
+
+    /**
+     * Compute the volume in ml in the longdrink glass given flow_rate and time the
+     * water has flown in seconds.
+     */
+    function compute_volume(time) {
+        return time * flow_rate;
+    }
+    
+
+    /**
+     * Compute the height of the water in cm given the volume of the water in
+     * the glass in ml.
+     */
+    function compute_height(volume) {
+        var area = Math.PI * Math.pow(radius, 2);
+        if (area > 0) {
+            return volume / area;
+        } else {
+            return 0;
+        }
+    }
+
+    function create_actions(action_list) {
+        var actions = {},
+            create_action = function(action_name) {
+                actions[action_name] = default_actions[action_name];
+            };
+        action_list.forEach(create_action);
+        return actions;
+    }
+
+
+    var quantities = {
+        hoogte: {
+            minimum: 0,
+            maximum: 0,
+            value: 0,
+            unit: 'cm',
+            name: "hoogte",
+            label: "hoogte in cm",
+            stepsize: 0.01,
+            monotone: true,
+            precision: 2
+        },
+        volume: {
+            minimum: 0,
+            maximum: 0,
+            value: 0,
+            unit: 'ml',
+            name: "volume",
+            label: "volume in ml",
+            stepsize: 0.1,
+            monotone: true,
+            precision: 0
+        },
+        tijd: {
+            minimum: 0,
+            maximum: 0,
+            value: 0,
+            unit: 'sec',
+            name: "tijd",
+            label: "tijd",
+            stepsize: 0.01,
+            monotone: true,
+            precision: 1
+        }
+    };
+
+
+    var time = {
+        start: 0,
+        end: quantities.tijd.maximum*1000,
+        step: Math.ceil(1000/flow_rate)
+    };
+
+    var _model = model(name, {
+        time: time,
+        quantities: quantities,
+        actions: create_actions(action_list)
+    });
+
+    function compute_maxima() {
+        // Has to be computed before the model can be used. Probably time
+        // intensive.
+
+
+        var area, time_max, volume_max, height_max,
+            CM_SCALE = shape.scale / 10;
+
+        time_max = 100;
+        height_max = 4;
+        volume_max = 50;
+
+        _model.set_end(time_max);
+
+        _model.quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
+        _model.quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
+        _model.quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
+    }
+
+    compute_maxima();
+
+
+    _model.measure_moment = function(moment) {
+        return {
+            time: 23,
+                height: 3,
+                volume: 23
+        };
+        return _model.get_moment(moment);
+    };
+
+    var scaled_shape = {
+        base_path: shape.base_path,
+        bowl_path: shape.bowl_path,
+        scale: shape.scale
+    };
+
+    _model.path = function(SCALE, fill, x_, y_) {
+        var x = x_ || 0,
+            y = y_ || 0;
+        if (fill) {
+            h = _model.get("hoogte") * SCALE * 10;
+            y += height * SCALE * 10 - h;
+        }
+
+        var path = "M" + x + "," + y;
+        path += shape.bowl_path;
+        return path;
+    };
+
+    _model.base_path = function(SCALE, x_, y_) {
+        return shape.base_path;
+    };
+
+    _model.bowl_path = function(SCALE, fill, x_, y_) {
+        if (scaled_shape.scale !== SCALE) {
+            scale_paths(SCALE);
+        }
+        return scaled_shape.bowl_path;
+    };
+
+    function scale_paths(scale) {
+        scaled_paths = {
+            base_path: scale_path(shape.base_path, scale),
+            bowl_path: scale_path(shape.bowl_path, scale),
+            scale: scale
+        };
+
+        function scale_path(path, scale) {
+            return path;
+        }
+    }
+
+    _model.step();
+
+    return _model;
+};
+
+module.exports = glass;
+
+
+},{"../actions/actions":2,"./model.js":7}],6:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -6182,9 +6360,9 @@ var longdrink_glass = function(name, config) {
      * Compute the height of the water in cm given the volume of the water in
      * the glass in ml.
      */
-    var area = Math.PI * Math.pow(radius, 2);
     function compute_height(volume) {
-        if (volume > 0) {
+        var area = Math.PI * Math.pow(radius, 2);
+        if (area > 0) {
             return volume / area;
         } else {
             return 0;
@@ -6204,6 +6382,7 @@ var longdrink_glass = function(name, config) {
     var quantities = {
         hoogte: {
             minimum: 0,
+            maximum: 0,
             value: 0,
             unit: 'cm',
             name: "hoogte",
@@ -6214,6 +6393,7 @@ var longdrink_glass = function(name, config) {
         },
         volume: {
             minimum: 0,
+            maximum: 0,
             value: 0,
             unit: 'ml',
             name: "volume",
@@ -6224,6 +6404,7 @@ var longdrink_glass = function(name, config) {
         },
         tijd: {
             minimum: 0,
+            maximum: 0,
             value: 0,
             unit: 'sec',
             name: "tijd",
@@ -6234,18 +6415,6 @@ var longdrink_glass = function(name, config) {
         }
     };
 
-    var time_max, volume_max, height_max;
-    function compute_maxima() {
-        time_max = Math.floor(area*height*10 / flow_rate)/10;
-        volume_max = time_max * flow_rate;
-        height_max = volume_max / area;
-
-        quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
-        quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
-        quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
-    }
-
-    compute_maxima();
 
     var time = {
         start: 0,
@@ -6258,6 +6427,21 @@ var longdrink_glass = function(name, config) {
         quantities: quantities,
         actions: create_actions(action_list)
     });
+
+    function compute_maxima() {
+        var area = Math.PI * Math.pow(radius, 2),
+            time_max = Math.floor(area*height*10 / flow_rate)/10,
+            volume_max = time_max * flow_rate,
+            height_max = volume_max / area;
+
+        _model.set_end(time_max);
+
+        _model.quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
+        _model.quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
+        _model.quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
+    }
+
+    compute_maxima();
 
     _model.measure_moment = function(moment) {
         var time_in_ms = _model.moment_to_time(moment),
@@ -6272,7 +6456,7 @@ var longdrink_glass = function(name, config) {
         };
     };
 
-    _model.path = function(SCALE, fill, x_, y_) {
+    _model.bowl_path = function(SCALE, fill, x_, y_) {
         var x = x_ || 0,
             y = y_ || 0,
             h = height * SCALE * 10;
@@ -6287,6 +6471,10 @@ var longdrink_glass = function(name, config) {
         path += "v-" + h;
         return path;
     };
+    _model.base_path = function(SCALE, fill, x_, y_) {
+        return "M0,0";
+    };
+    _model.path = _model.bowl_path;
 
     _model.step();
     _model.compute_maxima = compute_maxima;
@@ -6294,6 +6482,8 @@ var longdrink_glass = function(name, config) {
     _model.height = function(h) {
         if (arguments.length === 1) {
             height = h;
+            _model.reset_model();
+            compute_maxima();
             _model.update_views();
         }
         return height;
@@ -6301,6 +6491,8 @@ var longdrink_glass = function(name, config) {
     _model.radius = function(r) {
         if (arguments.length === 1) {
             radius = r;
+            _model.reset_model();
+            compute_maxima();
             _model.update_views();
         }
         return radius;
@@ -6308,6 +6500,8 @@ var longdrink_glass = function(name, config) {
     _model.flow_rate = function(fr) {
         if (arguments.length === 1) {
             flow_rate = fr;
+            _model.reset_model();
+            compute_maxima();
             _model.update_views();
         }
         return flow_rate;
@@ -6318,7 +6512,7 @@ var longdrink_glass = function(name, config) {
 
 module.exports = longdrink_glass;
 
-},{"../actions/actions":2,"./model":6}],6:[function(require,module,exports){
+},{"../actions/actions":2,"./model":7}],7:[function(require,module,exports){
 (function(){/*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -6366,6 +6560,11 @@ var model = function(name, config) {
         T_END       = config.time.end       || Infinity,
         T_STEP      = config.time.step      || 1;
 
+    function set_end(seconds) {
+        T_END = seconds*1000;
+    }
+    _model.set_end = set_end;
+
     // To translate from a moment's order number to its corresponding time in
     // ms and vice versa, two helper functions are defined, `time_to_moment`
     // and `moment_to_time`, as well as a shorthand name for these two helper
@@ -6407,6 +6606,11 @@ var model = function(name, config) {
 
     var moments = [];
 
+    _model.get_moment = function(moment) {
+        return moments[moment];
+    };
+
+
     // A moment can only be inspected if it already has been "measured".
     // Following the data invariant, a moment has been measured when its order
     // number is smaller or equal to the number of measured moments.
@@ -6435,6 +6639,9 @@ var model = function(name, config) {
     var views = [];
     var update_views = function() {
         var update_view = function(view) {
+            if (view.update_all) {
+                view.update_all();
+            }
             view.update(_model.name);
         };
         views.forEach(update_view);
@@ -6532,6 +6739,11 @@ var model = function(name, config) {
         return _model.can_finish() && m2t(now) >= T_END;
     };
 
+    function reset_model() {
+        moments = [];
+        _model.reset();
+    }
+    _model.reset_model = reset_model;
 
     /** 
      * ## Actions on the model
@@ -6826,13 +7038,14 @@ var model = function(name, config) {
 module.exports = model;
 
 })()
-},{}],7:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 
 var view = require("../view"),
     dom = require("../../dom/dom"),
     ruler = require("./ruler"),
     raphael = require("raphael-browserify"),
-    longdrink = require("./longdrink_glass");
+    longdrink = require("./longdrink_glass"),
+    various_glass = require("./glass");
 
 var flaskfiller = function(config, scale_, dimensions_) {
     var _flaskfiller = view(config);
@@ -6931,15 +7144,9 @@ var flaskfiller = function(config, scale_, dimensions_) {
     function add_glass(model) {
         var glass;
         if (model.type === "longdrink") {
-            var BOUNDARIES = {
-                left: SIMULATION.x,
-                right: SIMULATION.x + SIMULATION.width,
-                top: SIMULATION.y,
-                bottom: SIMULATION.y + SIMULATION.height
-            };
-            glass = longdrink(canvas, model, scale, BOUNDARIES);
+            glass = longdrink(canvas, model, scale);
         } else {
-            // any other kind of glass
+            glass = various_glass(canvas, model, scale);
         }
         return glass;
     }
@@ -6975,11 +7182,11 @@ var flaskfiller = function(config, scale_, dimensions_) {
 
 module.exports = flaskfiller;
 
-},{"../../dom/dom":3,"../view":15,"./longdrink_glass":9,"./ruler":10,"raphael-browserify":1}],8:[function(require,module,exports){
+},{"../../dom/dom":3,"../view":16,"./glass":9,"./longdrink_glass":10,"./ruler":11,"raphael-browserify":1}],9:[function(require,module,exports){
 
 
 
-var glass = function(canvas, model, SCALE, boundaries_) {
+var glass = function(canvas, model, SCALE) {
     var _glass = canvas.set();
 
     var GLASS_BORDER = 3;
@@ -6989,17 +7196,11 @@ var glass = function(canvas, model, SCALE, boundaries_) {
         width, 
         height;
 
-    var BOUNDARIES = boundaries_ || {
-            left: 0,  
-            right: canvas.width,
-            top: 0,
-            bottom: canvas.height
-    },
-        PADDING = 5;
+    var PADDING = 5;
     var HANDLE_SPACE = 15,
         HANDLE_SIZE = 2.5;
 
-    var fill, glass_shape, label, glass_pane, handle;
+    var fill, base_shape, bowl_shape, max_line, max_label, label, glass_pane, handle;
 
     function update() {
         style({
@@ -7014,37 +7215,12 @@ var glass = function(canvas, model, SCALE, boundaries_) {
         }
     }
 
-    function move_by(dx, dy) {
-        var new_x = x + dx,
-            new_y = y + dy;
-        if (new_x <= BOUNDARIES.left) {
-            dx = BOUNDARIES.left - x;
-            new_x = BOUNDARIES.left;
-        }
-        if (new_y <= BOUNDARIES.top) {
-            dy = BOUNDARIES.top - y;
-            new_y = BOUNDARIES.top;
-        }
-        if (BOUNDARIES.right <= (new_x + width)) {
-            dx = BOUNDARIES.right - (x + width);
-            new_x = BOUNDARIES.right - width;
-        }
-        if (BOUNDARIES.bottom <= (new_y + height)) {
-            dy = BOUNDARIES.bottom - (y + height);
-            new_y = BOUNDARIES.bottom - height;
-        }
-        _glass.transform("...t" + dx + "," + dy );
-        x = new_x;
-        y = new_y;
-        return _glass;
-    }
-
     function draw() {
         label = canvas.text(x, y, model.get_maximum("volume") + " ml");
         label.attr({
         });
         _glass.push(label);
-        fill = canvas.path(model.path(SCALE, true));
+        fill = canvas.path(model.bowl_path(SCALE, true));
         fill.attr({
             fill: model.color(),
             stroke: "none",
@@ -7052,14 +7228,37 @@ var glass = function(canvas, model, SCALE, boundaries_) {
         });
         _glass.push(fill);
 
-        glass_shape = canvas.path(model.path(SCALE));
-        glass_shape.attr({
+        max_line = canvas.path("M0,0");
+        max_line.attr({
+            stroke: "dimgray",
+            "stroke-width": 1
+        });
+        _glass.push(max_line);
+
+        max_label = canvas.text(x, y, "max");
+        max_label.attr({
+            stroke: "none",
+            fill: "dimgray",
+            "font-family": "inherit",
+            "font-size": "10pt"
+        });
+        _glass.push(max_label);
+
+        bowl_shape = canvas.path(model.bowl_path(SCALE));
+        bowl_shape.attr({
             "stroke": "black",
             "stroke-width": GLASS_BORDER,
             "fill": "none"
         });
-        _glass.push(glass_shape);  
+        _glass.push(bowl_shape);  
 
+        base_shape = canvas.path(model.base_path(SCALE));
+        base_shape.attr({
+            "stroke": "black",
+            "stroke-width": GLASS_BORDER,
+            "fill": "dimgray"
+        });
+        _glass.push(base_shape);  
 
         glass_pane = canvas.path(model.path(SCALE));
         glass_pane.attr({
@@ -7070,6 +7269,8 @@ var glass = function(canvas, model, SCALE, boundaries_) {
             "stroke-width": GLASS_BORDER
         });
         _glass.push(glass_pane);
+
+
         update_size();
 
         handle = canvas.circle( 
@@ -7091,10 +7292,22 @@ var glass = function(canvas, model, SCALE, boundaries_) {
 
         glass_pane.hover(onhover, offhover);
         glass_pane.drag(onmove, onstart, onend);
+
+        glass_pane.dblclick(run_pause);
+    }
+
+    function run_pause() {
+        if (model.is_finished()) {
+            model.action("reset").callback(model)();
+        } else {
+            model.action("start").callback(model)();
+        }
     }
 
     function set_label(x, y) {
-        model.compute_maxima();
+        if (model.type === "longdrinkglas") {
+            model.compute_maxima();
+        }
         label.attr({
             x: x + width/2,
             y: y + height/2,
@@ -7124,6 +7337,7 @@ var glass = function(canvas, model, SCALE, boundaries_) {
     }
 
     function onstart(x, y, event) {
+        model.action("pause").callback(model)();
         delta_x = 0;
         delta_y = 0;
     }
@@ -7150,14 +7364,17 @@ var glass = function(canvas, model, SCALE, boundaries_) {
     function sizemove(dx, dy) {
         var 
             d_height = dy / SCALE / 10,
-            d_radius = dx / 2 / SCALE ,
+            d_radius = dx / 2 / SCALE / 10,
             new_radius = old_radius + d_radius,
-            new_height = old_height - d_height;
+            new_height = old_height - d_height,
+            area = Math.PI * new_radius * new_radius;
 
-        if (new_height >= 1 && new_radius >= 1){
+
+        if (area*new_height >= 5){
+            delta_y = dy;
             model.height(new_height);
             model.radius(new_radius);
-            model.update_views();
+            draw_at(x, y+dy);
         }
 
     }
@@ -7167,9 +7384,11 @@ var glass = function(canvas, model, SCALE, boundaries_) {
         delta_y = 0;
         old_height = model.height();
         old_radius = model.radius();
+        model.action("reset").callback(model)();
     }
 
-    function sizestop(event) {
+    function sizestop() {
+        y += delta_y;
     }
 
 
@@ -7202,10 +7421,23 @@ var glass = function(canvas, model, SCALE, boundaries_) {
     }
 
     function draw_at(x, y) {
-        _glass.fill.attr({path: model.path(SCALE, true, x, y)});
-        _glass.glass_shape.attr({path: model.path(SCALE, false, x, y)});
+
+        _glass.fill.attr({path: model.bowl_path(SCALE, true, x, y)});
+        _glass.bowl_shape.attr({path: model.bowl_path(SCALE, false, x, y)});
+        _glass.base_shape.attr({path: model.base_path(SCALE, false, x, y)});
         _glass.glass_pane.attr({path: model.path(SCALE, false, x, y)});
         update_size();
+        var MAX_LINE_WIDTH = Math.min(30, width / 2),
+            MAX_LINE_SKIP = 5,
+            MAX_LINE_Y = y + height - model.get_maximum("hoogte") * 10 * SCALE;
+        _glass.max_line.attr({
+            path: "M" + x + "," + MAX_LINE_Y + 
+                "h" + MAX_LINE_WIDTH
+        });
+        _glass.max_label.attr({
+            x: x + MAX_LINE_WIDTH / 1.5,
+            y: MAX_LINE_Y - MAX_LINE_SKIP            
+        });
         _glass.handle.attr({
             cx: x + width + HANDLE_SPACE, 
             cy: y - HANDLE_SPACE
@@ -7228,7 +7460,10 @@ var glass = function(canvas, model, SCALE, boundaries_) {
     _glass.update = update;
     _glass.update_color = update_color;
     _glass.fill = fill;
-    _glass.glass_shape = glass_shape;
+    _glass.bowl_shape = bowl_shape;
+    _glass.base_shape = base_shape;
+    _glass.max_line = max_line;
+    _glass.max_label = max_label;
     _glass.glass_pane = glass_pane;
     _glass.handle = handle;
     return _glass;
@@ -7236,7 +7471,7 @@ var glass = function(canvas, model, SCALE, boundaries_) {
 
 module.exports = glass;
 
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 
 var glass = require("./glass");
 
@@ -7286,7 +7521,7 @@ var longdrink_glass = function(canvas, model, SCALE, boundaries_) {
 
 module.exports = longdrink_glass;
 
-},{"./glass":8}],10:[function(require,module,exports){
+},{"./glass":9}],11:[function(require,module,exports){
 
 var ruler = function(canvas, config) {
     var _ruler = canvas.set();
@@ -7440,7 +7675,7 @@ var ruler = function(canvas, config) {
 
 module.exports = ruler;
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -7466,9 +7701,12 @@ module.exports = ruler;
 var view = require("./view"),
     dom = require("../dom/dom");
 
-var graph = function(config, horizontal, vertical, dimensions_) {
+var graph = function(config, horizontal_, vertical_, dimensions_) {
 
     var _graph = view(config);
+
+    var horizontal = horizontal_,
+        vertical = vertical_;
 
 
     var dimensions = dimensions_ || {
@@ -7657,6 +7895,7 @@ var graph = function(config, horizontal, vertical, dimensions_) {
             axis = create_axis(quantity, orientation);
        
         if (orientation === "horizontal") {
+            horizontal = quantity_name;
             //  create axes    
             var xaxisg = _graph.fragment.querySelector("g.x.axis");
             if (xaxisg) {
@@ -7697,6 +7936,7 @@ var graph = function(config, horizontal, vertical, dimensions_) {
             };
         } else {
             // vertical axis
+            vertical = quantity_name;
             var yaxisg = _graph.fragment.querySelector("g.y.axis");
             if (yaxisg) {
                 yaxisg.parentNode.removeChild(yaxisg);
@@ -7764,6 +8004,7 @@ var graph = function(config, horizontal, vertical, dimensions_) {
     };
 
     _graph.update_all = function() {
+        _graph.compute_extrema();
         set_axis(horizontal, "horizontal");
         set_axis(vertical, "vertical");
         Object.keys(_graph.models).forEach(_graph.update);
@@ -7780,7 +8021,7 @@ var graph = function(config, horizontal, vertical, dimensions_) {
 
 module.exports = graph;
 
-},{"../dom/dom":3,"./view":15}],12:[function(require,module,exports){
+},{"../dom/dom":3,"./view":16}],13:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -8122,7 +8363,7 @@ var table = function(config) {
 
 module.exports = table;
 
-},{"../dom/dom":3,"./view":15}],13:[function(require,module,exports){
+},{"../dom/dom":3,"./view":16}],14:[function(require,module,exports){
 
 var view = require("../view"),
     draw_thermometer = require("./thermometer"),
@@ -8280,7 +8521,7 @@ var temperaturetyper = function(config, scale_, dimensions_) {
 
 module.exports = temperaturetyper;
 
-},{"../../dom/dom":3,"../view":15,"./thermometer":14,"raphael-browserify":1}],14:[function(require,module,exports){
+},{"../../dom/dom":3,"../view":16,"./thermometer":15,"raphael-browserify":1}],15:[function(require,module,exports){
 
 var thermometer = function(canvas, dimensions_) {
 
@@ -8489,7 +8730,7 @@ var thermometer = function(canvas, dimensions_) {
 
 module.exports = thermometer;
 
-},{}],15:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -8605,10 +8846,11 @@ var view = function(config) {
 
 module.exports = view;
 
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 
 var model = require("../src/models/equation");
 var long_model = require("../src/models/longdrink_glass");
+var glass_model = require("../src/models/glass");
 var view = require("../src/views/view");
 var table = require("../src/views/table");
 var graph = require("../src/views/graph");
@@ -8723,11 +8965,14 @@ var longdrinkglas = long_model("longdrinkglas", {
     flow_rate: flow_rate
 });
 
-var breedlongdrinkglas = long_model("breedlongdrinkglas", {
-    radius: 1.3,
-    height: 2,
-    flow_rate: flow_rate
-});
+var cocktailglas = glass_model("cocktailglas", {
+        flow_rate: flow_rate,
+        shape: {
+            base_path: "M10,110v100l50,10",
+            bowl_path: "M100,200L10,0",
+            scale: 10    
+        }
+    });
 
 // console.log(para.get_minimum());
 // console.log(para.get_minimum("x"));
@@ -8751,7 +8996,7 @@ var repr3 = ff(config);
 var repr4 = tt(config);
 var body = document.querySelector("body");
 
-body.appendChild(repr4.fragment);
+//body.appendChild(repr4.fragment);
 
 body.appendChild(repr3.fragment);
 body.appendChild(repr.fragment);
@@ -8759,14 +9004,14 @@ body.appendChild(repr2.fragment);
 
 
 repr.register(longdrinkglas);
-repr.register(breedlongdrinkglas);
+repr.register(cocktailglas);
 
 repr2.register(longdrinkglas);
-repr2.register(breedlongdrinkglas);
+repr2.register(cocktailglas);
 
 repr3.register(longdrinkglas);
-repr3.register(breedlongdrinkglas);
+repr3.register(cocktailglas);
 
 
-},{"../src/actions/actions":2,"../src/models/equation":4,"../src/models/longdrink_glass":5,"../src/views/flaskfiller/flaskfiller":7,"../src/views/graph":11,"../src/views/table":12,"../src/views/temperaturetyper/temperaturetyper":13,"../src/views/view":15}]},{},[16])
+},{"../src/actions/actions":2,"../src/models/equation":4,"../src/models/glass":5,"../src/models/longdrink_glass":6,"../src/views/flaskfiller/flaskfiller":8,"../src/views/graph":12,"../src/views/table":13,"../src/views/temperaturetyper/temperaturetyper":14,"../src/views/view":16}]},{},[17])
 ;

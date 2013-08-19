@@ -23,9 +23,12 @@
 var view = require("./view"),
     dom = require("../dom/dom");
 
-var graph = function(config, horizontal, vertical, dimensions_) {
+var graph = function(config, horizontal_, vertical_, dimensions_) {
 
     var _graph = view(config);
+
+    var horizontal = horizontal_,
+        vertical = vertical_;
 
 
     var dimensions = dimensions_ || {
@@ -214,6 +217,7 @@ var graph = function(config, horizontal, vertical, dimensions_) {
             axis = create_axis(quantity, orientation);
        
         if (orientation === "horizontal") {
+            horizontal = quantity_name;
             //  create axes    
             var xaxisg = _graph.fragment.querySelector("g.x.axis");
             if (xaxisg) {
@@ -254,6 +258,7 @@ var graph = function(config, horizontal, vertical, dimensions_) {
             };
         } else {
             // vertical axis
+            vertical = quantity_name;
             var yaxisg = _graph.fragment.querySelector("g.y.axis");
             if (yaxisg) {
                 yaxisg.parentNode.removeChild(yaxisg);
@@ -321,6 +326,7 @@ var graph = function(config, horizontal, vertical, dimensions_) {
     };
 
     _graph.update_all = function() {
+        _graph.compute_extrema();
         set_axis(horizontal, "horizontal");
         set_axis(vertical, "vertical");
         Object.keys(_graph.models).forEach(_graph.update);

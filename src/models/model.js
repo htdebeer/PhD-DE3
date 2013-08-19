@@ -45,6 +45,11 @@ var model = function(name, config) {
         T_END       = config.time.end       || Infinity,
         T_STEP      = config.time.step      || 1;
 
+    function set_end(seconds) {
+        T_END = seconds*1000;
+    }
+    _model.set_end = set_end;
+
     // To translate from a moment's order number to its corresponding time in
     // ms and vice versa, two helper functions are defined, `time_to_moment`
     // and `moment_to_time`, as well as a shorthand name for these two helper
@@ -86,6 +91,11 @@ var model = function(name, config) {
 
     var moments = [];
 
+    _model.get_moment = function(moment) {
+        return moments[moment];
+    };
+
+
     // A moment can only be inspected if it already has been "measured".
     // Following the data invariant, a moment has been measured when its order
     // number is smaller or equal to the number of measured moments.
@@ -114,6 +124,9 @@ var model = function(name, config) {
     var views = [];
     var update_views = function() {
         var update_view = function(view) {
+            if (view.update_all) {
+                view.update_all();
+            }
             view.update(_model.name);
         };
         views.forEach(update_view);
@@ -211,6 +224,11 @@ var model = function(name, config) {
         return _model.can_finish() && m2t(now) >= T_END;
     };
 
+    function reset_model() {
+        moments = [];
+        _model.reset();
+    }
+    _model.reset_model = reset_model;
 
     /** 
      * ## Actions on the model
