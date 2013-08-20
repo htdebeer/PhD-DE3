@@ -6133,15 +6133,12 @@ module.exports = equation_model;
 
 
 var model = require("./model.js");
+var raphael = require("raphael-browserify");
 
 var glass = function(name, config) {
     var 
         flow_rate = config.flow_rate || 50,
-        shape = config.shape || {
-            base_path: "",
-            bowl_path: "",
-            scale: 1
-        },
+        shape = config.shape,
         action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
         default_actions = require("../actions/actions")({speed: flow_rate});
 
@@ -6258,41 +6255,167 @@ var glass = function(name, config) {
     };
 
     var scaled_shape = {
-        base_path: shape.base_path,
-        bowl_path: shape.bowl_path,
+        base: shape.base,
+        bowl: shape.bowl,
         scale: shape.scale
     };
 
     _model.path = function(SCALE, fill, x_, y_) {
-        var x = x_ || 0,
-            y = y_ || 0;
-        if (fill) {
-            h = _model.get("hoogte") * SCALE * 10;
-            y += height * SCALE * 10 - h;
-        }
-
-        var path = "M" + x + "," + y;
-        path += shape.bowl_path;
-        return path;
+        var bowl = _model.bowl_path(SCALE, fill, x_, y_),
+            base = _model.base_path(SCALE, fill, x_, y_),
+            whole_glass = base + bowl;
+        return whole_glass;
     };
 
     _model.base_path = function(SCALE, x_, y_) {
-        return shape.base_path;
+        if (scaled_shape.scale !== SCALE) {
+            scale_paths(SCALE);
+        }
+        var x = x_ || 0,
+            y = y_ || 0,
+            path = "M" + x + "," + y + complete_path(scaled_shape.base) + "z";
+        
+        return path;
     };
 
     _model.bowl_path = function(SCALE, fill, x_, y_) {
         if (scaled_shape.scale !== SCALE) {
             scale_paths(SCALE);
         }
-        return scaled_shape.bowl_path;
+        var x = x_ || 0,
+            y = y_ || 0,
+            path = "M" + x + "," + y + complete_path(scaled_shape.bowl);
+
+        return path;
     };
+
+    function start_of_path(path) {
+        return raphael.getPointAtLength(path, 0);
+    }
+
+    function end_of_path(path) {
+        return raphael.getPointAtLength(path,
+                raphael.getTotalLength());
+    }
+
+    function complete_path(part) {
+        var start = part.top,
+            end = part.bottom,
+            path = part.path,
+            segments = raphael.parsePathString(path),
+            completed_path = "m" + start.x + "," + start.y + path;
+
+
+        completed_path += "h-" +(Math.abs(0 - end.x) * 2);
+
+        var mirror_segment = function(segment) {
+            var command = segment[0],
+                x,y, cp1, cp2,
+                mirrored_segment = "";
+
+            switch (command) {
+                case "l":
+                    x = segment[1];
+                    y = segment[2];
+                    mirrored_segment = "l" + x + "," + (-y);
+                    start = {
+                        x: start.x + x,
+                        y: start.y + y
+                    };
+                    break;
+                case "c":
+                    cp1 = {
+                        x: segment[1],
+                        y: segment[2]
+                    };
+                    cp2 = {
+                        x: segment[3],
+                        y: segment[4]
+                    };
+
+                    x = segment[5];
+                    y = segment[6];
+                    end = {
+                        x: x,
+                        y: y
+                    };
+                    mirrored_segment = "c" + (end.x - cp2.x) + "," + (-(end.y - cp2.y)) + "," +
+                        (end.x - cp1.x) + "," + (-(end.y - cp1.y)) + "," + 
+                        (x) + "," + (-y);
+                    start = {
+                        x: start.x + x,
+                        y: start.y + y
+                    };
+                    break;
+                case "v":
+                    y = segment[1];
+                    mirrored_segment = "v" + (-y);
+                    start = {
+                        x: start.x,
+                        y: start.y + y
+                    };
+                    break;
+                case "h":
+                    x = segment[1];
+                    mirrored_segment = "h" + x;
+                    start = {
+                        x: start.x + x,
+                        y: start.y
+                    };
+                    break;
+                case "m":
+                    // skip
+
+                    break;
+            }
+
+            return mirrored_segment;
+        };
+
+        completed_path += segments.map(mirror_segment).reverse().join("");
+
+
+        return completed_path;
+    }
+
+    function mirror_path(path) {
+        var curve_path = raphael.path2curve(path);
+
+
+        // First path segment is mx,y. get those x and y
+        var first = curve_path.shift();
+        var x = first[1],
+            y = first[2];
+
+        // Now, for all other path segments, which are C commands of the form
+        // C cp1x, cp2x, cp2x, cp2y, x, y, mirror the coordinates in 0
+        //
+        var mirror_segment = function(segment) {
+            var cp1x = segment[1],
+                cp1y = segment[2],
+                cp2x = segment[3],
+                cp2y = segment[4],
+                mirrored_segment = "C" + [cp2x, cp2y, cp1x, cp1y, -x, y].join(",");
+
+            x = segment[5];
+            y = segment[6];
+
+            return mirrored_segment;
+        };
+
+        return curve_path.map(mirror_segment).reverse().join("");
+
+    }
 
     function scale_paths(scale) {
         scaled_paths = {
-            base_path: scale_path(shape.base_path, scale),
-            bowl_path: scale_path(shape.bowl_path, scale),
-            scale: scale
+            base: {},
+            bowl: {},
+            scale: 1
         };
+        scaled_paths.base.path = scale_path(shape.base.path, scale);
+        scaled_paths.bowl.path = scale_path(shape.bowl.path, scale);
+        scaled_paths.scale = scale;
 
         function scale_path(path, scale) {
             return path;
@@ -6307,7 +6430,7 @@ var glass = function(name, config) {
 module.exports = glass;
 
 
-},{"../actions/actions":2,"./model.js":7}],6:[function(require,module,exports){
+},{"../actions/actions":2,"./model.js":7,"raphael-browserify":1}],6:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -7184,6 +7307,7 @@ module.exports = flaskfiller;
 
 },{"../../dom/dom":3,"../view":16,"./glass":9,"./longdrink_glass":10,"./ruler":11,"raphael-browserify":1}],9:[function(require,module,exports){
 
+var raphael = require("raphael-browserify");
 
 
 var glass = function(canvas, model, SCALE) {
@@ -7197,23 +7321,14 @@ var glass = function(canvas, model, SCALE) {
         height;
 
     var PADDING = 5;
-    var HANDLE_SPACE = 15,
-        HANDLE_SIZE = 2.5;
 
-    var fill, base_shape, bowl_shape, max_line, max_label, label, glass_pane, handle;
 
     function update() {
-        style({
-            color: model.color()
-        });
-        draw_at(x, y);
+        fill.attr("fill", model.color());
+        _glass.draw_at(_glass.x, _glass.y);
     }
 
-    function style(config) {
-        if (config.color) {
-            fill.attr("fill", config.color);
-        }
-    }
+    var fill, base_shape, bowl_shape, max_line, max_label, label, glass_pane;
 
     function draw() {
         label = canvas.text(x, y, model.get_maximum("volume") + " ml");
@@ -7271,22 +7386,9 @@ var glass = function(canvas, model, SCALE) {
         _glass.push(glass_pane);
 
 
-        update_size();
-
-        handle = canvas.circle( 
-                x + width + HANDLE_SPACE, 
-                y - HANDLE_SPACE, 
-                HANDLE_SIZE);
-        handle.attr({
-            fill: "silver",
-            "stroke": "silver"
-        });
-        handle.hide();
-        handle.hover(enable_resizing, disable_resizing);
-        handle.drag(sizemove, sizestart, sizestop);
-
-
-        _glass.push(handle);
+        var bbox = _glass.getBBox();
+        width = bbox.width;
+        height = bbox.height;
 
         set_label();
 
@@ -7304,47 +7406,43 @@ var glass = function(canvas, model, SCALE) {
         }
     }
 
-    function set_label(x, y) {
-        if (model.type === "longdrinkglas") {
-            model.compute_maxima();
-        }
+    function set_label(x_, y_) {
+        var bowlbb = bowl_shape.getBBox(),
+            bowl_width = bowlbb.width,
+            bowl_height = bowlbb.height;
+
+        var x = x_, y = y_;
+
         label.attr({
-            x: x + width/2,
-            y: y + height/2,
+            x: x,
+            y: y + bowl_height/2,
             "font-size": compute_font_size(),
             text: model.get_maximum("volume") + " ml"
         });
         function compute_font_size() {
-            return Math.max((((width -2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
+            return Math.max((((bowl_width - 2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
         }
     }
     _glass.set_label = set_label;
-
-    function update_size() {
-        var bbox = glass_pane.getBBox();
-
-        width = bbox.width;
-        height = bbox.height;
-    }
 
 
     var delta_x = 0, delta_y = 0;
     function onmove(dx, dy) {
         delta_x = dx;
         delta_y = dy;
-        draw_at(x+dx, y+dy);
-        return;
+        _glass.draw_at(_glass.x+dx, _glass.y+dy);
     }
+    
 
-    function onstart(x, y, event) {
+    function onstart() {
         model.action("pause").callback(model)();
         delta_x = 0;
         delta_y = 0;
     }
 
-    function onend(event) {
-        x += delta_x;
-        y += delta_y;
+    function onend() {
+        _glass.x += delta_x;
+        _glass.y += delta_y;
     }
 
     function onhover() {
@@ -7354,79 +7452,18 @@ var glass = function(canvas, model, SCALE) {
     }
 
     function offhover() {
-        delta_x = delta_y = 0;
         _glass.attr({
             "cursor": "default"
         });
     }
 
-    var old_height, old_radius;
-    function sizemove(dx, dy) {
-        var 
-            d_height = dy / SCALE / 10,
-            d_radius = dx / 2 / SCALE / 10,
-            new_radius = old_radius + d_radius,
-            new_height = old_height - d_height,
-            area = Math.PI * new_radius * new_radius;
 
-
-        if (area*new_height >= 5){
-            delta_y = dy;
-            model.height(new_height);
-            model.radius(new_radius);
-            draw_at(x, y+dy);
-        }
-
-    }
-
-    function sizestart() {
-        delta_x = 0;
-        delta_y = 0;
-        old_height = model.height();
-        old_radius = model.radius();
-        model.action("reset").callback(model)();
-    }
-
-    function sizestop() {
-        y += delta_y;
-    }
-
-
-    function enable_resizing() {
-        handle.attr({
-            fill: "yellow",
-            stroke: "black",
-            "stroke-width": 2,
-            r: HANDLE_SIZE * 1.5,
-            cursor: "nesw-resize"
-        });
-        _glass.glass_pane.attr({
-            fill: "lightyellow",
-            opacity: 0.7
-        });
-    }
-
-    function disable_resizing() {
-        handle.attr({
-            fill: "silver",
-            stroke: "silver",
-            "stroke-width": 1,
-            r: HANDLE_SIZE,
-            cursor: "default"
-        });
-        _glass.glass_pane.attr({
-            fill: "white",
-            opacity: 0
-        });
-    }
-
-    function draw_at(x, y) {
+    _glass.draw_at = function (x, y) {
 
         _glass.fill.attr({path: model.bowl_path(SCALE, true, x, y)});
         _glass.bowl_shape.attr({path: model.bowl_path(SCALE, false, x, y)});
-        _glass.base_shape.attr({path: model.base_path(SCALE, false, x, y)});
+        _glass.base_shape.attr({path: model.base_path(SCALE, x, y)});
         _glass.glass_pane.attr({path: model.path(SCALE, false, x, y)});
-        update_size();
         var MAX_LINE_WIDTH = Math.min(30, width / 2),
             MAX_LINE_SKIP = 5,
             MAX_LINE_Y = y + height - model.get_maximum("hoogte") * 10 * SCALE;
@@ -7438,13 +7475,9 @@ var glass = function(canvas, model, SCALE) {
             x: x + MAX_LINE_WIDTH / 1.5,
             y: MAX_LINE_Y - MAX_LINE_SKIP            
         });
-        _glass.handle.attr({
-            cx: x + width + HANDLE_SPACE, 
-            cy: y - HANDLE_SPACE
-        });
-        set_label(x, y);
-    }
 
+        _glass.set_label(x, y);
+    };
 
     function update_color() {
         fill.attr("fill", model.color());
@@ -7460,47 +7493,99 @@ var glass = function(canvas, model, SCALE) {
     _glass.update = update;
     _glass.update_color = update_color;
     _glass.fill = fill;
+    _glass.label = label;
     _glass.bowl_shape = bowl_shape;
     _glass.base_shape = base_shape;
     _glass.max_line = max_line;
     _glass.max_label = max_label;
     _glass.glass_pane = glass_pane;
-    _glass.handle = handle;
     return _glass;
 };
 
 module.exports = glass;
 
-},{}],10:[function(require,module,exports){
+},{"raphael-browserify":1}],10:[function(require,module,exports){
 
 var glass = require("./glass");
 
 var longdrink_glass = function(canvas, model, SCALE, boundaries_) {
+    var HANDLE_SPACE = 15,
+        HANDLE_SIZE = 2.5;
+
+    var PADDING = 5;
+
     var _glass = glass(canvas, model, SCALE, boundaries_);
-    _glass.handle.show();
+
+    _glass.handle = canvas.circle( 
+            _glass.x + _glass.width + HANDLE_SPACE, 
+            _glass.y - HANDLE_SPACE, 
+            HANDLE_SIZE);
+    _glass.handle.attr({
+        fill: "silver",
+        "stroke": "silver"
+    });
+    _glass.push(_glass.handle);
+    _glass.handle.hover(enable_resizing, disable_resizing);
+    _glass.handle.drag(sizemove, sizestart, sizestop);
+
+    var old_height, old_radius, delta_x, delta_y;
+    function sizemove(dx, dy) {
+        var 
+            d_height = dy / SCALE / 10,
+            d_radius = dx / 2 / SCALE / 10,
+            new_radius = old_radius + d_radius,
+            new_height = old_height - d_height,
+            area = Math.PI * new_radius * new_radius;
 
 
+        if (area*new_height >= 5){
+            delta_y = dy;
+            model.height(new_height);
+            model.radius(new_radius);
+            _glass.draw_at(_glass.x, _glass.y+dy);
+        }
 
-
-
-
-
-    var height = model.height,
-        radius = model.radius,
-        flow_rate = model.flow_rate,
-        color = model.color || "blue";
-
-
-    function set_height(h) {
-        model.height(h);
-        height = h;
-        update();
     }
 
-    function set_radius(r) {
-        model.radius(r);
-        radius = r;
-        update();
+    function sizestart() {
+        delta_x = 0;
+        delta_y = 0;
+        old_height = model.height();
+        old_radius = model.radius();
+        model.action("reset").callback(model)();
+    }
+
+    function sizestop() {
+        _glass.y += delta_y;
+    }
+
+
+    function enable_resizing() {
+        _glass.handle.attr({
+            fill: "yellow",
+            stroke: "black",
+            "stroke-width": 2,
+            r: HANDLE_SIZE * 1.5,
+            cursor: "nesw-resize"
+        });
+        _glass.glass_pane.attr({
+            fill: "lightyellow",
+            opacity: 0.7
+        });
+    }
+
+    function disable_resizing() {
+        _glass.handle.attr({
+            fill: "silver",
+            stroke: "silver",
+            "stroke-width": 1,
+            r: HANDLE_SIZE,
+            cursor: "default"
+        });
+        _glass.glass_pane.attr({
+            fill: "white",
+            opacity: 0
+        });
     }
 
     function update_size() {
@@ -7510,11 +7595,47 @@ var longdrink_glass = function(canvas, model, SCALE, boundaries_) {
         _glass.height = bbox.height;
     }
 
-    function update() {
-    }
+    _glass.draw_at = function (x, y) {
+
+        _glass.fill.attr({path: model.bowl_path(SCALE, true, x, y)});
+        _glass.bowl_shape.attr({path: model.bowl_path(SCALE, false, x, y)});
+        _glass.base_shape.attr({path: model.base_path(SCALE, x, y)});
+        _glass.glass_pane.attr({path: model.path(SCALE, false, x, y)});
+        update_size();
+        var MAX_LINE_WIDTH = Math.min(30, _glass.width / 2),
+            MAX_LINE_SKIP = 5,
+            MAX_LINE_Y = y + _glass.height - model.get_maximum("hoogte") * 10 * SCALE;
+        _glass.max_line.attr({
+            path: "M" + x + "," + MAX_LINE_Y + 
+                "h" + MAX_LINE_WIDTH
+        });
+        _glass.max_label.attr({
+            x: x + MAX_LINE_WIDTH / 1.5,
+            y: MAX_LINE_Y - MAX_LINE_SKIP            
+        });
+
+        _glass.handle.attr({
+            cx: x + _glass.width + HANDLE_SPACE, 
+            cy: y - HANDLE_SPACE
+        });
+        _glass.set_label(x, y);
+    };
+
+    _glass.set_label = function(x_, y_) {
+        var x = x_, y = y_;
+        model.compute_maxima();
+        _glass.label.attr({
+            x: x + _glass.width / 2,
+            y: y + _glass.height/2,
+            "font-size": compute_font_size(),
+            text: model.get_maximum("volume") + " ml"
+        });
+        function compute_font_size() {
+            return Math.max((((_glass.width - 2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
+        }
+    };
 
 
-    //_glass.update = update;
 
     return _glass;
 };
@@ -8968,8 +9089,28 @@ var longdrinkglas = long_model("longdrinkglas", {
 var cocktailglas = glass_model("cocktailglas", {
         flow_rate: flow_rate,
         shape: {
-            base_path: "M10,110v100l50,10",
-            bowl_path: "M100,200L10,0",
+            bowl: {
+                top: {
+                    x: 100,
+                    y: 0
+                },
+                bottom: {
+                    x: 10,
+                    y: 100
+                },
+                path: "l-90,100"
+            },
+            base: {
+                top: {
+                    x: 10,
+                    y: 100
+                },
+                bottom: {
+                    x: 70,
+                    y: 200
+                },
+                path: "v90h50c5,2.5,7.5,7.5,10,10"
+            },
             scale: 10    
         }
     });
@@ -9007,7 +9148,7 @@ repr.register(longdrinkglas);
 repr.register(cocktailglas);
 
 repr2.register(longdrinkglas);
-repr2.register(cocktailglas);
+//repr2.register(cocktailglas);
 
 repr3.register(longdrinkglas);
 repr3.register(cocktailglas);

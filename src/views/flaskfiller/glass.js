@@ -1,4 +1,5 @@
 
+var raphael = require("raphael-browserify");
 
 
 var glass = function(canvas, model, SCALE) {
@@ -12,23 +13,14 @@ var glass = function(canvas, model, SCALE) {
         height;
 
     var PADDING = 5;
-    var HANDLE_SPACE = 15,
-        HANDLE_SIZE = 2.5;
 
-    var fill, base_shape, bowl_shape, max_line, max_label, label, glass_pane, handle;
 
     function update() {
-        style({
-            color: model.color()
-        });
-        draw_at(x, y);
+        fill.attr("fill", model.color());
+        _glass.draw_at(_glass.x, _glass.y);
     }
 
-    function style(config) {
-        if (config.color) {
-            fill.attr("fill", config.color);
-        }
-    }
+    var fill, base_shape, bowl_shape, max_line, max_label, label, glass_pane;
 
     function draw() {
         label = canvas.text(x, y, model.get_maximum("volume") + " ml");
@@ -86,22 +78,9 @@ var glass = function(canvas, model, SCALE) {
         _glass.push(glass_pane);
 
 
-        update_size();
-
-        handle = canvas.circle( 
-                x + width + HANDLE_SPACE, 
-                y - HANDLE_SPACE, 
-                HANDLE_SIZE);
-        handle.attr({
-            fill: "silver",
-            "stroke": "silver"
-        });
-        handle.hide();
-        handle.hover(enable_resizing, disable_resizing);
-        handle.drag(sizemove, sizestart, sizestop);
-
-
-        _glass.push(handle);
+        var bbox = _glass.getBBox();
+        width = bbox.width;
+        height = bbox.height;
 
         set_label();
 
@@ -119,47 +98,43 @@ var glass = function(canvas, model, SCALE) {
         }
     }
 
-    function set_label(x, y) {
-        if (model.type === "longdrinkglas") {
-            model.compute_maxima();
-        }
+    function set_label(x_, y_) {
+        var bowlbb = bowl_shape.getBBox(),
+            bowl_width = bowlbb.width,
+            bowl_height = bowlbb.height;
+
+        var x = x_, y = y_;
+
         label.attr({
-            x: x + width/2,
-            y: y + height/2,
+            x: x,
+            y: y + bowl_height/2,
             "font-size": compute_font_size(),
             text: model.get_maximum("volume") + " ml"
         });
         function compute_font_size() {
-            return Math.max((((width -2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
+            return Math.max((((bowl_width - 2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
         }
     }
     _glass.set_label = set_label;
-
-    function update_size() {
-        var bbox = glass_pane.getBBox();
-
-        width = bbox.width;
-        height = bbox.height;
-    }
 
 
     var delta_x = 0, delta_y = 0;
     function onmove(dx, dy) {
         delta_x = dx;
         delta_y = dy;
-        draw_at(x+dx, y+dy);
-        return;
+        _glass.draw_at(_glass.x+dx, _glass.y+dy);
     }
+    
 
-    function onstart(x, y, event) {
+    function onstart() {
         model.action("pause").callback(model)();
         delta_x = 0;
         delta_y = 0;
     }
 
-    function onend(event) {
-        x += delta_x;
-        y += delta_y;
+    function onend() {
+        _glass.x += delta_x;
+        _glass.y += delta_y;
     }
 
     function onhover() {
@@ -169,79 +144,18 @@ var glass = function(canvas, model, SCALE) {
     }
 
     function offhover() {
-        delta_x = delta_y = 0;
         _glass.attr({
             "cursor": "default"
         });
     }
 
-    var old_height, old_radius;
-    function sizemove(dx, dy) {
-        var 
-            d_height = dy / SCALE / 10,
-            d_radius = dx / 2 / SCALE / 10,
-            new_radius = old_radius + d_radius,
-            new_height = old_height - d_height,
-            area = Math.PI * new_radius * new_radius;
 
-
-        if (area*new_height >= 5){
-            delta_y = dy;
-            model.height(new_height);
-            model.radius(new_radius);
-            draw_at(x, y+dy);
-        }
-
-    }
-
-    function sizestart() {
-        delta_x = 0;
-        delta_y = 0;
-        old_height = model.height();
-        old_radius = model.radius();
-        model.action("reset").callback(model)();
-    }
-
-    function sizestop() {
-        y += delta_y;
-    }
-
-
-    function enable_resizing() {
-        handle.attr({
-            fill: "yellow",
-            stroke: "black",
-            "stroke-width": 2,
-            r: HANDLE_SIZE * 1.5,
-            cursor: "nesw-resize"
-        });
-        _glass.glass_pane.attr({
-            fill: "lightyellow",
-            opacity: 0.7
-        });
-    }
-
-    function disable_resizing() {
-        handle.attr({
-            fill: "silver",
-            stroke: "silver",
-            "stroke-width": 1,
-            r: HANDLE_SIZE,
-            cursor: "default"
-        });
-        _glass.glass_pane.attr({
-            fill: "white",
-            opacity: 0
-        });
-    }
-
-    function draw_at(x, y) {
+    _glass.draw_at = function (x, y) {
 
         _glass.fill.attr({path: model.bowl_path(SCALE, true, x, y)});
         _glass.bowl_shape.attr({path: model.bowl_path(SCALE, false, x, y)});
-        _glass.base_shape.attr({path: model.base_path(SCALE, false, x, y)});
+        _glass.base_shape.attr({path: model.base_path(SCALE, x, y)});
         _glass.glass_pane.attr({path: model.path(SCALE, false, x, y)});
-        update_size();
         var MAX_LINE_WIDTH = Math.min(30, width / 2),
             MAX_LINE_SKIP = 5,
             MAX_LINE_Y = y + height - model.get_maximum("hoogte") * 10 * SCALE;
@@ -253,13 +167,9 @@ var glass = function(canvas, model, SCALE) {
             x: x + MAX_LINE_WIDTH / 1.5,
             y: MAX_LINE_Y - MAX_LINE_SKIP            
         });
-        _glass.handle.attr({
-            cx: x + width + HANDLE_SPACE, 
-            cy: y - HANDLE_SPACE
-        });
-        set_label(x, y);
-    }
 
+        _glass.set_label(x, y);
+    };
 
     function update_color() {
         fill.attr("fill", model.color());
@@ -275,12 +185,12 @@ var glass = function(canvas, model, SCALE) {
     _glass.update = update;
     _glass.update_color = update_color;
     _glass.fill = fill;
+    _glass.label = label;
     _glass.bowl_shape = bowl_shape;
     _glass.base_shape = base_shape;
     _glass.max_line = max_line;
     _glass.max_label = max_label;
     _glass.glass_pane = glass_pane;
-    _glass.handle = handle;
     return _glass;
 };
 

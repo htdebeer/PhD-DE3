@@ -119,8 +119,28 @@ var longdrinkglas = long_model("longdrinkglas", {
 var cocktailglas = glass_model("cocktailglas", {
         flow_rate: flow_rate,
         shape: {
-            base_path: "M10,110v100l50,10",
-            bowl_path: "M100,200L10,0",
+            bowl: {
+                top: {
+                    x: 100,
+                    y: 0
+                },
+                bottom: {
+                    x: 10,
+                    y: 100
+                },
+                path: "l-90,100"
+            },
+            base: {
+                top: {
+                    x: 10,
+                    y: 100
+                },
+                bottom: {
+                    x: 70,
+                    y: 200
+                },
+                path: "v90h50c5,2.5,7.5,7.5,10,10"
+            },
             scale: 10    
         }
     });
@@ -158,7 +178,7 @@ repr.register(longdrinkglas);
 repr.register(cocktailglas);
 
 repr2.register(longdrinkglas);
-repr2.register(cocktailglas);
+//repr2.register(cocktailglas);
 
 repr3.register(longdrinkglas);
 repr3.register(cocktailglas);

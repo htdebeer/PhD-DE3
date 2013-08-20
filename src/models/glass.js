@@ -1,15 +1,12 @@
 
 
 var model = require("./model.js");
+var raphael = require("raphael-browserify");
 
 var glass = function(name, config) {
     var 
         flow_rate = config.flow_rate || 50,
-        shape = config.shape || {
-            base_path: "",
-            bowl_path: "",
-            scale: 1
-        },
+        shape = config.shape,
         action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
         default_actions = require("../actions/actions")({speed: flow_rate});
 
@@ -126,41 +123,167 @@ var glass = function(name, config) {
     };
 
     var scaled_shape = {
-        base_path: shape.base_path,
-        bowl_path: shape.bowl_path,
+        base: shape.base,
+        bowl: shape.bowl,
         scale: shape.scale
     };
 
     _model.path = function(SCALE, fill, x_, y_) {
-        var x = x_ || 0,
-            y = y_ || 0;
-        if (fill) {
-            h = _model.get("hoogte") * SCALE * 10;
-            y += height * SCALE * 10 - h;
-        }
-
-        var path = "M" + x + "," + y;
-        path += shape.bowl_path;
-        return path;
+        var bowl = _model.bowl_path(SCALE, fill, x_, y_),
+            base = _model.base_path(SCALE, fill, x_, y_),
+            whole_glass = base + bowl;
+        return whole_glass;
     };
 
     _model.base_path = function(SCALE, x_, y_) {
-        return shape.base_path;
+        if (scaled_shape.scale !== SCALE) {
+            scale_paths(SCALE);
+        }
+        var x = x_ || 0,
+            y = y_ || 0,
+            path = "M" + x + "," + y + complete_path(scaled_shape.base) + "z";
+        
+        return path;
     };
 
     _model.bowl_path = function(SCALE, fill, x_, y_) {
         if (scaled_shape.scale !== SCALE) {
             scale_paths(SCALE);
         }
-        return scaled_shape.bowl_path;
+        var x = x_ || 0,
+            y = y_ || 0,
+            path = "M" + x + "," + y + complete_path(scaled_shape.bowl);
+
+        return path;
     };
+
+    function start_of_path(path) {
+        return raphael.getPointAtLength(path, 0);
+    }
+
+    function end_of_path(path) {
+        return raphael.getPointAtLength(path,
+                raphael.getTotalLength());
+    }
+
+    function complete_path(part) {
+        var start = part.top,
+            end = part.bottom,
+            path = part.path,
+            segments = raphael.parsePathString(path),
+            completed_path = "m" + start.x + "," + start.y + path;
+
+
+        completed_path += "h-" +(Math.abs(0 - end.x) * 2);
+
+        var mirror_segment = function(segment) {
+            var command = segment[0],
+                x,y, cp1, cp2,
+                mirrored_segment = "";
+
+            switch (command) {
+                case "l":
+                    x = segment[1];
+                    y = segment[2];
+                    mirrored_segment = "l" + x + "," + (-y);
+                    start = {
+                        x: start.x + x,
+                        y: start.y + y
+                    };
+                    break;
+                case "c":
+                    cp1 = {
+                        x: segment[1],
+                        y: segment[2]
+                    };
+                    cp2 = {
+                        x: segment[3],
+                        y: segment[4]
+                    };
+
+                    x = segment[5];
+                    y = segment[6];
+                    end = {
+                        x: x,
+                        y: y
+                    };
+                    mirrored_segment = "c" + (end.x - cp2.x) + "," + (-(end.y - cp2.y)) + "," +
+                        (end.x - cp1.x) + "," + (-(end.y - cp1.y)) + "," + 
+                        (x) + "," + (-y);
+                    start = {
+                        x: start.x + x,
+                        y: start.y + y
+                    };
+                    break;
+                case "v":
+                    y = segment[1];
+                    mirrored_segment = "v" + (-y);
+                    start = {
+                        x: start.x,
+                        y: start.y + y
+                    };
+                    break;
+                case "h":
+                    x = segment[1];
+                    mirrored_segment = "h" + x;
+                    start = {
+                        x: start.x + x,
+                        y: start.y
+                    };
+                    break;
+                case "m":
+                    // skip
+
+                    break;
+            }
+
+            return mirrored_segment;
+        };
+
+        completed_path += segments.map(mirror_segment).reverse().join("");
+
+
+        return completed_path;
+    }
+
+    function mirror_path(path) {
+        var curve_path = raphael.path2curve(path);
+
+
+        // First path segment is mx,y. get those x and y
+        var first = curve_path.shift();
+        var x = first[1],
+            y = first[2];
+
+        // Now, for all other path segments, which are C commands of the form
+        // C cp1x, cp2x, cp2x, cp2y, x, y, mirror the coordinates in 0
+        //
+        var mirror_segment = function(segment) {
+            var cp1x = segment[1],
+                cp1y = segment[2],
+                cp2x = segment[3],
+                cp2y = segment[4],
+                mirrored_segment = "C" + [cp2x, cp2y, cp1x, cp1y, -x, y].join(",");
+
+            x = segment[5];
+            y = segment[6];
+
+            return mirrored_segment;
+        };
+
+        return curve_path.map(mirror_segment).reverse().join("");
+
+    }
 
     function scale_paths(scale) {
         scaled_paths = {
-            base_path: scale_path(shape.base_path, scale),
-            bowl_path: scale_path(shape.bowl_path, scale),
-            scale: scale
+            base: {},
+            bowl: {},
+            scale: 1
         };
+        scaled_paths.base.path = scale_path(shape.base.path, scale);
+        scaled_paths.bowl.path = scale_path(shape.bowl.path, scale);
+        scaled_paths.scale = scale;
 
         function scale_path(path, scale) {
             return path;
