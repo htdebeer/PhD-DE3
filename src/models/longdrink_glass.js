@@ -118,6 +118,7 @@ var longdrink_glass = function(name, config) {
         actions: create_actions(action_list)
     });
 
+
     function compute_maxima() {
         var area = Math.PI * Math.pow(radius, 2),
             time_max = Math.floor(area*height*10 / flow_rate)/10,

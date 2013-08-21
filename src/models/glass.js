@@ -2,6 +2,7 @@
 
 var model = require("./model.js");
 var raphael = require("raphael-browserify");
+var paths = require("../svg/path");
 
 var glass = function(name, config) {
     var 
@@ -10,27 +11,6 @@ var glass = function(name, config) {
         action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
         default_actions = require("../actions/actions")({speed: flow_rate});
 
-    /**
-     * Compute the volume in ml in the longdrink glass given flow_rate and time the
-     * water has flown in seconds.
-     */
-    function compute_volume(time) {
-        return time * flow_rate;
-    }
-    
-
-    /**
-     * Compute the height of the water in cm given the volume of the water in
-     * the glass in ml.
-     */
-    function compute_height(volume) {
-        var area = Math.PI * Math.pow(radius, 2);
-        if (area > 0) {
-            return volume / area;
-        } else {
-            return 0;
-        }
-    }
 
     function create_actions(action_list) {
         var actions = {},
@@ -91,19 +71,184 @@ var glass = function(name, config) {
         actions: create_actions(action_list)
     });
 
+    var scaled_shape = paths.scale_shape(shape, shape.scale);
+
+    _model.path = function(SCALE, fill, x_, y_) {
+        if (scaled_shape.scale !== SCALE) {
+            scaled_shape = scale_shape(shape, SCALE);
+        }
+        var bowl = _model.bowl_path(SCALE, fill, x_, y_),
+            base = _model.base_path(SCALE, fill, x_, y_),
+            whole_glass = base + bowl;
+        return whole_glass;
+    };
+
+    _model.base_path = function(SCALE, x_, y_) {
+        if (scaled_shape.scale !== SCALE) {
+            scaled_shape = scale_shape(shape, SCALE);
+        }
+        var x = x_ || 0,
+            y = y_ || 0,
+            path = "M" + x + "," + y + paths.complete_path(scaled_shape.base) + "z";
+        
+        return path;
+    };
+
+    _model.bowl_path = function(SCALE, fill, x_, y_) {
+        if (scaled_shape.scale !== SCALE) {
+            scaled_shape = paths.scale_shape(shape, SCALE);
+        }
+        var x = x_ || 0,
+            y = y_ || 0,
+            path = "M" + x + "," + y + paths.complete_path(scaled_shape.bowl);
+
+        return path;
+    };
+
+
+
+    var heights = [];
+    /**
+     * Compute the volume in ml in the longdrink glass given flow_rate and time the
+     * water has flown in seconds.
+     */
+    function compute_volume(time) {
+        return time * flow_rate;
+    }
+    
+
+    /**
+     * Compute the height of the water in cm given the volume of the water in
+     * the glass in ml.
+     */
+    function compute_height(moment) {
+
+        var scale = scaled_shape.scale,
+            px_to_cm = function(px) {
+                return (px/scale)/10;
+            },
+            ONE_PX_IN_CM = px_to_cm(1),
+            area = function(r) {
+                return Math.PI * r * r;
+            },
+            base = scaled_shape.base,
+            bowl = scaled_shape.bowl,
+            path = "M"+ bowl.top.x + "," + bowl.top.y + bowl.path,
+            h_start = px_to_cm(base.bottom.y - base.top.y),
+            h_end = h_start + px_to_cm(bowl.bottom.y - bowl.top.y),
+            h = h_start;
+
+        var pixel_disc = function(length) {
+            var point = function(length) {
+                return raphael.getPointAtLength(path, length);
+            };
+
+            var current_point = point(length);
+
+            while (length > 0 && point(length).y === current_point.y) {
+                length--;
+            }
+            
+            var next_point = point(length);
+
+            var current_r = px_to_cm(current_point.x),
+                next_r = px_to_cm(next_point.x),
+                avg_r = (current_r + next_r) / 2,
+                area = Math.PI * avg_r * avg_r,
+                volume = area * ONE_PX_IN_CM;
+
+            return {
+                volume: volume,
+                length: length
+            };
+        };
+
+        var next_delta_volume = function(moment) {
+            var time = _model.moment_to_time(moment) / 1000,
+                next = _model.moment_to_time(moment + 1) / 1000,
+                current_vol = compute_volume(time),
+                next_vol = compute_volume(next);
+
+            return next_vol - current_vol;
+        };
+
+        var length_start = raphael.getTotalLength(path),
+            length_end = 0;
+
+        var last_computed_moment = heights.length - 1;
+        if (moment > last_computed_moment) {
+            if (moment === 0) {
+                heights.push( {
+                    height: h_start,
+                    length: length_start
+                });
+            } else {
+                // compute heighs of every moment up till time
+
+                var height = heights[last_computed_moment].height,
+                    length = heights[last_computed_moment].length;
+
+                while (last_computed_moment < moment) {
+                    var delta_vol = next_delta_volume(last_computed_moment);
+                    var px_disc = pixel_disc(length);
+
+                    while (px_disc.volume < delta_vol) {
+                        delta_vol -= px_disc.volume;
+                        px_disc = pixel_disc(length);
+                        length = px_disc.length;
+                        height += ONE_PX_IN_CM;
+                    }
+
+                    height += ONE_PX_IN_CM * (delta_vol/px_disc.volume);
+
+                    last_computed_moment++;
+
+                    heights.push( {
+                        height: height,
+                        length: length
+                    });
+
+                }
+            }
+        }
+        return heights[moment].height;
+    }
+
+
     function compute_maxima() {
         // Has to be computed before the model can be used. Probably time
         // intensive.
 
+        var 
+            scale = scaled_shape.scale,
+            px_to_cm = function(px) {
+                return (px/scale)/10;
+            }
 
-        var area, time_max, volume_max, height_max,
-            CM_SCALE = shape.scale / 10;
+        ;
 
-        time_max = 100;
-        height_max = 4;
-        volume_max = 50;
+        var base = scaled_shape.base,
+            bowl = scaled_shape.bowl,
+            path = bowl.path,
+            h_start = px_to_cm(base.bottom.y - base.top.y),
+            h_end = h_start + px_to_cm(bowl.bottom.y - bowl.top.y),
+            h = h_start;
+
+        var moment = 0;
+
+        while (h < h_end) {
+            h = compute_height(moment);
+            moment++;
+        }
+
+        var time_in_ms = _model.moment_to_time(moment),
+            time_max = time_in_ms/1000,
+            height_max = h,
+            volume_max = compute_volume(time_max);
+
 
         _model.set_end(time_max);
+        _model.quantities._time_.maximum = time_in_ms;
 
         _model.quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
         _model.quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
@@ -114,184 +259,27 @@ var glass = function(name, config) {
 
 
     _model.measure_moment = function(moment) {
-        return {
-            time: 23,
-                height: 3,
-                volume: 23
-        };
-        return _model.get_moment(moment);
-    };
+        if (moment === 0) {
+            return {
+                tijd: 0,
+                hoogte: 0,
+                volume: 0
+            };
+        } else {
+            var time = _model.moment_to_time(moment) / 1000,
+                volume = compute_volume(time),
+                height = compute_height(moment);
 
-    var scaled_shape = {
-        base: shape.base,
-        bowl: shape.bowl,
-        scale: shape.scale
-    };
-
-    _model.path = function(SCALE, fill, x_, y_) {
-        var bowl = _model.bowl_path(SCALE, fill, x_, y_),
-            base = _model.base_path(SCALE, fill, x_, y_),
-            whole_glass = base + bowl;
-        return whole_glass;
-    };
-
-    _model.base_path = function(SCALE, x_, y_) {
-        if (scaled_shape.scale !== SCALE) {
-            scale_paths(SCALE);
+            return {
+                tijd: time,
+                volume: volume,
+                hoogte: height
+            };
         }
-        var x = x_ || 0,
-            y = y_ || 0,
-            path = "M" + x + "," + y + complete_path(scaled_shape.base) + "z";
-        
-        return path;
     };
 
-    _model.bowl_path = function(SCALE, fill, x_, y_) {
-        if (scaled_shape.scale !== SCALE) {
-            scale_paths(SCALE);
-        }
-        var x = x_ || 0,
-            y = y_ || 0,
-            path = "M" + x + "," + y + complete_path(scaled_shape.bowl);
-
-        return path;
-    };
-
-    function start_of_path(path) {
-        return raphael.getPointAtLength(path, 0);
-    }
-
-    function end_of_path(path) {
-        return raphael.getPointAtLength(path,
-                raphael.getTotalLength());
-    }
-
-    function complete_path(part) {
-        var start = part.top,
-            end = part.bottom,
-            path = part.path,
-            segments = raphael.parsePathString(path),
-            completed_path = "m" + start.x + "," + start.y + path;
-
-
-        completed_path += "h-" +(Math.abs(0 - end.x) * 2);
-
-        var mirror_segment = function(segment) {
-            var command = segment[0],
-                x,y, cp1, cp2,
-                mirrored_segment = "";
-
-            switch (command) {
-                case "l":
-                    x = segment[1];
-                    y = segment[2];
-                    mirrored_segment = "l" + x + "," + (-y);
-                    start = {
-                        x: start.x + x,
-                        y: start.y + y
-                    };
-                    break;
-                case "c":
-                    cp1 = {
-                        x: segment[1],
-                        y: segment[2]
-                    };
-                    cp2 = {
-                        x: segment[3],
-                        y: segment[4]
-                    };
-
-                    x = segment[5];
-                    y = segment[6];
-                    end = {
-                        x: x,
-                        y: y
-                    };
-                    mirrored_segment = "c" + (end.x - cp2.x) + "," + (-(end.y - cp2.y)) + "," +
-                        (end.x - cp1.x) + "," + (-(end.y - cp1.y)) + "," + 
-                        (x) + "," + (-y);
-                    start = {
-                        x: start.x + x,
-                        y: start.y + y
-                    };
-                    break;
-                case "v":
-                    y = segment[1];
-                    mirrored_segment = "v" + (-y);
-                    start = {
-                        x: start.x,
-                        y: start.y + y
-                    };
-                    break;
-                case "h":
-                    x = segment[1];
-                    mirrored_segment = "h" + x;
-                    start = {
-                        x: start.x + x,
-                        y: start.y
-                    };
-                    break;
-                case "m":
-                    // skip
-
-                    break;
-            }
-
-            return mirrored_segment;
-        };
-
-        completed_path += segments.map(mirror_segment).reverse().join("");
-
-
-        return completed_path;
-    }
-
-    function mirror_path(path) {
-        var curve_path = raphael.path2curve(path);
-
-
-        // First path segment is mx,y. get those x and y
-        var first = curve_path.shift();
-        var x = first[1],
-            y = first[2];
-
-        // Now, for all other path segments, which are C commands of the form
-        // C cp1x, cp2x, cp2x, cp2y, x, y, mirror the coordinates in 0
-        //
-        var mirror_segment = function(segment) {
-            var cp1x = segment[1],
-                cp1y = segment[2],
-                cp2x = segment[3],
-                cp2y = segment[4],
-                mirrored_segment = "C" + [cp2x, cp2y, cp1x, cp1y, -x, y].join(",");
-
-            x = segment[5];
-            y = segment[6];
-
-            return mirrored_segment;
-        };
-
-        return curve_path.map(mirror_segment).reverse().join("");
-
-    }
-
-    function scale_paths(scale) {
-        scaled_paths = {
-            base: {},
-            bowl: {},
-            scale: 1
-        };
-        scaled_paths.base.path = scale_path(shape.base.path, scale);
-        scaled_paths.bowl.path = scale_path(shape.bowl.path, scale);
-        scaled_paths.scale = scale;
-
-        function scale_path(path, scale) {
-            return path;
-        }
-    }
 
     _model.step();
-
     return _model;
 };
 

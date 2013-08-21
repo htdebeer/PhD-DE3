@@ -141,7 +141,7 @@ var cocktailglas = glass_model("cocktailglas", {
                 },
                 path: "v90h50c5,2.5,7.5,7.5,10,10"
             },
-            scale: 10    
+            scale: 3  
         }
     });
 
