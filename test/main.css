@@ -18,7 +18,6 @@ tbody tr:hover {
 
 th[data-list] ol.list {
     visibility: collapse;
-    display: absolute;
     z-index: 100;
     list-style: none;
     font-weight: lighter;

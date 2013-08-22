@@ -7,19 +7,9 @@ var paths = require("../svg/path");
 var glass = function(name, config) {
     var 
         flow_rate = config.flow_rate || 50,
-        shape = config.shape,
-        action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
-        default_actions = require("../actions/actions")({speed: flow_rate});
+        shape = config.shape;
 
 
-    function create_actions(action_list) {
-        var actions = {},
-            create_action = function(action_name) {
-                actions[action_name] = default_actions[action_name];
-            };
-        action_list.forEach(create_action);
-        return actions;
-    }
 
 
     var quantities = {
@@ -59,12 +49,23 @@ var glass = function(name, config) {
     };
 
 
-    var time = {
-        start: 0,
-        end: quantities.tijd.maximum*1000,
-        step: Math.ceil(1000/flow_rate)
-    };
+    var step = config.step || 10,
+        time = {
+            start: 0,
+            end: quantities.tijd.maximum*1000,
+            step: step
+        },        
+        action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
+        default_actions = require("../actions/actions")({speed: step});
 
+    function create_actions(action_list) {
+        var actions = {},
+            create_action = function(action_name) {
+                actions[action_name] = default_actions[action_name];
+            };
+        action_list.forEach(create_action);
+        return actions;
+    }
     var _model = model(name, {
         time: time,
         quantities: quantities,
@@ -72,6 +73,7 @@ var glass = function(name, config) {
     });
 
     var scaled_shape = paths.scale_shape(shape, shape.scale);
+
 
     _model.path = function(SCALE, fill, x_, y_) {
         if (scaled_shape.scale !== SCALE) {
@@ -100,182 +102,129 @@ var glass = function(name, config) {
         }
         var x = x_ || 0,
             y = y_ || 0,
+            path;
+
+        if (fill) {
+            var current_moment = _model.current_moment(true),
+                fill_length = values[current_moment].length * scaled_shape.factor;
+    
+            path = "M" + x + "," + y + paths.complete_path(scaled_shape.bowl,
+                    fill_length );
+
+        } else {
             path = "M" + x + "," + y + paths.complete_path(scaled_shape.bowl);
+        }
+
 
         return path;
     };
 
 
-
-    var heights = [];
-    /**
-     * Compute the volume in ml in the longdrink glass given flow_rate and time the
-     * water has flown in seconds.
-     */
-    function compute_volume(time) {
-        return time * flow_rate;
-    }
-    
-
-    /**
-     * Compute the height of the water in cm given the volume of the water in
-     * the glass in ml.
-     */
-    function compute_height(moment) {
+    function compute_quantities() {
 
         var scale = scaled_shape.scale,
-            px_to_cm = function(px) {
-                return (px/scale)/10;
-            },
-            ONE_PX_IN_CM = px_to_cm(1),
-            area = function(r) {
-                return Math.PI * r * r;
-            },
-            base = scaled_shape.base,
             bowl = scaled_shape.bowl,
-            path = "M"+ bowl.top.x + "," + bowl.top.y + bowl.path,
-            h_start = px_to_cm(base.bottom.y - base.top.y),
-            h_end = h_start + px_to_cm(bowl.bottom.y - bowl.top.y),
-            h = h_start;
+            base = scaled_shape.base,
+            path = "M"+ bowl.top.x + "," + bowl.top.y + bowl.path;
 
-        var pixel_disc = function(length) {
-            var point = function(length) {
-                return raphael.getPointAtLength(path, length);
-            };
+        var ms_step = step / 1000;
 
-            var current_point = point(length);
+        var h_start = px_to_cm(base.bottom.y - base.top.y),
+            l_start = 0,
+            l_end = raphael.getTotalLength(path);
 
-            while (length > 0 && point(length).y === current_point.y) {
-                length--;
-            }
-            
-            var next_point = point(length);
+        function px_to_cm(px) {
+            return px / scale / 10;
+        }
 
-            var current_r = px_to_cm(current_point.x),
-                next_r = px_to_cm(next_point.x),
-                avg_r = (current_r + next_r) / 2,
-                area = Math.PI * avg_r * avg_r,
-                volume = area * ONE_PX_IN_CM;
+        function point(length) {
+            return raphael.getPointAtLength(path, length);
+        }
 
-            return {
-                volume: volume,
-                length: length
-            };
-        };
+        function ml_to_ms(ml) {
+            return ml / flow_rate;
+        }
 
-        var next_delta_volume = function(moment) {
-            var time = _model.moment_to_time(moment) / 1000,
-                next = _model.moment_to_time(moment + 1) / 1000,
-                current_vol = compute_volume(time),
-                next_vol = compute_volume(next);
 
-            return next_vol - current_vol;
-        };
+        var h = h_start,
+            r,
+            area,
+            vol = 0,
+            time = 0;
 
-        var length_start = raphael.getTotalLength(path),
-            length_end = 0;
+        var l = l_end,
+            prev = point(l),
+            cur = prev,
+            delta_time = 0,
+            delta_vol = 0,
+            delta_h = 0;
 
-        var last_computed_moment = heights.length - 1;
-        if (moment > last_computed_moment) {
-            if (moment === 0) {
-                heights.push( {
-                    height: h_start,
-                    length: length_start
+        var values = [{
+                tijd: time,
+                hoogte: h,
+                volume: vol,
+                length: l
+            }];
+
+        while (l > l_start) {
+            l--;
+            prev = cur;
+            cur = point(l);
+            r = px_to_cm((cur.x+prev.x)/2);
+            area = Math.PI * r * r;
+
+            delta_h = px_to_cm(Math.abs(prev.y - cur.y));
+            delta_vol = area * delta_h;
+            delta_time += ml_to_ms(delta_vol);
+
+
+            h += delta_h;
+            vol += delta_vol;
+
+            if (delta_time >= ms_step ) {
+                time += delta_time;
+                delta_time = 0;
+                values.push({
+                    tijd: time,
+                    hoogte: h,
+                    volume: vol,
+                    length: l
                 });
-            } else {
-                // compute heighs of every moment up till time
-
-                var height = heights[last_computed_moment].height,
-                    length = heights[last_computed_moment].length;
-
-                while (last_computed_moment < moment) {
-                    var delta_vol = next_delta_volume(last_computed_moment);
-                    var px_disc = pixel_disc(length);
-
-                    while (px_disc.volume < delta_vol) {
-                        delta_vol -= px_disc.volume;
-                        px_disc = pixel_disc(length);
-                        length = px_disc.length;
-                        height += ONE_PX_IN_CM;
-                    }
-
-                    height += ONE_PX_IN_CM * (delta_vol/px_disc.volume);
-
-                    last_computed_moment++;
-
-                    heights.push( {
-                        height: height,
-                        length: length
-                    });
-
-                }
             }
         }
-        return heights[moment].height;
+
+        return values;
     }
 
+
+
+    var values = []; 
 
     function compute_maxima() {
         // Has to be computed before the model can be used. Probably time
         // intensive.
+        //
 
-        var 
-            scale = scaled_shape.scale,
-            px_to_cm = function(px) {
-                return (px/scale)/10;
-            }
+        values = compute_quantities();
 
-        ;
+        var max = values[values.length - 1],
+            min = values[0],
+            max_tijd_in_ms = (values.length - 1) * step;
 
-        var base = scaled_shape.base,
-            bowl = scaled_shape.bowl,
-            path = bowl.path,
-            h_start = px_to_cm(base.bottom.y - base.top.y),
-            h_end = h_start + px_to_cm(bowl.bottom.y - bowl.top.y),
-            h = h_start;
+        _model.set_end(max_tijd_in_ms / 1000);
+        _model.quantities._time_.maximum = max_tijd_in_ms;
 
-        var moment = 0;
-
-        while (h < h_end) {
-            h = compute_height(moment);
-            moment++;
-        }
-
-        var time_in_ms = _model.moment_to_time(moment),
-            time_max = time_in_ms/1000,
-            height_max = h,
-            volume_max = compute_volume(time_max);
-
-
-        _model.set_end(time_max);
-        _model.quantities._time_.maximum = time_in_ms;
-
-        _model.quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
-        _model.quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
-        _model.quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
+        _model.quantities.tijd.maximum = max.tijd.toFixed(quantities.tijd.precision);
+        _model.quantities.hoogte.maximum = max.hoogte.toFixed(quantities.hoogte.precision);
+        _model.quantities.hoogte.minimum = min.hoogte.toFixed(quantities.hoogte.precision);
+        _model.quantities.volume.maximum = max.volume.toFixed(quantities.volume.precision);
     }
 
     compute_maxima();
 
 
     _model.measure_moment = function(moment) {
-        if (moment === 0) {
-            return {
-                tijd: 0,
-                hoogte: 0,
-                volume: 0
-            };
-        } else {
-            var time = _model.moment_to_time(moment) / 1000,
-                volume = compute_volume(time),
-                height = compute_height(moment);
-
-            return {
-                tijd: time,
-                volume: volume,
-                hoogte: height
-            };
-        }
+        return values[moment];
     };
 
 

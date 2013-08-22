@@ -85,6 +85,7 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
             y_scale = vertical_axis.scale,
             y_quantity = vertical_axis.quantity;
 
+
         var line = d3.svg.line()
                 .x(function(d) {
                     return x_scale(d[x_quantity.name]);
@@ -93,7 +94,7 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
                     return y_scale(d[y_quantity.name]);
                 })
                 .interpolate("cardinal")
-                .tension(0);
+                .tension(1);
                 
 
         var model_line = _graph.fragment

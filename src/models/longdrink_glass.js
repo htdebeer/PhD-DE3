@@ -33,9 +33,7 @@ var longdrink_glass = function(name, config) {
 
     var radius = config.radius || 2,
         height = config.height || 7.5,
-        flow_rate = config.flow_rate || 50,
-        action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
-        default_actions = require("../actions/actions")({speed: flow_rate});
+        flow_rate = config.flow_rate || 50;
 
     /**
      * Compute the volume in ml in the longdrink glass given flow_rate and time the
@@ -106,12 +104,15 @@ var longdrink_glass = function(name, config) {
     };
 
 
-    var time = {
-        start: 0,
-        end: quantities.tijd.maximum*1000,
-        step: Math.ceil(1000/flow_rate)
-    };
-
+    var step = config.step || 10,
+        time = {
+            start: 0,
+            end: quantities.tijd.maximum*1000,
+            step: step
+        },
+        action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
+        default_actions = require("../actions/actions")({speed: step});
+    
     var _model = model(name, {
         time: time,
         quantities: quantities,

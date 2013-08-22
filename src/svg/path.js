@@ -10,11 +10,24 @@ function end_of_path(path) {
             raphael.getTotalLength());
 }
 
-function complete_path(part) {
+function complete_path(part, fill_length) {
     var start = part.top,
         end = part.bottom,
-        path = part.path,
-        segments = raphael.parsePathString(path),
+        path = part.path;
+    
+    if (fill_length) {
+        path = "m" + start.x + "," + start.y + path;
+        start = raphael.getPointAtLength(path, fill_length);
+
+        var total_length = raphael.getTotalLength(path);
+
+        path = raphael.getSubpath(path, fill_length, total_length);
+        path = raphael.pathToRelative(path);
+        path.shift(); // remove the M command
+        path = path.toString();
+    }
+   
+    var segments = raphael.parsePathString(path),
         completed_path = "m" + start.x + "," + start.y + path;
 
 
@@ -133,7 +146,8 @@ function scale_shape(shape, scale_) {
                 y: scale(shape.bowl.top.y)
             }
         },
-        scale: scale_
+        scale: scale_,
+        factor: factor
     };
 }
 

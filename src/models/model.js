@@ -471,8 +471,12 @@ var model = function(name, config) {
         return moments.slice(0, now + 1);
     };
 
-    _model.current_moment = function() {
-        return moments[now];
+    _model.current_moment = function(moment_only) {
+        if (moment_only) {
+            return now;
+        } else {
+            return moments[now];
+        }
     };
 
 

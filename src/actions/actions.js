@@ -9,7 +9,7 @@ var actions = function(config) {
     // Running model actions
 
     var running_models = {},
-        current_speed = config.speed || 500;
+        current_speed = config.speed || 10;
 
     _actions.speed = function( speed ) {
         if (arguments.length === 1) {

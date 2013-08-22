@@ -178,7 +178,7 @@ repr.register(longdrinkglas);
 repr.register(cocktailglas);
 
 repr2.register(longdrinkglas);
-//repr2.register(cocktailglas);
+repr2.register(cocktailglas);
 
 repr3.register(longdrinkglas);
 repr3.register(cocktailglas);
