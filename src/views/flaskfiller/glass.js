@@ -171,6 +171,19 @@ var glass = function(canvas, model, SCALE) {
         _glass.set_label(x, y);
     };
 
+    function draw_at_bottom(boundaries, distance_from_left) {
+        var bbox = _glass.glass_pane.getBBox(),
+            width = _glass.width,
+            height = _glass.height,
+            x = Math.min(boundaries.x + (distance_from_left || width), boundaries.x + (boundaries.width - width)),
+            y = boundaries.y + boundaries.height - height + 2*_glass.bowl_shape.attr("stroke-width");
+
+        _glass.draw_at(x, y);
+        _glass.x = x;
+        _glass.y = y;
+    }
+    _glass.draw_at_bottom = draw_at_bottom;
+
     function update_color() {
         fill.attr("fill", model.color());
     }

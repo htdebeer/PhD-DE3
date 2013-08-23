@@ -95,6 +95,10 @@ var model = function(name, config) {
         return moments[moment];
     };
 
+    _model.number_of_moments = function() {
+        return moments.length;
+    };
+
 
     // A moment can only be inspected if it already has been "measured".
     // Following the data invariant, a moment has been measured when its order
@@ -138,6 +142,12 @@ var model = function(name, config) {
         if (view_found === -1) {
             views.push(view);
         }
+    };
+
+    _model.get_views_of_type = function(view_type) {
+        return views.filter(function(v) {
+            return v.type === view_type;
+        });
     };
 
     _model.unregister = function(view) {
@@ -496,6 +506,15 @@ var model = function(name, config) {
             };
         };
 
+
+    var step = config.step_size || 1;
+    function step_size(size) {
+        if (arguments.length === 1) {
+            step = size;
+        }
+        return step;
+    }
+    _model.step_size = step_size;
 
     function random_color() {
         var hexes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'],

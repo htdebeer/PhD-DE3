@@ -108,6 +108,8 @@ var view = function(config) {
     };
     _view.models = models;
 
+    _view.type = config.type || "view";
+
     return _view;    
 };
 

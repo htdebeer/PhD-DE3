@@ -1,5 +1,5 @@
 
-var ruler = function(canvas, config) {
+var ruler = function(canvas, config, MEASURE_LINE_WIDTH) {
     var _ruler = canvas.set();
 
     var x = config.x || 0,
@@ -12,6 +12,7 @@ var ruler = function(canvas, config) {
     var background,
         ticks,
         labels,
+        measure_line,
         glass_pane;
 
     draw();
@@ -23,12 +24,43 @@ var ruler = function(canvas, config) {
     });
 
 
+    function move_measuring_line(e, x_, y_) {
+        var path;
+
+        if (orientation === "horizontal") {
+            path = "M" + (x_) + "," + (y + height) + "v-" + MEASURE_LINE_WIDTH;
+        } else {
+            path = "M" + x + "," + (y_) + "h" + MEASURE_LINE_WIDTH;
+        }
+        measure_line.attr({
+            "path": path
+        });
+    }
+
+    function show_measuring_line() {
+        glass_pane.mousemove(move_measuring_line);
+        measure_line.show();
+    }
+
+    function hide_measuring_line() {
+        glass_pane.unmousemove(move_measuring_line);
+        measure_line.hide();
+    }
+
     
     function draw() {
         background = canvas.rect(x, y, width, height);
         _ruler.push(background);
         _ruler.push(draw_ticks());
         _ruler.push(draw_labels());
+        measure_line = canvas.path("M0,0");
+        measure_line.attr({
+            stroke: "crimson",
+            "stroke-width": 2,
+            "stroke-opacity": 0.5
+        });
+        _ruler.push(measure_line);
+        measure_line.hide();
         glass_pane = canvas.rect(x, y, width, height);
         glass_pane.attr({
             fill: "white",
@@ -37,6 +69,9 @@ var ruler = function(canvas, config) {
             "stroke-opacity": 0
         });
         _ruler.push(glass_pane);
+
+        glass_pane.mouseover(show_measuring_line);
+        glass_pane.mouseout(hide_measuring_line);
 
         function draw_labels() {
             labels = canvas.set();

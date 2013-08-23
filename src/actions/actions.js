@@ -1,6 +1,5 @@
 
-
-// add attribution to the icons: "Entypo pictograms by Daniel Bruce — www.entypo.com"
+// using http://fortawesome.github.io/Font-Awesome/icons/ for icons
 
 var actions = function(config) {
     var _actions = {};
@@ -134,6 +133,65 @@ var actions = function(config) {
     };
 
     // Toggle view action
+
+    _actions.toggle_line = {
+        name: "toggle_line",
+        group: "toggle_view",
+        icon: "icon-picture",
+        tooltip: "Show/hide the line graph of this model",
+        enabled: true,
+        toggled: true,
+        callback: function(model) {
+            return function() {
+                if (this.hasAttribute("data-toggled")) {
+                    this.removeAttribute("data-toggled");
+                    model.get_views_of_type("graph")[0].hide_line(model.name);
+                } else {
+                    this.setAttribute("data-toggled", true);
+                    model.get_views_of_type("graph")[0].show_line(model.name);
+                }
+            };
+        }
+    };
+
+    _actions.toggle_tailpoints = {
+        name: "toggle_tailpoints",
+        group: "toggle_view",
+        icon: "icon-bar-chart",
+        tooltip: "Show/hide the tailpoints graph of this model",
+        enabled: true,
+        toggled: false,
+        callback: function(model) {
+            return function() {
+                if (this.hasAttribute("data-toggled")) {
+                    this.removeAttribute("data-toggled");
+                    model.get_views_of_type("graph")[0].hide_tailpoints(model.name);
+                } else {
+                    this.setAttribute("data-toggled", true);
+                    model.get_views_of_type("graph")[0].show_tailpoints(model.name);
+                }
+            };
+        }
+    };
+
+
+    _actions.step_size = {
+        name: "step_size",
+        group: "step_size",
+        tooltip: "Set the step size of the tailpoint graph",
+        enabled: true,
+        type: "slider",
+        callback: function(model) {
+            return function() {
+                model.step_size(this.value);
+
+                var update_tailpoints = function(graph) {
+                    graph.update(model.name);
+                };
+                model.get_views_of_type("graph").forEach(update_tailpoints);
+            };
+        }
+    };
 
 
     return _actions;

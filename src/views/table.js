@@ -26,6 +26,8 @@ var table = function(config) {
     var _table = require("./view")(config),
         _appendix = {};
 
+    var TOGGLED_COLOR = "gold";
+
 
     var table_fragment = document
         .createDocumentFragment()
@@ -203,24 +205,47 @@ var table = function(config) {
                     group = action.group;
                 }
 
-                return {
-                    name: "button",
-                    attributes: {
+                var attributes = {
                         "class": classes,
-                        "data-action": action_name,
-                        "data-tooltip": action.tooltip
-                    },
-                    children: [{
-                        name: "i",
-                        attributes: {
-                           "class": action.icon
+                        "data-action": action_name
+                    };
+
+                if (action.type && action.type === "slider") {
+                    attributes.type = "range";
+                    attributes.min = 1;
+                    attributes.max = 50;
+                    attributes.step = 1;
+                    attributes.value = model.step_size();
+
+                    return {
+                        name: "input",
+                        attributes: attributes,
+                        on: {
+                            type: "change",
+                            callback: action.install()
                         }
-                    }],
-                    on: {
-                        type: "click",
-                        callback: action.install()
+
+                    };
+                } else {
+                    if (action.toggled) {
+                        attributes["data-toggled"] = true;
                     }
-                };
+                    return {
+                        name: "button",
+                        attributes: attributes,
+                        children: [{
+                            name: "i",
+                            attributes: {
+                               "class": action.icon
+                            }
+                        }],
+                        on: {
+                            type: "click",
+                            callback: action.install()
+                        }
+
+                    };
+                }
             },
             actions_elts = Object.keys(model.actions).map(create_action_elt);
 
@@ -309,6 +334,7 @@ var table = function(config) {
                 } else {
                     button.setAttribute("disabled", true);
                 }
+                
             }
 
         };

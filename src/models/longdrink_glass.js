@@ -88,7 +88,7 @@ var longdrink_glass = function(name, config) {
             label: "volume in ml",
             stepsize: 0.1,
             monotone: true,
-            precision: 0
+            precision: 1
         },
         tijd: {
             minimum: 0,
@@ -99,7 +99,7 @@ var longdrink_glass = function(name, config) {
             label: "tijd",
             stepsize: 0.01,
             monotone: true,
-            precision: 1
+            precision: 2
         }
     };
 
@@ -110,7 +110,7 @@ var longdrink_glass = function(name, config) {
             end: quantities.tijd.maximum*1000,
             step: step
         },
-        action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
+        action_list = config.actions || ["start", "pause", "reset", "finish","toggle_line", "toggle_tailpoints", "step_size", "remove"],
         default_actions = require("../actions/actions")({speed: step});
     
     var _model = model(name, {

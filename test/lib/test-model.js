@@ -5860,8 +5860,7 @@ if (typeof module !== 'undefined') {
 
 },{}],2:[function(require,module,exports){
 
-
-// add attribution to the icons: "Entypo pictograms by Daniel Bruce — www.entypo.com"
+// using http://fortawesome.github.io/Font-Awesome/icons/ for icons
 
 var actions = function(config) {
     var _actions = {};
@@ -5996,6 +5995,65 @@ var actions = function(config) {
 
     // Toggle view action
 
+    _actions.toggle_line = {
+        name: "toggle_line",
+        group: "toggle_view",
+        icon: "icon-picture",
+        tooltip: "Show/hide the line graph of this model",
+        enabled: true,
+        toggled: true,
+        callback: function(model) {
+            return function() {
+                if (this.hasAttribute("data-toggled")) {
+                    this.removeAttribute("data-toggled");
+                    model.get_views_of_type("graph")[0].hide_line(model.name);
+                } else {
+                    this.setAttribute("data-toggled", true);
+                    model.get_views_of_type("graph")[0].show_line(model.name);
+                }
+            };
+        }
+    };
+
+    _actions.toggle_tailpoints = {
+        name: "toggle_tailpoints",
+        group: "toggle_view",
+        icon: "icon-bar-chart",
+        tooltip: "Show/hide the tailpoints graph of this model",
+        enabled: true,
+        toggled: false,
+        callback: function(model) {
+            return function() {
+                if (this.hasAttribute("data-toggled")) {
+                    this.removeAttribute("data-toggled");
+                    model.get_views_of_type("graph")[0].hide_tailpoints(model.name);
+                } else {
+                    this.setAttribute("data-toggled", true);
+                    model.get_views_of_type("graph")[0].show_tailpoints(model.name);
+                }
+            };
+        }
+    };
+
+
+    _actions.step_size = {
+        name: "step_size",
+        group: "step_size",
+        tooltip: "Set the step size of the tailpoint graph",
+        enabled: true,
+        type: "slider",
+        callback: function(model) {
+            return function() {
+                model.step_size(this.value);
+
+                var update_tailpoints = function(graph) {
+                    graph.update(model.name);
+                };
+                model.get_views_of_type("graph").forEach(update_tailpoints);
+            };
+        }
+    };
+
 
     return _actions;
 };
@@ -6076,6 +6134,18 @@ var dom = {
         }
 
         return elt;
+    },
+    invert_color: function(color) {
+        var R = parseInt(color.slice(1,3), 16),
+            G = parseInt(color.slice(3,5), 16),
+            B = parseInt(color.slice(5,7), 16),
+            inverted_color = "#" +       
+               (255 - R).toString(16) +
+               (255 - G).toString(16) +
+               (255 - B).toString(16);
+
+        console.log(color, inverted_color);
+        return inverted_color;
     }
 };
 
@@ -6165,7 +6235,7 @@ var glass = function(name, config) {
             label: "volume in ml",
             stepsize: 0.1,
             monotone: true,
-            precision: 0
+            precision: 1
         },
         tijd: {
             minimum: 0,
@@ -6176,7 +6246,7 @@ var glass = function(name, config) {
             label: "tijd",
             stepsize: 0.01,
             monotone: true,
-            precision: 1
+            precision: 2
         }
     };
 
@@ -6187,7 +6257,7 @@ var glass = function(name, config) {
             end: quantities.tijd.maximum*1000,
             step: step
         },        
-        action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
+        action_list = config.actions || ["start", "pause", "reset", "finish","toggle_line", "toggle_tailpoints", "step_size", "remove"],
         default_actions = require("../actions/actions")({speed: step});
 
     function create_actions(action_list) {
@@ -6458,7 +6528,7 @@ var longdrink_glass = function(name, config) {
             label: "volume in ml",
             stepsize: 0.1,
             monotone: true,
-            precision: 0
+            precision: 1
         },
         tijd: {
             minimum: 0,
@@ -6469,7 +6539,7 @@ var longdrink_glass = function(name, config) {
             label: "tijd",
             stepsize: 0.01,
             monotone: true,
-            precision: 1
+            precision: 2
         }
     };
 
@@ -6480,7 +6550,7 @@ var longdrink_glass = function(name, config) {
             end: quantities.tijd.maximum*1000,
             step: step
         },
-        action_list = config.actions || ["start", "pause", "reset", "finish", "remove"],
+        action_list = config.actions || ["start", "pause", "reset", "finish","toggle_line", "toggle_tailpoints", "step_size", "remove"],
         default_actions = require("../actions/actions")({speed: step});
     
     var _model = model(name, {
@@ -6672,6 +6742,10 @@ var model = function(name, config) {
         return moments[moment];
     };
 
+    _model.number_of_moments = function() {
+        return moments.length;
+    };
+
 
     // A moment can only be inspected if it already has been "measured".
     // Following the data invariant, a moment has been measured when its order
@@ -6715,6 +6789,12 @@ var model = function(name, config) {
         if (view_found === -1) {
             views.push(view);
         }
+    };
+
+    _model.get_views_of_type = function(view_type) {
+        return views.filter(function(v) {
+            return v.type === view_type;
+        });
     };
 
     _model.unregister = function(view) {
@@ -7074,6 +7154,15 @@ var model = function(name, config) {
         };
 
 
+    var step = config.step_size || 1;
+    function step_size(size) {
+        if (arguments.length === 1) {
+            step = size;
+        }
+        return step;
+    }
+    _model.step_size = step_size;
+
     function random_color() {
         var hexes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'],
             colors = [],
@@ -7340,11 +7429,11 @@ var flaskfiller = function(config, scale_, dimensions_) {
             CONTAINER.width, 
             CONTAINER.height);
 
-    var vertical_ruler = ruler(canvas, RULERS.vertical)
+    var vertical_ruler = ruler(canvas, RULERS.vertical, CONTAINER.width)
             .style({
                 "background": "white"
             }),
-        horizontal_ruler = ruler(canvas, RULERS.horizontal)
+        horizontal_ruler = ruler(canvas, RULERS.horizontal, CONTAINER.height)
             .style({
                 "background": "white"
             }),
@@ -7375,6 +7464,8 @@ var flaskfiller = function(config, scale_, dimensions_) {
         } else {
             glass = various_glass(canvas, model, scale);
         }
+        vertical_ruler.toFront();
+        horizontal_ruler.toFront();
         return glass;
     }
 
@@ -7388,15 +7479,12 @@ var flaskfiller = function(config, scale_, dimensions_) {
 
         if (!model.glass) {
             model.glass = add_glass(model.model);
+            model.glass.draw_at_bottom(SIMULATION, Math.random() * SIMULATION.width);
         }
 
         update_glass(model.glass);
 
     };
-
-    _flaskfiller.remove = function(model_name) {
-    };
-
 
 
     // There is a bug in Raphael regarding placing text on the right
@@ -7583,6 +7671,19 @@ var glass = function(canvas, model, SCALE) {
         _glass.set_label(x, y);
     };
 
+    function draw_at_bottom(boundaries, distance_from_left) {
+        var bbox = _glass.glass_pane.getBBox(),
+            width = _glass.width,
+            height = _glass.height,
+            x = Math.min(boundaries.x + (distance_from_left || width), boundaries.x + (boundaries.width - width)),
+            y = boundaries.y + boundaries.height - height + 2*_glass.bowl_shape.attr("stroke-width");
+
+        _glass.draw_at(x, y);
+        _glass.x = x;
+        _glass.y = y;
+    }
+    _glass.draw_at_bottom = draw_at_bottom;
+
     function update_color() {
         fill.attr("fill", model.color());
     }
@@ -7748,7 +7849,7 @@ module.exports = longdrink_glass;
 
 },{"./glass":10}],12:[function(require,module,exports){
 
-var ruler = function(canvas, config) {
+var ruler = function(canvas, config, MEASURE_LINE_WIDTH) {
     var _ruler = canvas.set();
 
     var x = config.x || 0,
@@ -7761,6 +7862,7 @@ var ruler = function(canvas, config) {
     var background,
         ticks,
         labels,
+        measure_line,
         glass_pane;
 
     draw();
@@ -7772,12 +7874,43 @@ var ruler = function(canvas, config) {
     });
 
 
+    function move_measuring_line(e, x_, y_) {
+        var path;
+
+        if (orientation === "horizontal") {
+            path = "M" + (x_) + "," + (y + height) + "v-" + MEASURE_LINE_WIDTH;
+        } else {
+            path = "M" + x + "," + (y_) + "h" + MEASURE_LINE_WIDTH;
+        }
+        measure_line.attr({
+            "path": path
+        });
+    }
+
+    function show_measuring_line() {
+        glass_pane.mousemove(move_measuring_line);
+        measure_line.show();
+    }
+
+    function hide_measuring_line() {
+        glass_pane.unmousemove(move_measuring_line);
+        measure_line.hide();
+    }
+
     
     function draw() {
         background = canvas.rect(x, y, width, height);
         _ruler.push(background);
         _ruler.push(draw_ticks());
         _ruler.push(draw_labels());
+        measure_line = canvas.path("M0,0");
+        measure_line.attr({
+            stroke: "crimson",
+            "stroke-width": 2,
+            "stroke-opacity": 0.5
+        });
+        _ruler.push(measure_line);
+        measure_line.hide();
         glass_pane = canvas.rect(x, y, width, height);
         glass_pane.attr({
             fill: "white",
@@ -7786,6 +7919,9 @@ var ruler = function(canvas, config) {
             "stroke-opacity": 0
         });
         _ruler.push(glass_pane);
+
+        glass_pane.mouseover(show_measuring_line);
+        glass_pane.mouseout(hide_measuring_line);
 
         function draw_labels() {
             labels = canvas.set();
@@ -7926,8 +8062,10 @@ module.exports = ruler;
 var view = require("./view"),
     dom = require("../dom/dom");
 
-var graph = function(config, horizontal_, vertical_, dimensions_) {
+var graph = function(config_, horizontal_, vertical_, dimensions_) {
 
+    var config = Object.create(config_);
+    config.type = "graph";
     var _graph = view(config);
 
     var horizontal = horizontal_,
@@ -7980,6 +8118,77 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
 
     var horizontal_axis, vertical_axis;
 
+    var showline = true,
+        showtailpoints = false;
+
+    function draw_tailpoints(model_name) {
+        var model = _graph.get_model(model_name).model,
+            step = function(value, index) {
+                var step_size = model.step_size() || 1;
+
+                return (index % step_size === 0) && (index !== 0);
+            },
+            data = model.data().filter(step),
+            x_scale = horizontal_axis.scale,
+            x_quantity = horizontal_axis.quantity,
+            y_scale = vertical_axis.scale,
+            y_quantity = vertical_axis.quantity;
+
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.parentNode.removeChild(model_tailpoints);
+        }
+
+
+        svg.select("g.tailpoints")
+                .append("g")
+                .attr("class", model_name)
+                .selectAll("line")
+                .data(data)
+                .enter()
+                .append("line")
+                .attr("x1", function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .attr("y1", function(d) {
+                    return y_scale(d[y_quantity.name]);
+                })
+                .attr("x2", function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .attr("y2", y_scale(0))
+                .attr("stroke", model.color || "red")
+                .style("stroke-width", 1)
+//                .style("stroke-opacity", 0.7)
+//                .style("stroke-dasharray", [3,1])
+                ;
+        svg.select("g.tailpoints g." + model_name)
+                .selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("cx", function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .attr("cy", function(d) {
+                    return y_scale(d[y_quantity.name]);
+                })
+                .attr("r", 2)
+                .attr("stroke", "black")
+                .attr("fill", "white")
+                .style("stroke-width", 1.5)
+                .on("mouseover", add_tooltip(model_name))
+                .on("mouseout", remove_tooltip(model_name))
+                ;
+
+        model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (!showtailpoints) {
+            model_tailpoints.style.visibility = "hidden";
+        }            
+    }
+
     function draw_line(model_name) {
         var model = _graph.get_model(model_name).model,
             data = model.data(),
@@ -8018,9 +8227,60 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
                 .attr("class", "graph")
                 .attr("fill", "none")
                 .attr("stroke", model.color || "red")
-                .style("stroke-width", 3);
+                .style("stroke-width", 3)
+                .on("mouseover", add_tooltip(model_name))
+                .on("mousemove", add_tooltip(model_name))
+                .on("mouseout", remove_tooltip(model_name));
 
+        model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (!showline) {
+            model_line.style.visibility = "hidden";
+        }            
 
+    }
+
+    var tooltip = d3.select("body")
+        .append("div")
+        .attr("class", "tooltip")
+        .style("position", "absolute")
+        .style("visibility", "hidden")
+        .style("opacity", 0.7);
+
+    function add_tooltip(model_name) {
+        return function(d, i) {
+            var PADDING = 10;
+            var line = svg.select("g.lines g.line." + model_name + " path");
+            line.style("cursor", "crosshair");
+
+            var container = _graph.fragment.querySelector("svg > g"),
+                point = d3.mouse(container),
+                x_scale = horizontal_axis.scale,
+                x_quantity = horizontal_axis.quantity,
+                y_scale = vertical_axis.scale,
+                y_quantity = vertical_axis.quantity,
+                x = x_scale.invert(point[0]).toFixed(x_quantity.precision || 0),
+                y = y_scale.invert(point[1]).toFixed(y_quantity.precision || 0),
+                x_unit = x_quantity.unit,
+                y_unit = y_quantity.unit;
+                            
+
+            tooltip.html( x + " " + x_unit + "; " + y + " " + y_unit);
+
+            tooltip
+                .style("left", (d3.event.pageX + PADDING*2) + "px")     
+                .style("top", (d3.event.pageY - PADDING) + "px");   
+
+            tooltip.style("visibility", "visible");
+        };
+    }
+
+    function remove_tooltip(model_name) {
+        return function() {
+            var line = svg.select("g.lines g.line." + model_name + " path");
+            line.style("cursor", "default");
+            tooltip.style("visibility", "hidden");
+        };
     }
 
 
@@ -8054,7 +8314,23 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
 
         _graph.fragment.appendChild(dom.create({
                 name: "figcaption",
-                children: [{
+                children: [
+                {
+                    name: "select",
+                    children: horizontal_quantity_list,
+                    on: {
+                        type: "change",
+                        callback: function(event) {
+                            var quantity = event.target.value;
+                            set_axis(quantity, "horizontal");
+                        }
+                    }
+                }, 
+                {
+                    name: "textNode",
+                    value: " - "
+                }, 
+                {
                     name: "select",
                     attributes: {
 
@@ -8067,20 +8343,8 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
                             set_axis(quantity, "vertical");
                         }
                     }
-                },{
-                    name: "textNode",
-                    value: " - "
-                }, {
-                    name: "select",
-                    children: horizontal_quantity_list,
-                    on: {
-                        type: "change",
-                        callback: function(event) {
-                            var quantity = event.target.value;
-                            set_axis(quantity, "horizontal");
-                        }
-                    }
-                }, {
+                },
+                {
                     name: "textNode",
                     value: " grafiek"
                 }            
@@ -8202,11 +8466,16 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
         }
 
         update_lines();
+        update_tailpoints();
         
     }
 
     function update_lines() {
         Object.keys(_graph.models).forEach(draw_line);
+    }
+
+    function update_tailpoints() {
+        Object.keys(_graph.models).forEach(draw_tailpoints);
     }
 
     function create_graph() {
@@ -8216,6 +8485,8 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
         set_axis(vertical, "vertical");
         svg.append("g")
             .attr("class", "lines");
+        svg.append("g")
+            .attr("class", "tailpoints");
 
     }
     create_graph();
@@ -8225,7 +8496,12 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
         var model_line = _graph.fragment
             .querySelector("svg g.lines g.line." + model_name);
         if (model_line) {
-            model_line.parentNode.removeChild(model_line);
+            model_line.parentnode.removechild(model_line);
+        }
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.parentNode.removeChild(model_tailpoints);
         }
     };
 
@@ -8240,6 +8516,44 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
     _graph.update = function(model_name) {
         var model = _graph.get_model(model_name);
         draw_line(model_name);
+        draw_tailpoints(model_name);
+    };
+
+    _graph.show_tailpoints = function(model_name) {
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.style.visibility = "visible";
+        }
+        showtailpoints = true;
+    };
+
+    _graph.hide_tailpoints = function(model_name) {
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.style.visibility = "hidden";
+        }
+        showtailpoints = false;
+    };
+
+
+    _graph.show_line = function(model_name) {
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.style.visibility = "visible";
+        }
+        showline = true;
+    };
+
+    _graph.hide_line = function(model_name) {
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.style.visibility = "hidden";
+        }
+        showline = false;
     };
 
     return _graph;
@@ -8275,6 +8589,8 @@ var dom = require("../dom/dom");
 var table = function(config) {
     var _table = require("./view")(config),
         _appendix = {};
+
+    var TOGGLED_COLOR = "gold";
 
 
     var table_fragment = document
@@ -8453,24 +8769,47 @@ var table = function(config) {
                     group = action.group;
                 }
 
-                return {
-                    name: "button",
-                    attributes: {
+                var attributes = {
                         "class": classes,
-                        "data-action": action_name,
-                        "data-tooltip": action.tooltip
-                    },
-                    children: [{
-                        name: "i",
-                        attributes: {
-                           "class": action.icon
+                        "data-action": action_name
+                    };
+
+                if (action.type && action.type === "slider") {
+                    attributes.type = "range";
+                    attributes.min = 1;
+                    attributes.max = 50;
+                    attributes.step = 1;
+                    attributes.value = model.step_size();
+
+                    return {
+                        name: "input",
+                        attributes: attributes,
+                        on: {
+                            type: "change",
+                            callback: action.install()
                         }
-                    }],
-                    on: {
-                        type: "click",
-                        callback: action.install()
+
+                    };
+                } else {
+                    if (action.toggled) {
+                        attributes["data-toggled"] = true;
                     }
-                };
+                    return {
+                        name: "button",
+                        attributes: attributes,
+                        children: [{
+                            name: "i",
+                            attributes: {
+                               "class": action.icon
+                            }
+                        }],
+                        on: {
+                            type: "click",
+                            callback: action.install()
+                        }
+
+                    };
+                }
             },
             actions_elts = Object.keys(model.actions).map(create_action_elt);
 
@@ -8559,6 +8898,7 @@ var table = function(config) {
                 } else {
                     button.setAttribute("disabled", true);
                 }
+                
             }
 
         };
@@ -9066,6 +9406,8 @@ var view = function(config) {
         // change
     };
     _view.models = models;
+
+    _view.type = config.type || "view";
 
     return _view;    
 };

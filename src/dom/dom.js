@@ -71,6 +71,18 @@ var dom = {
         }
 
         return elt;
+    },
+    invert_color: function(color) {
+        var R = parseInt(color.slice(1,3), 16),
+            G = parseInt(color.slice(3,5), 16),
+            B = parseInt(color.slice(5,7), 16),
+            inverted_color = "#" +       
+               (255 - R).toString(16) +
+               (255 - G).toString(16) +
+               (255 - B).toString(16);
+
+        console.log(color, inverted_color);
+        return inverted_color;
     }
 };
 

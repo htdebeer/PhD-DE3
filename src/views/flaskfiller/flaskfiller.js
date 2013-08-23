@@ -72,11 +72,11 @@ var flaskfiller = function(config, scale_, dimensions_) {
             CONTAINER.width, 
             CONTAINER.height);
 
-    var vertical_ruler = ruler(canvas, RULERS.vertical)
+    var vertical_ruler = ruler(canvas, RULERS.vertical, CONTAINER.width)
             .style({
                 "background": "white"
             }),
-        horizontal_ruler = ruler(canvas, RULERS.horizontal)
+        horizontal_ruler = ruler(canvas, RULERS.horizontal, CONTAINER.height)
             .style({
                 "background": "white"
             }),
@@ -107,6 +107,8 @@ var flaskfiller = function(config, scale_, dimensions_) {
         } else {
             glass = various_glass(canvas, model, scale);
         }
+        vertical_ruler.toFront();
+        horizontal_ruler.toFront();
         return glass;
     }
 
@@ -120,15 +122,12 @@ var flaskfiller = function(config, scale_, dimensions_) {
 
         if (!model.glass) {
             model.glass = add_glass(model.model);
+            model.glass.draw_at_bottom(SIMULATION, Math.random() * SIMULATION.width);
         }
 
         update_glass(model.glass);
 
     };
-
-    _flaskfiller.remove = function(model_name) {
-    };
-
 
 
     // There is a bug in Raphael regarding placing text on the right

@@ -23,8 +23,10 @@
 var view = require("./view"),
     dom = require("../dom/dom");
 
-var graph = function(config, horizontal_, vertical_, dimensions_) {
+var graph = function(config_, horizontal_, vertical_, dimensions_) {
 
+    var config = Object.create(config_);
+    config.type = "graph";
     var _graph = view(config);
 
     var horizontal = horizontal_,
@@ -77,6 +79,77 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
 
     var horizontal_axis, vertical_axis;
 
+    var showline = true,
+        showtailpoints = false;
+
+    function draw_tailpoints(model_name) {
+        var model = _graph.get_model(model_name).model,
+            step = function(value, index) {
+                var step_size = model.step_size() || 1;
+
+                return (index % step_size === 0) && (index !== 0);
+            },
+            data = model.data().filter(step),
+            x_scale = horizontal_axis.scale,
+            x_quantity = horizontal_axis.quantity,
+            y_scale = vertical_axis.scale,
+            y_quantity = vertical_axis.quantity;
+
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.parentNode.removeChild(model_tailpoints);
+        }
+
+
+        svg.select("g.tailpoints")
+                .append("g")
+                .attr("class", model_name)
+                .selectAll("line")
+                .data(data)
+                .enter()
+                .append("line")
+                .attr("x1", function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .attr("y1", function(d) {
+                    return y_scale(d[y_quantity.name]);
+                })
+                .attr("x2", function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .attr("y2", y_scale(0))
+                .attr("stroke", model.color || "red")
+                .style("stroke-width", 1)
+//                .style("stroke-opacity", 0.7)
+//                .style("stroke-dasharray", [3,1])
+                ;
+        svg.select("g.tailpoints g." + model_name)
+                .selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("cx", function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .attr("cy", function(d) {
+                    return y_scale(d[y_quantity.name]);
+                })
+                .attr("r", 2)
+                .attr("stroke", "black")
+                .attr("fill", "white")
+                .style("stroke-width", 1.5)
+                .on("mouseover", add_tooltip(model_name))
+                .on("mouseout", remove_tooltip(model_name))
+                ;
+
+        model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (!showtailpoints) {
+            model_tailpoints.style.visibility = "hidden";
+        }            
+    }
+
     function draw_line(model_name) {
         var model = _graph.get_model(model_name).model,
             data = model.data(),
@@ -115,9 +188,60 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
                 .attr("class", "graph")
                 .attr("fill", "none")
                 .attr("stroke", model.color || "red")
-                .style("stroke-width", 3);
+                .style("stroke-width", 3)
+                .on("mouseover", add_tooltip(model_name))
+                .on("mousemove", add_tooltip(model_name))
+                .on("mouseout", remove_tooltip(model_name));
 
+        model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (!showline) {
+            model_line.style.visibility = "hidden";
+        }            
 
+    }
+
+    var tooltip = d3.select("body")
+        .append("div")
+        .attr("class", "tooltip")
+        .style("position", "absolute")
+        .style("visibility", "hidden")
+        .style("opacity", 0.7);
+
+    function add_tooltip(model_name) {
+        return function(d, i) {
+            var PADDING = 10;
+            var line = svg.select("g.lines g.line." + model_name + " path");
+            line.style("cursor", "crosshair");
+
+            var container = _graph.fragment.querySelector("svg > g"),
+                point = d3.mouse(container),
+                x_scale = horizontal_axis.scale,
+                x_quantity = horizontal_axis.quantity,
+                y_scale = vertical_axis.scale,
+                y_quantity = vertical_axis.quantity,
+                x = x_scale.invert(point[0]).toFixed(x_quantity.precision || 0),
+                y = y_scale.invert(point[1]).toFixed(y_quantity.precision || 0),
+                x_unit = x_quantity.unit,
+                y_unit = y_quantity.unit;
+                            
+
+            tooltip.html( x + " " + x_unit + "; " + y + " " + y_unit);
+
+            tooltip
+                .style("left", (d3.event.pageX + PADDING*2) + "px")     
+                .style("top", (d3.event.pageY - PADDING) + "px");   
+
+            tooltip.style("visibility", "visible");
+        };
+    }
+
+    function remove_tooltip(model_name) {
+        return function() {
+            var line = svg.select("g.lines g.line." + model_name + " path");
+            line.style("cursor", "default");
+            tooltip.style("visibility", "hidden");
+        };
     }
 
 
@@ -151,7 +275,23 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
 
         _graph.fragment.appendChild(dom.create({
                 name: "figcaption",
-                children: [{
+                children: [
+                {
+                    name: "select",
+                    children: horizontal_quantity_list,
+                    on: {
+                        type: "change",
+                        callback: function(event) {
+                            var quantity = event.target.value;
+                            set_axis(quantity, "horizontal");
+                        }
+                    }
+                }, 
+                {
+                    name: "textNode",
+                    value: " - "
+                }, 
+                {
                     name: "select",
                     attributes: {
 
@@ -164,20 +304,8 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
                             set_axis(quantity, "vertical");
                         }
                     }
-                },{
-                    name: "textNode",
-                    value: " - "
-                }, {
-                    name: "select",
-                    children: horizontal_quantity_list,
-                    on: {
-                        type: "change",
-                        callback: function(event) {
-                            var quantity = event.target.value;
-                            set_axis(quantity, "horizontal");
-                        }
-                    }
-                }, {
+                },
+                {
                     name: "textNode",
                     value: " grafiek"
                 }            
@@ -299,11 +427,16 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
         }
 
         update_lines();
+        update_tailpoints();
         
     }
 
     function update_lines() {
         Object.keys(_graph.models).forEach(draw_line);
+    }
+
+    function update_tailpoints() {
+        Object.keys(_graph.models).forEach(draw_tailpoints);
     }
 
     function create_graph() {
@@ -313,6 +446,8 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
         set_axis(vertical, "vertical");
         svg.append("g")
             .attr("class", "lines");
+        svg.append("g")
+            .attr("class", "tailpoints");
 
     }
     create_graph();
@@ -322,7 +457,12 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
         var model_line = _graph.fragment
             .querySelector("svg g.lines g.line." + model_name);
         if (model_line) {
-            model_line.parentNode.removeChild(model_line);
+            model_line.parentnode.removechild(model_line);
+        }
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.parentNode.removeChild(model_tailpoints);
         }
     };
 
@@ -337,6 +477,44 @@ var graph = function(config, horizontal_, vertical_, dimensions_) {
     _graph.update = function(model_name) {
         var model = _graph.get_model(model_name);
         draw_line(model_name);
+        draw_tailpoints(model_name);
+    };
+
+    _graph.show_tailpoints = function(model_name) {
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.style.visibility = "visible";
+        }
+        showtailpoints = true;
+    };
+
+    _graph.hide_tailpoints = function(model_name) {
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.style.visibility = "hidden";
+        }
+        showtailpoints = false;
+    };
+
+
+    _graph.show_line = function(model_name) {
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.style.visibility = "visible";
+        }
+        showline = true;
+    };
+
+    _graph.hide_line = function(model_name) {
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.style.visibility = "hidden";
+        }
+        showline = false;
     };
 
     return _graph;
