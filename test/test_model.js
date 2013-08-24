@@ -7,6 +7,7 @@ var table = require("../src/views/table");
 var graph = require("../src/views/graph");
 var ff = require("../src/views/flaskfiller/flaskfiller");
 var tt = require("../src/views/temperaturetyper/temperaturetyper");
+var gg = require("../src/views/flaskfiller/glass_grafter");
 
 var actions = require("../src/actions/actions")({speed: 10});
 var actions2 = require("../src/actions/actions")({speed: 10});
@@ -169,10 +170,15 @@ var body = document.querySelector("body");
 
 //body.appendChild(repr4.fragment);
 
+//var scale = 10;
+
+var glassgrafter = gg({});
+
+
+body.appendChild(glassgrafter.fragment);
 body.appendChild(repr3.fragment);
 body.appendChild(repr.fragment);
 body.appendChild(repr2.fragment);
-
 
 repr.register(longdrinkglas);
 repr.register(cocktailglas);
