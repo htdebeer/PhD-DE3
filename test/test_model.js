@@ -172,10 +172,10 @@ var body = document.querySelector("body");
 
 //var scale = 10;
 
-var glassgrafter = gg({});
+//var glassgrafter = gg({});
 
 
-body.appendChild(glassgrafter.fragment);
+//body.appendChild(glassgrafter.fragment);
 body.appendChild(repr3.fragment);
 body.appendChild(repr.fragment);
 body.appendChild(repr2.fragment);

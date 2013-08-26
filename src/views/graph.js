@@ -69,6 +69,155 @@ var graph = function(config_, horizontal_, vertical_, dimensions_) {
             }
         }));
 
+    var horizontal_axis, vertical_axis;
+
+    var mouse_actions = [
+        {
+            name: "tangent_triangle",
+            icon: "icon-crop",
+            on: show_tangent_triangle,
+            off: hide_tangent_triangle
+        }, {
+            name: "locally_zoom",
+            icon: "icon-zoom-in",
+            on: show_zoom,
+            off: hide_zoom
+        }
+    ];
+
+    var current_action = config.default_action || "measure_point";
+
+    function toggle_action(action) {
+
+        return function() {
+            if (!this.hasAttribute("data-toggled")) {
+                this.setAttribute("data-toggled", true);
+                // enable mouse thingie
+                action.on();
+            } else {
+                this.removeAttribute("data-toggled");
+                // diable mouse thingie
+                action.off();
+            }
+        };
+
+    }
+             
+    function show_tangent_triangle() {
+            var tangent_triangle = svg.select("g.tangent_triangle");
+            if (tangent_triangle) tangent_triangle.style("visibility", "visible");
+    }
+
+    function hide_tangent_triangle() {
+            var tangent_triangle = svg.select("g.tangent_triangle");
+            if (tangent_triangle) tangent_triangle.style("visibility", "hidden");
+    }
+
+    function show_zoom() {
+        console.log("start zooming");
+    }
+
+    function hide_zoom() {
+        console.log("stop zooming");
+    }
+
+
+    function create_caption() {
+        var get_name = function(q) {
+                return _graph.quantities[q].name;
+            },
+            quantity_names = Object.keys(_graph.quantities),
+            horizontal_selected_index = quantity_names.indexOf(
+                    horizontal),
+            vertical_selected_index = quantity_names.indexOf(
+                    vertical),
+            create_option = function(selected_index) {
+                return function(quantity_name, index) {
+                    var option = {
+                        name: "option",
+                        value: quantity_name
+                    };
+                    if (index === selected_index) {
+                        option.attributes = {
+                            selected: true
+                        };
+                    }
+                    return option;
+                };
+            },
+            horizontal_quantity_list = quantity_names.map(
+                    create_option(horizontal_selected_index)),
+            vertical_quantity_list = quantity_names.map(
+                    create_option(vertical_selected_index));
+
+        var create_action = function(action) {
+                var attributes = {
+                        "class": "action",
+                        "data-action": action.name
+                    };
+
+                    if (current_action === action.name) {
+                        attributes["data-toggled"] = true;
+                    }
+                    return {
+                        name: "button",
+                        attributes: attributes,
+                        children: [{
+                            name: "i",
+                            attributes: {
+                               "class": action.icon
+                            }
+                        }],
+                        on: {
+                            type: "click",
+                            callback: toggle_action(action)
+                        }
+
+                    };
+        };
+        var actions_elts = mouse_actions.map(create_action);
+
+        _graph.fragment.appendChild(dom.create({
+                name: "figcaption",
+                children: [
+                {
+                    name: "select",
+                    children: horizontal_quantity_list,
+                    on: {
+                        type: "change",
+                        callback: function(event) {
+                            var quantity = event.target.value;
+                            set_axis(quantity, "horizontal");
+                        }
+                    }
+                }, 
+                {
+                    name: "textNode",
+                    value: " - "
+                }, 
+                {
+                    name: "select",
+                    attributes: {
+
+                    },
+                    children: vertical_quantity_list,
+                    on: {
+                        type: "change",
+                        callback: function(event) {
+                            var quantity = event.target.value;
+                            set_axis(quantity, "vertical");
+                        }
+                    }
+                },
+                {
+                    name: "textNode",
+                    value: " grafiek — "
+                } 
+                ].concat(actions_elts)
+            }));
+    }
+    create_caption();
+
     var svg = d3.select(_graph.fragment).append("svg")
             .attr("width", CONTAINER.width)
             .attr("height", CONTAINER.height)
@@ -77,7 +226,6 @@ var graph = function(config_, horizontal_, vertical_, dimensions_) {
                         MARGINS.left + "," + 
                         MARGINS.right + ")");
 
-    var horizontal_axis, vertical_axis;
 
     var showline = true,
         showtailpoints = false;
@@ -139,8 +287,10 @@ var graph = function(config_, horizontal_, vertical_, dimensions_) {
                 .attr("stroke", "black")
                 .attr("fill", "white")
                 .style("stroke-width", 1.5)
-                .on("mouseover", add_tooltip(model_name))
-                .on("mouseout", remove_tooltip(model_name))
+                .on("mouseover.tooltip", add_tooltip(model_name))
+                .on("mouseout.tooltip", remove_tooltip(model_name))
+                .on("mouseover.tangent_triangle", add_tangent_triangle(model_name))
+                .on("mouseout.tangent_triangle", remove_tangent_triangle(model_name))
                 ;
 
         model_tailpoints = _graph.fragment
@@ -189,9 +339,13 @@ var graph = function(config_, horizontal_, vertical_, dimensions_) {
                 .attr("fill", "none")
                 .attr("stroke", model.color || "red")
                 .style("stroke-width", 3)
-                .on("mouseover", add_tooltip(model_name))
-                .on("mousemove", add_tooltip(model_name))
-                .on("mouseout", remove_tooltip(model_name));
+                .on("mouseover.tooltip", add_tooltip(model_name))
+                .on("mousemove.tooltip", add_tooltip(model_name))
+                .on("mouseout.tooltip", remove_tooltip(model_name))
+                .on("mouseover.tangent_triangle", add_tangent_triangle(model_name))
+                .on("mousemove.tangent_triangle", add_tangent_triangle(model_name))
+                .on("mouseout.tangent_triangle", remove_tangent_triangle(model_name))
+                ;
 
         model_line = _graph.fragment
             .querySelector("svg g.lines g.line." + model_name);
@@ -245,74 +399,101 @@ var graph = function(config_, horizontal_, vertical_, dimensions_) {
     }
 
 
-    function create_caption() {
-        var get_name = function(q) {
-                return _graph.quantities[q].name;
-            },
-            quantity_names = Object.keys(_graph.quantities),
-            horizontal_selected_index = quantity_names.indexOf(
-                    horizontal),
-            vertical_selected_index = quantity_names.indexOf(
-                    vertical),
-            create_option = function(selected_index) {
-                return function(quantity_name, index) {
-                    var option = {
-                        name: "option",
-                        value: quantity_name
-                    };
-                    if (index === selected_index) {
-                        option.attributes = {
-                            selected: true
-                        };
+
+    var tangent_triangle = svg
+        .append("g")
+        .classed("tangent_triangle", true);
+    tangent_triangle.append("line")
+        .classed("tangent", true)
+        .style({
+            "stroke-width": 3,
+            "stroke": "crimson"
+        });
+
+    function add_tangent_triangle(model_name) {
+        return function(d, i) {
+            var container = _graph.fragment.querySelector("svg > g"),
+                path = d3.event.target || d3.event.srcElement,
+                point = d3.mouse(container);
+
+
+            var length_at_point = 0,
+                total_length = path.getTotalLength(),
+                INTERVAL = 50;
+
+            while (path.getPointAtLength(length_at_point).x < point[0] && 
+                    length_at_point < total_length) {
+                        length_at_point += INTERVAL;
                     }
-                    return option;
+
+            length_at_point -= INTERVAL;
+
+            while (path.getPointAtLength(length_at_point).x < point[0] && 
+                    length_at_point < total_length) {
+                        length_at_point++;
+                    }
+
+
+            var x_scale = horizontal_axis.scale,
+                x_quantity = horizontal_axis.quantity,
+                y_scale = vertical_axis.scale,
+                y_quantity = vertical_axis.quantity,
+                x_unit = x_quantity.unit,
+                y_unit = y_quantity.unit,
+                cur = {
+                    x: x_scale.invert(point[0]).toFixed(x_quantity.precision || 0),
+                    y: y_scale.invert(point[1]).toFixed(y_quantity.precision || 0)
                 };
-            },
-            horizontal_quantity_list = quantity_names.map(
-                    create_option(horizontal_selected_index)),
-            vertical_quantity_list = quantity_names.map(
-                    create_option(vertical_selected_index));
 
-        _graph.fragment.appendChild(dom.create({
-                name: "figcaption",
-                children: [
-                {
-                    name: "select",
-                    children: horizontal_quantity_list,
-                    on: {
-                        type: "change",
-                        callback: function(event) {
-                            var quantity = event.target.value;
-                            set_axis(quantity, "horizontal");
-                        }
-                    }
-                }, 
-                {
-                    name: "textNode",
-                    value: " - "
-                }, 
-                {
-                    name: "select",
-                    attributes: {
+            var prev,
+                next,
+                delta;
 
-                    },
-                    children: vertical_quantity_list,
-                    on: {
-                        type: "change",
-                        callback: function(event) {
-                            var quantity = event.target.value;
-                            set_axis(quantity, "vertical");
-                        }
-                    }
-                },
-                {
-                    name: "textNode",
-                    value: " grafiek"
-                }            
-                ]
-            }));
+            if (length_at_point > 1 && length_at_point < (total_length - 1)) {
+                prev = path.getPointAtLength(length_at_point - 0.1);
+                next = path.getPointAtLength(length_at_point + 0.1);
+                delta = {
+                    x: next.x - prev.x,
+                    y: next.y - prev.y
+                };
+                console.log(prev, next, delta, point);
+            } else {
+
+                // don't worry about the first
+                // and last pixel or so
+                return;
+            }
+
+        
+
+
+            var tangent = tangent_triangle.select("g.tangent_triangle line.tangent");
+
+            var LENGTH = 200;
+
+            point = path.getPointAtLength(length_at_point);
+            var x1 = point.x - delta.x * LENGTH,
+                y1 = point.y - delta.y * LENGTH,
+                x2 = point.x + delta.x * LENGTH,
+                y2 = point.y + delta.y * LENGTH;
+
+console.log(x1, y1, x2, y2);
+            tangent.attr("x1", x1)
+                .attr("y1", y1)
+                .attr("x2", x2)
+                .attr("y2", y2);
+
+
+            svg.select("g.tangent_triangle").style("opacity", 1);
+        };
     }
-    create_caption();
+
+    function remove_tangent_triangle(model_name) {
+        return function() {
+            var tangent_triangle = svg.select("g.tangent_triangle");
+            tangent_triangle.style("opacity", 0);
+        };
+    }
 
 
     function set_axis(quantity_name, orientation) {
@@ -448,6 +629,9 @@ var graph = function(config_, horizontal_, vertical_, dimensions_) {
             .attr("class", "lines");
         svg.append("g")
             .attr("class", "tailpoints");
+
+        tangent_triangle.style("visibility", "hidden");
+
 
     }
     create_graph();

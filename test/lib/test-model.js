@@ -1,1171 +1,4 @@
 ;(function(e,t,n){function i(n,s){if(!t[n]){if(!e[n]){var o=typeof require=="function"&&require;if(!s&&o)return o(n,!0);if(r)return r(n,!0);throw new Error("Cannot find module '"+n+"'")}var u=t[n]={exports:{}};e[n][0].call(u.exports,function(t){var r=e[n][1][t];return i(r?r:t)},u,u.exports)}return t[n].exports}var r=typeof require=="function"&&require;for(var s=0;s<n.length;s++)i(n[s]);return i})({1:[function(require,module,exports){
-/*
- * Copyright (C) 2013 Huub de Beer
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- */
-
-/*
- *  equation.js is a model based on a simple equation like y = x^2
- */
-
-var equation_model = function(name, config) {
-    var _model = require("./model")(name, config),
-        f = config.equation;
-
-    _model.measure_moment =  function(moment) {
-        var x = moment / 10,
-            y = f(x),
-            time = _model.moment_to_time(moment) / 1000;
-        return {
-            x: x,
-            y: y,
-            time: time
-        };
-    };
-
-    return _model;
-};
-
-module.exports = equation_model;
-
-
-},{"./model":2}],2:[function(require,module,exports){
-(function(){/*
- * Copyright (C) 2013 Huub de Beer
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- */
-
-var model = function(name, config) {
-    "use strict";
-
-    var _model = {name: name},
-        _appendix = {};
-
-
-    // ## Data invariant and initialization
-    //
-    // This model describes a dynamic phenomenon in terms of changing
-    // quantities over time.
-    //
-    //
-    // This description starts at `T_START` milliseconds
-    // (ms), defaulting to 0 ms and ends at `T_END` ms. If no end is specified
-    // it is assumed that the phenomenon does not end or is still ongoing in
-    // the real world (RW). The phenomenon's change is tracked by "measuring"
-    // the changing quantities at consecutive moments in time. These moments
-    // are `T_STEP` apart, defaulting to 1 ms, and are tracked by order
-    // number.
-
-    var T_START     = config.time.start     || 0,
-        T_END       = config.time.end       || Infinity,
-        T_STEP      = config.time.step      || 1;
-
-    function set_end(seconds) {
-        T_END = seconds*1000;
-    }
-    _model.set_end = set_end;
-
-    // To translate from a moment's order number to its corresponding time in
-    // ms and vice versa, two helper functions are defined, `time_to_moment`
-    // and `moment_to_time`, as well as a shorthand name for these two helper
-    // functions, respectively, `t2m` and `m2t`.
-
-    _model.time_to_moment = function(time) {
-        return Math.floor(time / T_STEP); 
-    };
-    var t2m = _model.time_to_moment;
-
-    _model.moment_to_time = function(moment) {
-        return moment * T_STEP;
-    };
-    var m2t = _model.moment_to_time;
-
-    // When I use "measured" I mean to denote that the values of the
-    // quantities describing the phenomenon have been captured, computed,
-    // downloaded, measured, or otherwise obtained. This `model` function is
-    // intended to be applicable for describing purely theoretical models of a
-    // phenomenon as well as real-time measurements of a phenomenon.
-    //
-    // "Measuring" a moment is left to the `measure_moment` function. Each
-    // model has to (re)implement this function to specify the relationship
-    // between the phenomenon's quantities of interest at each moment during
-    // the phenomenon.
-
-    _model.measure_moment = function(moment) {
-        // to be implemented in an object implementing model
-    };
-
-
-    // The model has the following data invariant:
-    //
-    //   (∀m: 0 ≤ m ≤ |`moments`|: `moment_computed`(`moments`[m]))
-    //
-    // stating that the phenomenon has been described quantitatively for all
-    // moments. These "measurements" are stored in a list of `moments` and can
-    // be accessed through a moment's order number.
-
-    var moments = [];
-
-    _model.get_moment = function(moment) {
-        return moments[moment];
-    };
-
-    _model.number_of_moments = function() {
-        return moments.length;
-    };
-
-
-    // A moment can only be inspected if it already has been "measured".
-    // Following the data invariant, a moment has been measured when its order
-    // number is smaller or equal to the number of measured moments.
-    
-    _model.moment_measured = function(moment) {
-        return (moment <= (moments.length - 1));
-    };
-
-    // Furthermore, the current moment of interest, or `now`, points to an
-    // already "measured" moment during the phenomenon's duration. Hence, the
-    // data invariant is extended as follows:
-    //
-    //   `t2m`(`T_START`) ≤ `now` ≤ `t2m`(`T_END`) → `moment_computed`(`now`)
-
-    var now;
-
-    // To ensure this data invariant, `now` is set to a moment before the
-    // phenomenon started. 
-
-    now = t2m(T_START) - 1;
-
-    // ## Inspecting and running a model
-
-    // Inspection through registerd views
-
-    var views = [];
-    var update_views = function() {
-        var update_view = function(view) {
-            if (view.update_all) {
-                view.update_all();
-            }
-            view.update(_model.name);
-        };
-        views.forEach(update_view);
-    };
-    _model.update_views = update_views;
-
-    _model.register = function(view) {
-        var view_found = views.indexOf(view);
-        if (view_found === -1) {
-            views.push(view);
-        }
-    };
-
-    _model.get_views_of_type = function(view_type) {
-        return views.filter(function(v) {
-            return v.type === view_type;
-        });
-    };
-
-    _model.unregister = function(view) {
-        if (arguments.length === 0) {
-            var unregister = function(view) {
-                view.unregister(_model.name);
-            };
-            views.forEach(unregister);
-        } else {
-            var view_found = views.indexOf(view);
-            if (view_found !== -1) {
-                views.slice(view_found, 1);
-            }
-        }
-    };
-
-    // As a model can be inspected repeatedly, as is one
-    // of the reasons to model a phenomenon using a computer, we introduce a
-    // `reset` function to resets `now` to a moment before the phenomenon
-    // started.
-
-    _model.reset = function() {
-        now = t2m(T_START) - 1;
-        _model.step();
-        update_views();
-    };
-
-
-
-    // Once a model has been started, the current moment will be measured as
-    // well as all moments before since the start. These moments can be
-    // inspected.
-    //
-    _model.has_started = function() {
-        return now >= 0;
-    };
-
-    // The `step` function will advance `now` to the next moment if the end of
-    // the phenomenon has not been reached yet. If that moment has not been
-    // "measured" earlier, "measure" it now.
-
-    _model.step = function(do_not_update_views) {
-        if (m2t(now) + T_STEP <= T_END) {
-            now++;
-            if (!_model.moment_measured(now)) {
-                var moment = _model.measure_moment(now);
-                moment._time_ = m2t(now);
-                moments.push(moment);
-            }
-        }
-        if (!do_not_update_views) {
-            update_views();
-        }
-        return now;
-    };
-
-    // If the phenomenon is a finite process or the "measuring" process cannot
-    // go further `T_END` will have a value that is not `Infinity`.
-
-    _model.can_finish = function() {
-        return Math.abs(T_END) !== Infinity;
-    };
-
-    // To inspect the whole phenomenon at once or inspect the last moment,
-    // `finish`ing the model will ensure that all moments during the
-    // phenomenon have been "measured".
-
-    _model.finish = function() {
-        var DO_NOT_UPDATE_VIEWS = true;
-        if (_model.can_finish()) {
-            while ((moments.length - 1) < t2m(T_END)) {
-                _model.step(DO_NOT_UPDATE_VIEWS);
-            }
-        }
-        now = moments.length - 1;
-        _model.update_views();
-        return now;
-    };
-
-    // We call the model finished if the current moment, or `now`, is the
-    // phenomenon's last moment.
-
-    _model.is_finished = function() {
-        return _model.can_finish() && m2t(now) >= T_END;
-    };
-
-    function reset_model() {
-        moments = [];
-        _model.reset();
-    }
-    _model.reset_model = reset_model;
-
-    /** 
-     * ## Actions on the model
-     *
-     */
-    _model.actions = {};
-    _model.add_action = function( action ) {
-        _model.actions[action.name] = action;
-        _model.actions[action.name].install = function() {
-            return action.callback(_model);
-        };
-    };
-    if (config.actions) {
-        var add_action = function(action_name) {
-            _model.add_action(config.actions[action_name]);
-        };
-        Object.keys(config.actions).forEach(add_action);
-    }
-    _model.action = function( action_name ) {
-        if (_model.actions[action_name]) {
-            return _model.actions[action_name];
-        }
-    };
-    _model.remove_action = function( action ) {
-        if (_model.actions[action.name]) {
-            delete _model.actions[action.name];
-        }
-    };
-    _model.disable_action = function( action_name ) {
-        if (_model.actions[action_name]) {
-            _model.actions[action_name].enabled = false;
-        }
-    };
-    _model.enable_action = function( action_name ) {
-        if (_model.actions[action_name]) {
-            _model.actions[action_name].enabled = true;
-        }
-    };
-    _model.toggle_action = function( action_name ) {
-        if (_model.actions[action_name]) {
-            _model.actions[action_name].enabled = 
-                !_model.action[action_name].enabled;
-        }
-    };
-
-           
-    // ## Coordinating quantities
-    //
-    // All quantities that describe the phenomenon being modeled change in
-    // coordination with time's change. Add the model's time as a quantity to
-    // the list with quantities. To allow people to model time as part of
-    // their model, for example to describe the phenomenon accelerated, the
-    // internal time is added as quantity `_time_` and, as a result, "_time_"
-    // is not allowed as a quantity name.
-
-    _model.quantities = config.quantities || {};
-    
-    _model.quantities._time_ = {
-        hidden: true,
-        minimum: T_START,
-        maximum: T_END,
-        value: m2t(now),
-        stepsize: T_STEP,
-        unit: "ms",
-        label: "internal time",
-        monotone: true
-    };
-
-
-    _model.get_minimum = function(quantity) {
-        if (arguments.length===0) {
-            // called without any arguments: return all minima
-            var minima = {},
-                add_minimum = function(quantity) {
-                    minima[quantity] = _model.quantities[quantity].minimum;
-                };
-
-            Object.keys(_model.quantities).forEach(add_minimum);
-            return minima;
-        } else {
-            // return quantity's minimum
-            return _model.quantities[quantity].minimum;
-        }
-    };
-                    
-    _model.get_maximum = function(quantity) {
-        if (arguments.length===0) {
-            // called without any arguments: return all minima
-            var maxima = {},
-                add_maximum = function(quantity) {
-                    maxima[quantity] = _model.quantities[quantity].maximum;
-                };
-
-            Object.keys(_model.quantities).forEach(add_maximum);
-            return maxima;
-        } else {
-            // return quantity's minimum
-            return _model.quantities[quantity].maximum;
-        }
-    };
-
-
-    _model.find_moment = function(quantity, value, EPSILON) {
-        if (moments.length === 0) {
-            // no moment are measured yet, so there is nothing to be found
-
-            return -1;
-        } else {
-            var val = _appendix.quantity_value(quantity);
-
-            // pre: quantity is monotone
-            // determine if it is increasing or decreasing
-            // determine type of monotone
-            //
-            // As the first moment has been measured and we do know the
-            // minimum of this quantity, type of monotone follows.
-
-            var start = val(0),
-                INCREASING = (start === _model.get_minimum(quantity));
-
-            // Use a stupid linear search to find the moment that approaches the
-            // value best
-
-
-            var m = 0,
-                n = moments.length - 1,
-                approx = _appendix.approximates(EPSILON),
-                lowerbound,
-                upperbound;
-
-
-            if (INCREASING) {
-                lowerbound = function(moment) {
-                    return val(moment) < value;
-                };
-                upperbound = function(moment) {
-                    return val(moment) > value;
-                };
-            } else {
-                lowerbound = function(moment) {
-                    return val(moment) > value;
-                };
-                upperbound = function(moment) {
-                    return val(moment) < value;
-                };
-            }
-
-            // Increasing "function", meaning
-            //
-            //  (∀m: 0 ≤ m < |`moments`|: `val`(m) <= `val`(m+1))
-            //
-            // Therefore,
-            //
-            //  (∃m, n: 0 ≤ m < n ≤ |`moments`|: 
-            //      `val`(m) ≤ value ≤ `val`(n) ⋀
-            //      (∀p: m < p < n: `val`(p) = value))
-            //
-            // `find_moment` finds those moments m and n and returns the
-            // one closest to value or, when even close, the last moment
-            // decreasing is reverse.
-            
-
-            while (lowerbound(m)) {
-                m++;
-                if (m>n) {
-                    // 
-                    return -1;
-                }
-            }
-            return m;
-            //m--;
-            /*
-            while (upperbound(n)) {
-                n--;
-                if (n<m) {
-                    return -1;
-                }
-            }
-            //n++;
-
-
-            return (Math.abs(val(n)-value) < Math.abs(val(m)-value))?n:m;
-            */
-        }
-    };
-
-
-    _model.get = function(quantity) {
-        if (now < 0) {
-            return undefined;
-        } else {
-            return moments[now][quantity];
-        }
-    };
-    
-    _model.set = function(quantity, value) {
-        var q = _model.quantities[quantity];
-
-        if (value < q.minimum) {
-            value = q.minimum;
-        } else if (value > q.maximum) {
-            value = q.maximum;
-        }
-
-        // q.minimum ≤ value ≤ q.maximum
-
-        // has value already been "measured"?
-        // As some quantities can have the same value more often, there are
-        // potentially many moments that fit the bill. There can be an unknown
-        // amount of moments that aren't measured as well.
-        //
-        // However, some quantities will be strictly increasing or decreasing
-        // and no value will appear twice. For example, the internal time will
-        // only increase. Those quantities with property `monotone`
-        // `true`, only one value will be searched for
-        
-        var approx = _appendix.approximates(),
-            moment = -1;
-        if (q.monotone) {
-            moment = _model.find_moment(quantity, value);
-
-            if (moment === -1) {
-                // not yet "measured"
-                var DO_NOT_UPDATE_VIEWS = true;
-                _model.step(DO_NOT_UPDATE_VIEWS);
-                // THIS DOES WORK ONLY FOR INCREASING QUANTITIES. CHANGE THIS
-                // ALTER WITH FIND FUNCTION !!!!
-                while((moments[now][quantity] < value) && !_model.is_finished()) {
-                    _model.step(DO_NOT_UPDATE_VIEWS);
-                }
-            } else {
-                now = moment;
-            }
-            update_views();
-            return moments[now];
-        }
-    };
-
-    _model.data = function() {
-        return moments.slice(0, now + 1);
-    };
-
-    _model.current_moment = function(moment_only) {
-        if (moment_only) {
-            return now;
-        } else {
-            return moments[now];
-        }
-    };
-
-
-    // ## _appendix H: helper functions
-
-    _appendix.approximates = function(epsilon) {
-            var EPSILON = epsilon || 0.001,
-                fn = function(a, b) {
-                    return Math.abs(a - b) <= EPSILON;
-                };
-            fn.EPSILON = EPSILON;
-            return fn;
-        };
-    _appendix.quantity_value = function(quantity) {
-            return function(moment) {
-                return moments[moment][quantity];
-            };
-        };
-
-
-    var step = config.step_size || 1;
-    function step_size(size) {
-        if (arguments.length === 1) {
-            step = size;
-        }
-        return step;
-    }
-    _model.step_size = step_size;
-
-    function random_color() {
-        var hexes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'],
-            colors = [],
-            i = 0;
-           
-        while (i < 6) {
-            colors.push(hexes[Math.round(Math.random()*(hexes.length - 1))]);
-            i++;
-        }
-        return "#"+ colors.join("");
-    }
-
-    var color = random_color();
-    _model.color = function(c) {
-        if (arguments.length === 1) {
-            if (c === "random") {
-                color = random_color();
-            } else {
-                color = c;
-            }
-        }
-        return color;
-    };
-    return _model;
-};    
-
-
-module.exports = model;
-
-})()
-},{}],3:[function(require,module,exports){
-/*
- * Copyright (C) 2013 Huub de Beer
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- */
-
-var model = require("./model");
-
-
-/**
- * height in cm
- * radius in cm
- * flow_rate in ml/sec
- *
- */
-var longdrink_glass = function(name, config) {
-
-    var radius = config.radius || 2,
-        height = config.height || 7.5,
-        flow_rate = config.flow_rate || 50;
-
-    /**
-     * Compute the volume in ml in the longdrink glass given flow_rate and time the
-     * water has flown in seconds.
-     */
-    function compute_volume(time) {
-        return time * flow_rate;
-    }
-    
-
-    /**
-     * Compute the height of the water in cm given the volume of the water in
-     * the glass in ml.
-     */
-    function compute_height(volume) {
-        var area = Math.PI * Math.pow(radius, 2);
-        if (area > 0) {
-            return volume / area;
-        } else {
-            return 0;
-        }
-    }
-
-    function create_actions(action_list) {
-        var actions = {},
-            create_action = function(action_name) {
-                actions[action_name] = default_actions[action_name];
-            };
-        action_list.forEach(create_action);
-        return actions;
-    }
-
-
-    var quantities = {
-        hoogte: {
-            minimum: 0,
-            maximum: 0,
-            value: 0,
-            unit: 'cm',
-            name: "hoogte",
-            label: "hoogte in cm",
-            stepsize: 0.01,
-            monotone: true,
-            precision: 2
-        },
-        volume: {
-            minimum: 0,
-            maximum: 0,
-            value: 0,
-            unit: 'ml',
-            name: "volume",
-            label: "volume in ml",
-            stepsize: 0.1,
-            monotone: true,
-            precision: 1
-        },
-        tijd: {
-            minimum: 0,
-            maximum: 0,
-            value: 0,
-            unit: 'sec',
-            name: "tijd",
-            label: "tijd",
-            stepsize: 0.01,
-            monotone: true,
-            precision: 2
-        }
-    };
-
-
-    var step = config.step || 10,
-        time = {
-            start: 0,
-            end: quantities.tijd.maximum*1000,
-            step: step
-        },
-        action_list = config.actions || ["start", "pause", "reset", "finish","toggle_line", "toggle_tailpoints", "step_size", "remove"],
-        default_actions = require("../actions/actions")({speed: step});
-    
-    var _model = model(name, {
-        time: time,
-        quantities: quantities,
-        actions: create_actions(action_list)
-    });
-
-
-    function compute_maxima() {
-        var area = Math.PI * Math.pow(radius, 2),
-            time_max = Math.floor(area*height*10 / flow_rate)/10,
-            volume_max = time_max * flow_rate,
-            height_max = volume_max / area;
-
-        _model.set_end(time_max);
-
-        _model.quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
-        _model.quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
-        _model.quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
-    }
-
-    compute_maxima();
-
-    _model.measure_moment = function(moment) {
-        var time_in_ms = _model.moment_to_time(moment),
-            tijd = time_in_ms / 1000,
-            volume = compute_volume(tijd),
-            hoogte = compute_height(volume);
-
-        return {
-            tijd: tijd,
-            volume: volume,
-            hoogte: hoogte
-        };
-    };
-
-    _model.bowl_path = function(SCALE, fill, x_, y_) {
-        var x = x_ || 0,
-            y = y_ || 0,
-            h = height * SCALE * 10;
-        if (fill) {
-            h = _model.get("hoogte") * SCALE * 10;
-            y += height * SCALE * 10 - h;
-        }
-
-        var path = "M" + x + "," + y;
-        path += "v" + h;
-        path += "h" + radius * 2 * SCALE * 10;
-        path += "v-" + h;
-        return path;
-    };
-    _model.base_path = function(SCALE, fill, x_, y_) {
-        return "M0,0";
-    };
-    _model.path = _model.bowl_path;
-
-    _model.step();
-    _model.compute_maxima = compute_maxima;
-    _model.type = "longdrink";
-    _model.height = function(h) {
-        if (arguments.length === 1) {
-            height = h;
-            _model.reset_model();
-            compute_maxima();
-            _model.update_views();
-        }
-        return height;
-    };
-    _model.radius = function(r) {
-        if (arguments.length === 1) {
-            radius = r;
-            _model.reset_model();
-            compute_maxima();
-            _model.update_views();
-        }
-        return radius;
-    };
-    _model.flow_rate = function(fr) {
-        if (arguments.length === 1) {
-            flow_rate = fr;
-            _model.reset_model();
-            compute_maxima();
-            _model.update_views();
-        }
-        return flow_rate;
-    };
-
-    return _model;
-};
-
-module.exports = longdrink_glass;
-
-},{"./model":2,"../actions/actions":4}],4:[function(require,module,exports){
-
-// using http://fortawesome.github.io/Font-Awesome/icons/ for icons
-
-var actions = function(config) {
-    var _actions = {};
-
-
-    // Running model actions
-
-    var running_models = {},
-        current_speed = config.speed || 10;
-
-    _actions.speed = function( speed ) {
-        if (arguments.length === 1) {
-            current_speed = speed;
-        }
-        return current_speed;
-    };
-
-    var is_running =  function(model) {
-        return running_models[model.name];
-    };
-
-    _actions.start = {
-        name: "start",
-        group: "run_model",
-        icon: "icon-play",
-        tooltip: "Start simulation",
-        enabled: true,
-        callback: function(model) {
-           
-            var step = function() {
-                if (!model.is_finished()) {
-                    model.step();
-                } else {
-                    clearInterval(running_models[model.name]);
-                    delete running_models[model.name];
-                    model.disable_action("finish");
-                    model.disable_action("pause");
-                    model.disable_action("start");
-                    model.update_views();
-                }
-            };
-
-            return function() {
-                    if (!is_running(model)) {
-                        running_models[model.name] = setInterval(step, current_speed);
-                    }
-                    model.disable_action("start");
-                    model.enable_action("pause");
-                    model.enable_action("reset");
-                    model.update_views();
-            };
-        }
-    };
-
-    _actions.pause = {
-        name: "pause",
-        group: "run_model",
-        icon: "icon-pause",
-        tooltip: "Pause simulation",
-        enabled: false,
-        callback: function(model) {
-            return function() {
-                if (is_running(model)) {
-                    clearInterval(running_models[model.name]);
-                    delete running_models[model.name];
-                }
-                model.enable_action("start");
-                model.disable_action("pause");
-                model.update_views();
-            };
-        }
-    };
-
-    _actions.reset = {
-        name: "reset",
-        group: "run_model",
-        icon: "icon-fast-backward",
-        tooltip: "Reset simulation",
-        enabled: true,
-        callback: function(model) {
-            return function() {
-                if (is_running(model)) {
-                    clearInterval(running_models[model.name]);
-                    delete running_models[model.name];
-                }
-                model.reset();
-                model.enable_action("start");
-                model.enable_action("finish");
-                model.disable_action("pause");
-                model.disable_action("reset");
-                model.update_views();
-            };
-        }
-    };
-
-    _actions.finish = {
-        name: "finish",
-        group: "run_model",
-        icon: "icon-fast-forward",
-        tooltip: "Finish simulation",
-        enabled: true,
-        callback: function(model) {
-            return function() {
-                if (is_running(model)) {
-                    clearInterval(running_models[model.name]);
-                    delete running_models[model.name];
-                }
-                model.finish();
-                model.disable_action("pause");
-                model.disable_action("start");
-                model.disable_action("finish");
-                model.enable_action("reset");
-                model.update_views();
-            };
-        }
-    };
-
-    // Remove model actions
-    
-    _actions.remove = {
-        name: "remove",
-        group: "edit",
-        icon: "icon-remove",
-        tooltip: "Remove this model",
-        enabled: true,
-        callback: function(model) {
-            return function() {
-                model.unregister();
-            };
-        }
-    };
-
-    // Toggle view action
-
-    _actions.toggle_line = {
-        name: "toggle_line",
-        group: "toggle_view",
-        icon: "icon-picture",
-        tooltip: "Show/hide the line graph of this model",
-        enabled: true,
-        toggled: true,
-        callback: function(model) {
-            return function() {
-                if (this.hasAttribute("data-toggled")) {
-                    this.removeAttribute("data-toggled");
-                    model.get_views_of_type("graph")[0].hide_line(model.name);
-                } else {
-                    this.setAttribute("data-toggled", true);
-                    model.get_views_of_type("graph")[0].show_line(model.name);
-                }
-            };
-        }
-    };
-
-    _actions.toggle_tailpoints = {
-        name: "toggle_tailpoints",
-        group: "toggle_view",
-        icon: "icon-bar-chart",
-        tooltip: "Show/hide the tailpoints graph of this model",
-        enabled: true,
-        toggled: false,
-        callback: function(model) {
-            return function() {
-                if (this.hasAttribute("data-toggled")) {
-                    this.removeAttribute("data-toggled");
-                    model.get_views_of_type("graph")[0].hide_tailpoints(model.name);
-                } else {
-                    this.setAttribute("data-toggled", true);
-                    model.get_views_of_type("graph")[0].show_tailpoints(model.name);
-                }
-            };
-        }
-    };
-
-
-    _actions.step_size = {
-        name: "step_size",
-        group: "step_size",
-        tooltip: "Set the step size of the tailpoint graph",
-        enabled: true,
-        type: "slider",
-        callback: function(model) {
-            return function() {
-                model.step_size(this.value);
-
-                var update_tailpoints = function(graph) {
-                    graph.update(model.name);
-                };
-                model.get_views_of_type("graph").forEach(update_tailpoints);
-            };
-        }
-    };
-
-
-    return _actions;
-};
-
-module.exports = actions;
-
-},{}],5:[function(require,module,exports){
-
-var raphael = require("raphael-browserify");
-
-function start_of_path(path) {
-    return raphael.getPointAtLength(path, 0);
-}
-
-function end_of_path(path) {
-    return raphael.getPointAtLength(path,
-            raphael.getTotalLength());
-}
-
-function complete_path(part, fill_length) {
-    var start = part.top,
-        end = part.bottom,
-        path = part.path;
-    
-    if (fill_length) {
-        path = "m" + start.x + "," + start.y + path;
-        start = raphael.getPointAtLength(path, fill_length);
-
-        var total_length = raphael.getTotalLength(path);
-
-        path = raphael.getSubpath(path, fill_length, total_length);
-        path = raphael.pathToRelative(path);
-        path.shift(); // remove the M command
-        path = path.toString();
-    }
-   
-    var segments = raphael.parsePathString(path),
-        completed_path = "m" + start.x + "," + start.y + path;
-
-
-    completed_path += "h-" +(Math.abs(0 - end.x) * 2);
-
-    var mirror_segment = function(segment) {
-        var command = segment[0],
-            x,y, cp1, cp2,
-            mirrored_segment = "";
-
-        switch (command) {
-            case "l":
-                x = segment[1];
-                y = segment[2];
-                mirrored_segment = "l" + x + "," + (-y);
-                start = {
-                    x: start.x + x,
-                    y: start.y + y
-                };
-                break;
-            case "c":
-                cp1 = {
-                    x: segment[1],
-                    y: segment[2]
-                };
-                cp2 = {
-                    x: segment[3],
-                    y: segment[4]
-                };
-
-                x = segment[5];
-                y = segment[6];
-                end = {
-                    x: x,
-                    y: y
-                };
-                mirrored_segment = "c" + (end.x - cp2.x) + "," + (-(end.y - cp2.y)) + "," +
-                    (end.x - cp1.x) + "," + (-(end.y - cp1.y)) + "," + 
-                    (x) + "," + (-y);
-                start = {
-                    x: start.x + x,
-                    y: start.y + y
-                };
-                break;
-            case "v":
-                y = segment[1];
-                mirrored_segment = "v" + (-y);
-                start = {
-                    x: start.x,
-                    y: start.y + y
-                };
-                break;
-            case "h":
-                x = segment[1];
-                mirrored_segment = "h" + x;
-                start = {
-                    x: start.x + x,
-                    y: start.y
-                };
-                break;
-            case "m":
-                // skip
-
-                break;
-        }
-
-        return mirrored_segment;
-    };
-
-    completed_path += segments.map(mirror_segment).reverse().join("");
-
-
-    return completed_path;
-}
-
-function scale_shape(shape, scale_) {
-    var model_scale = shape.scale,
-        factor = scale_/model_scale;
-
-    var scale = function(number) {
-            return number * factor;
-        };
-
-    function scale_path(path, factor) {
-        var path_segments = raphael.parsePathString(path),
-            scale_segment = function(segment) {
-                var segment_arr = segment,
-                    command = segment_arr.shift();
-
-                return command + segment_arr.map(scale).join(",");
-            };
-
-        return path_segments.map(scale_segment).join("");
-    }
-
-    return {
-        base: {
-            path: scale_path(shape.base.path, factor),
-            bottom: {
-                x: scale(shape.base.bottom.x),
-                y: scale(shape.base.bottom.y)
-            },
-            top: {
-                x: scale(shape.base.top.x),
-                y: scale(shape.base.top.y)
-            }
-        },
-        bowl: {
-            path: scale_path(shape.bowl.path, factor),
-            bottom: {
-                x: scale(shape.bowl.bottom.x),
-                y: scale(shape.bowl.bottom.y)
-            },
-            top: {
-                x: scale(shape.bowl.top.x),
-                y: scale(shape.bowl.top.y)
-            }
-        },
-        scale: scale_,
-        factor: factor
-    };
-}
-
-module.exports = {
-    start: start_of_path,
-    end: end_of_path,
-    complete_path: complete_path,
-    scale_shape: scale_shape
-};
-
-},{"raphael-browserify":6}],6:[function(require,module,exports){
 // Browserify modifications by Brenton Partridge, released into the public domain
 
 // BEGIN BROWSERIFY MOD
@@ -7025,7 +5858,348 @@ if (typeof module !== 'undefined') {
     module.exports = Raphael;
 }
 
-},{}],7:[function(require,module,exports){
+},{}],2:[function(require,module,exports){
+
+// using http://fortawesome.github.io/Font-Awesome/icons/ for icons
+
+var actions = function(config) {
+    var _actions = {};
+
+
+    // Running model actions
+
+    var running_models = {},
+        current_speed = config.speed || 10;
+
+    _actions.speed = function( speed ) {
+        if (arguments.length === 1) {
+            current_speed = speed;
+        }
+        return current_speed;
+    };
+
+    var is_running =  function(model) {
+        return running_models[model.name];
+    };
+
+    _actions.start = {
+        name: "start",
+        group: "run_model",
+        icon: "icon-play",
+        tooltip: "Start simulation",
+        enabled: true,
+        callback: function(model) {
+           
+            var step = function() {
+                if (!model.is_finished()) {
+                    model.step();
+                } else {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                    model.disable_action("finish");
+                    model.disable_action("pause");
+                    model.disable_action("start");
+                    model.update_views();
+                }
+            };
+
+            return function() {
+                    if (!is_running(model)) {
+                        running_models[model.name] = setInterval(step, current_speed);
+                    }
+                    model.disable_action("start");
+                    model.enable_action("pause");
+                    model.enable_action("reset");
+                    model.update_views();
+            };
+        }
+    };
+
+    _actions.pause = {
+        name: "pause",
+        group: "run_model",
+        icon: "icon-pause",
+        tooltip: "Pause simulation",
+        enabled: false,
+        callback: function(model) {
+            return function() {
+                if (is_running(model)) {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                }
+                model.enable_action("start");
+                model.disable_action("pause");
+                model.update_views();
+            };
+        }
+    };
+
+    _actions.reset = {
+        name: "reset",
+        group: "run_model",
+        icon: "icon-fast-backward",
+        tooltip: "Reset simulation",
+        enabled: true,
+        callback: function(model) {
+            return function() {
+                if (is_running(model)) {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                }
+                model.reset();
+                model.enable_action("start");
+                model.enable_action("finish");
+                model.disable_action("pause");
+                model.disable_action("reset");
+                model.update_views();
+            };
+        }
+    };
+
+    _actions.finish = {
+        name: "finish",
+        group: "run_model",
+        icon: "icon-fast-forward",
+        tooltip: "Finish simulation",
+        enabled: true,
+        callback: function(model) {
+            return function() {
+                if (is_running(model)) {
+                    clearInterval(running_models[model.name]);
+                    delete running_models[model.name];
+                }
+                model.finish();
+                model.disable_action("pause");
+                model.disable_action("start");
+                model.disable_action("finish");
+                model.enable_action("reset");
+                model.update_views();
+            };
+        }
+    };
+
+    // Remove model actions
+    
+    _actions.remove = {
+        name: "remove",
+        group: "edit",
+        icon: "icon-remove",
+        tooltip: "Remove this model",
+        enabled: true,
+        callback: function(model) {
+            return function() {
+                model.unregister();
+            };
+        }
+    };
+
+    // Toggle view action
+
+    _actions.toggle_line = {
+        name: "toggle_line",
+        group: "toggle_view",
+        icon: "icon-picture",
+        tooltip: "Show/hide the line graph of this model",
+        enabled: true,
+        toggled: true,
+        callback: function(model) {
+            return function() {
+                if (this.hasAttribute("data-toggled")) {
+                    this.removeAttribute("data-toggled");
+                    model.get_views_of_type("graph")[0].hide_line(model.name);
+                } else {
+                    this.setAttribute("data-toggled", true);
+                    model.get_views_of_type("graph")[0].show_line(model.name);
+                }
+            };
+        }
+    };
+
+    _actions.toggle_tailpoints = {
+        name: "toggle_tailpoints",
+        group: "toggle_view",
+        icon: "icon-bar-chart",
+        tooltip: "Show/hide the tailpoints graph of this model",
+        enabled: true,
+        toggled: false,
+        callback: function(model) {
+            return function() {
+                if (this.hasAttribute("data-toggled")) {
+                    this.removeAttribute("data-toggled");
+                    model.get_views_of_type("graph")[0].hide_tailpoints(model.name);
+                } else {
+                    this.setAttribute("data-toggled", true);
+                    model.get_views_of_type("graph")[0].show_tailpoints(model.name);
+                }
+            };
+        }
+    };
+
+
+    _actions.step_size = {
+        name: "step_size",
+        group: "step_size",
+        tooltip: "Set the step size of the tailpoint graph",
+        enabled: true,
+        type: "slider",
+        callback: function(model) {
+            return function() {
+                model.step_size(this.value);
+
+                var update_tailpoints = function(graph) {
+                    graph.update(model.name);
+                };
+                model.get_views_of_type("graph").forEach(update_tailpoints);
+            };
+        }
+    };
+
+
+    return _actions;
+};
+
+module.exports = actions;
+
+},{}],3:[function(require,module,exports){
+/*
+ * Copyright (C) 2013 Huub de Beer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+var dom = {
+    create: function(spec) {
+        var elt;
+       
+        if (spec.name === "textNode") {
+           elt = document.createTextNode(spec.value);
+        } else {
+           elt = document.createElement(spec.name);
+        }
+
+        var set_attribute = function(attr) {
+                elt.setAttribute(attr, spec.attributes[attr]);
+            };
+
+        if (spec.attributes) {
+            Object.keys(spec.attributes).forEach(set_attribute);
+        }
+
+        if (spec.children) {
+            var append = function(child) {
+                elt.appendChild(dom.create(child));
+            };
+            spec.children.forEach(append);
+        }
+
+        if (spec.on) {
+            if (typeof spec.on === "Array") {
+                spec.on.forEach(function(on) {
+                    elt.addEventListener( on.type, on.callback );
+                });
+            } else {
+                elt.addEventListener( spec.on.type, spec.on.callback );
+            }
+        }
+
+        if (spec.value) {
+            if (spec.name === "input") {
+                elt.value = spec.value;
+            } else {
+                elt.innerHTML = spec.value;
+            }
+        }
+
+        if (spec.style) {
+            var set_style = function(style_name) {
+                elt.style[style_name] = spec.style[style_name];
+            };
+            Object.keys(spec.style).forEach(set_style);
+        }
+
+        return elt;
+    },
+    invert_color: function(color) {
+        var R = parseInt(color.slice(1,3), 16),
+            G = parseInt(color.slice(3,5), 16),
+            B = parseInt(color.slice(5,7), 16),
+            inverted_color = "#" +       
+               (255 - R).toString(16) +
+               (255 - G).toString(16) +
+               (255 - B).toString(16);
+
+        console.log(color, inverted_color);
+        return inverted_color;
+    }
+};
+
+module.exports = dom;
+
+},{}],4:[function(require,module,exports){
+/*
+ * Copyright (C) 2013 Huub de Beer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+/*
+ *  equation.js is a model based on a simple equation like y = x^2
+ */
+
+var equation_model = function(name, config) {
+    var _model = require("./model")(name, config),
+        f = config.equation;
+
+    _model.measure_moment =  function(moment) {
+        var x = moment / 10,
+            y = f(x),
+            time = _model.moment_to_time(moment) / 1000;
+        return {
+            x: x,
+            y: y,
+            time: time
+        };
+    };
+
+    return _model;
+};
+
+module.exports = equation_model;
+
+
+},{"./model":7}],5:[function(require,module,exports){
 
 
 var model = require("./model.js");
@@ -7263,7 +6437,7 @@ var glass = function(name, config) {
 module.exports = glass;
 
 
-},{"./model.js":2,"../svg/path":5,"../actions/actions":4,"raphael-browserify":6}],8:[function(require,module,exports){
+},{"../actions/actions":2,"../svg/path":8,"./model.js":7,"raphael-browserify":1}],6:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -7286,102 +6460,1725 @@ module.exports = glass;
  * DEALINGS IN THE SOFTWARE.
  */
 
-var view = function(config) {
-    var _view = {},
+var model = require("./model");
+
+
+/**
+ * height in cm
+ * radius in cm
+ * flow_rate in ml/sec
+ *
+ */
+var longdrink_glass = function(name, config) {
+
+    var radius = config.radius || 2,
+        height = config.height || 7.5,
+        flow_rate = config.flow_rate || 50;
+
+    /**
+     * Compute the volume in ml in the longdrink glass given flow_rate and time the
+     * water has flown in seconds.
+     */
+    function compute_volume(time) {
+        return time * flow_rate;
+    }
+    
+
+    /**
+     * Compute the height of the water in cm given the volume of the water in
+     * the glass in ml.
+     */
+    function compute_height(volume) {
+        var area = Math.PI * Math.pow(radius, 2);
+        if (area > 0) {
+            return volume / area;
+        } else {
+            return 0;
+        }
+    }
+
+    function create_actions(action_list) {
+        var actions = {},
+            create_action = function(action_name) {
+                actions[action_name] = default_actions[action_name];
+            };
+        action_list.forEach(create_action);
+        return actions;
+    }
+
+
+    var quantities = {
+        hoogte: {
+            minimum: 0,
+            maximum: 0,
+            value: 0,
+            unit: 'cm',
+            name: "hoogte",
+            label: "hoogte in cm",
+            stepsize: 0.01,
+            monotone: true,
+            precision: 2
+        },
+        volume: {
+            minimum: 0,
+            maximum: 0,
+            value: 0,
+            unit: 'ml',
+            name: "volume",
+            label: "volume in ml",
+            stepsize: 0.1,
+            monotone: true,
+            precision: 1
+        },
+        tijd: {
+            minimum: 0,
+            maximum: 0,
+            value: 0,
+            unit: 'sec',
+            name: "tijd",
+            label: "tijd",
+            stepsize: 0.01,
+            monotone: true,
+            precision: 2
+        }
+    };
+
+
+    var step = config.step || 10,
+        time = {
+            start: 0,
+            end: quantities.tijd.maximum*1000,
+            step: step
+        },
+        action_list = config.actions || ["start", "pause", "reset", "finish","toggle_line", "toggle_tailpoints", "step_size", "remove"],
+        default_actions = require("../actions/actions")({speed: step});
+    
+    var _model = model(name, {
+        time: time,
+        quantities: quantities,
+        actions: create_actions(action_list)
+    });
+
+
+    function compute_maxima() {
+        var area = Math.PI * Math.pow(radius, 2),
+            time_max = Math.floor(area*height*10 / flow_rate)/10,
+            volume_max = time_max * flow_rate,
+            height_max = volume_max / area;
+
+        _model.set_end(time_max);
+
+        _model.quantities.tijd.maximum = time_max.toFixed(quantities.tijd.precision);
+        _model.quantities.hoogte.maximum = height_max.toFixed(quantities.hoogte.precision);
+        _model.quantities.volume.maximum = volume_max.toFixed(quantities.volume.precision);
+    }
+
+    compute_maxima();
+
+    _model.measure_moment = function(moment) {
+        var time_in_ms = _model.moment_to_time(moment),
+            tijd = time_in_ms / 1000,
+            volume = compute_volume(tijd),
+            hoogte = compute_height(volume);
+
+        return {
+            tijd: tijd,
+            volume: volume,
+            hoogte: hoogte
+        };
+    };
+
+    _model.bowl_path = function(SCALE, fill, x_, y_) {
+        var x = x_ || 0,
+            y = y_ || 0,
+            h = height * SCALE * 10;
+        if (fill) {
+            h = _model.get("hoogte") * SCALE * 10;
+            y += height * SCALE * 10 - h;
+        }
+
+        var path = "M" + x + "," + y;
+        path += "v" + h;
+        path += "h" + radius * 2 * SCALE * 10;
+        path += "v-" + h;
+        return path;
+    };
+    _model.base_path = function(SCALE, fill, x_, y_) {
+        return "M0,0";
+    };
+    _model.path = _model.bowl_path;
+
+    _model.step();
+    _model.compute_maxima = compute_maxima;
+    _model.type = "longdrink";
+    _model.height = function(h) {
+        if (arguments.length === 1) {
+            height = h;
+            _model.reset_model();
+            compute_maxima();
+            _model.update_views();
+        }
+        return height;
+    };
+    _model.radius = function(r) {
+        if (arguments.length === 1) {
+            radius = r;
+            _model.reset_model();
+            compute_maxima();
+            _model.update_views();
+        }
+        return radius;
+    };
+    _model.flow_rate = function(fr) {
+        if (arguments.length === 1) {
+            flow_rate = fr;
+            _model.reset_model();
+            compute_maxima();
+            _model.update_views();
+        }
+        return flow_rate;
+    };
+
+    return _model;
+};
+
+module.exports = longdrink_glass;
+
+},{"../actions/actions":2,"./model":7}],7:[function(require,module,exports){
+(function(){/*
+ * Copyright (C) 2013 Huub de Beer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+var model = function(name, config) {
+    "use strict";
+
+    var _model = {name: name},
         _appendix = {};
 
-    // Quantities to show
-    var show = function(quantity) {
-            return !config.quantities[quantity].hidden;
-        },
-        quantities = {},
-        add_quantity = function(q) {
-            var quantity = config.quantities[q];
-            quantities[quantity.name] = Object.create(quantity);
-        };
-    Object.keys(config.quantities).filter(show).forEach(add_quantity);
-    _view.quantities = quantities;
 
+    // ## Data invariant and initialization
+    //
+    // This model describes a dynamic phenomenon in terms of changing
+    // quantities over time.
+    //
+    //
+    // This description starts at `T_START` milliseconds
+    // (ms), defaulting to 0 ms and ends at `T_END` ms. If no end is specified
+    // it is assumed that the phenomenon does not end or is still ongoing in
+    // the real world (RW). The phenomenon's change is tracked by "measuring"
+    // the changing quantities at consecutive moments in time. These moments
+    // are `T_STEP` apart, defaulting to 1 ms, and are tracked by order
+    // number.
+
+    var T_START     = config.time.start     || 0,
+        T_END       = config.time.end       || Infinity,
+        T_STEP      = config.time.step      || 1;
+
+    function set_end(seconds) {
+        T_END = seconds*1000;
+    }
+    _model.set_end = set_end;
+
+    // To translate from a moment's order number to its corresponding time in
+    // ms and vice versa, two helper functions are defined, `time_to_moment`
+    // and `moment_to_time`, as well as a shorthand name for these two helper
+    // functions, respectively, `t2m` and `m2t`.
+
+    _model.time_to_moment = function(time) {
+        return Math.floor(time / T_STEP); 
+    };
+    var t2m = _model.time_to_moment;
+
+    _model.moment_to_time = function(moment) {
+        return moment * T_STEP;
+    };
+    var m2t = _model.moment_to_time;
+
+    // When I use "measured" I mean to denote that the values of the
+    // quantities describing the phenomenon have been captured, computed,
+    // downloaded, measured, or otherwise obtained. This `model` function is
+    // intended to be applicable for describing purely theoretical models of a
+    // phenomenon as well as real-time measurements of a phenomenon.
+    //
+    // "Measuring" a moment is left to the `measure_moment` function. Each
+    // model has to (re)implement this function to specify the relationship
+    // between the phenomenon's quantities of interest at each moment during
+    // the phenomenon.
+
+    _model.measure_moment = function(moment) {
+        // to be implemented in an object implementing model
+    };
+
+
+    // The model has the following data invariant:
+    //
+    //   (∀m: 0 ≤ m ≤ |`moments`|: `moment_computed`(`moments`[m]))
+    //
+    // stating that the phenomenon has been described quantitatively for all
+    // moments. These "measurements" are stored in a list of `moments` and can
+    // be accessed through a moment's order number.
+
+    var moments = [];
+
+    _model.get_moment = function(moment) {
+        return moments[moment];
+    };
+
+    _model.number_of_moments = function() {
+        return moments.length;
+    };
+
+
+    // A moment can only be inspected if it already has been "measured".
+    // Following the data invariant, a moment has been measured when its order
+    // number is smaller or equal to the number of measured moments.
     
-    // Observer pattern
-
-    var models = {};
-
-    _view.compute_extrema = function() {
-        // WARNING SOMEHOW CHANGES THE QUANTITIES OF THE MODELS ...
-        var compute_maximum = function(quantity_name){
-                return function(max, model_name) {
-                    var model = models[model_name].model;
-                    return Math.max(max, model.get_maximum(quantity_name));
-                };
-            },
-            compute_minimum = function(quantity_name){
-                return function(min, model_name) {
-                    var model = models[model_name].model;
-                    return Math.min(min, model.get_minimum(quantity_name));
-                };
-            },
-            compute_quantity_extrema = function(quantity_name) {
-                var quantity = _view.quantities[quantity_name];
-
-                quantity.minimum = Object.keys(models)
-                    .reduce(compute_minimum(quantity_name), Infinity);
-                quantity.maximum = Object.keys(models)
-                    .reduce(compute_maximum(quantity_name), -Infinity);
-            };
-
-        Object.keys(_view.quantities)
-            .forEach(compute_quantity_extrema);
+    _model.moment_measured = function(moment) {
+        return (moment <= (moments.length - 1));
     };
 
-    _view.register = function(model) {
-        var model_found = Object.keys(models).indexOf(model.name);
-        if (model_found === -1) {
-            models[model.name] = {
-                model: model
-            };
-            _view.compute_extrema();
-            model.register(this);
-            _view.update(model.name);
+    // Furthermore, the current moment of interest, or `now`, points to an
+    // already "measured" moment during the phenomenon's duration. Hence, the
+    // data invariant is extended as follows:
+    //
+    //   `t2m`(`T_START`) ≤ `now` ≤ `t2m`(`T_END`) → `moment_computed`(`now`)
+
+    var now;
+
+    // To ensure this data invariant, `now` is set to a moment before the
+    // phenomenon started. 
+
+    now = t2m(T_START) - 1;
+
+    // ## Inspecting and running a model
+
+    // Inspection through registerd views
+
+    var views = [];
+    var update_views = function() {
+        var update_view = function(view) {
+            if (view.update_all) {
+                view.update_all();
+            }
+            view.update(_model.name);
+        };
+        views.forEach(update_view);
+    };
+    _model.update_views = update_views;
+
+    _model.register = function(view) {
+        var view_found = views.indexOf(view);
+        if (view_found === -1) {
+            views.push(view);
         }
     };
 
-    _view.unregister = function(model_name) {
-        if (models[model_name]) {
-            _view.remove(model_name);
-            models[model_name].model.unregister(this);
-            delete models[model_name];
-            _view.compute_extrema();
-            _view.update_all();
+    _model.get_views_of_type = function(view_type) {
+        return views.filter(function(v) {
+            return v.type === view_type;
+        });
+    };
+
+    _model.unregister = function(view) {
+        if (arguments.length === 0) {
+            var unregister = function(view) {
+                view.unregister(_model.name);
+            };
+            views.forEach(unregister);
+        } else {
+            var view_found = views.indexOf(view);
+            if (view_found !== -1) {
+                views.slice(view_found, 1);
+            }
         }
     };
 
-    _view.get_model = function(model_name) {
-        return models[model_name];
+    // As a model can be inspected repeatedly, as is one
+    // of the reasons to model a phenomenon using a computer, we introduce a
+    // `reset` function to resets `now` to a moment before the phenomenon
+    // started.
+
+    _model.reset = function() {
+        now = t2m(T_START) - 1;
+        _model.step();
+        update_views();
     };
 
-    _view.remove = function(model_name) {
-        // implement in specialized view; called by unregister
+
+
+    // Once a model has been started, the current moment will be measured as
+    // well as all moments before since the start. These moments can be
+    // inspected.
+    //
+    _model.has_started = function() {
+        return now >= 0;
     };
 
-    _view.update_all = function() {
-        Object.keys(models).forEach(_view.update);
+    // The `step` function will advance `now` to the next moment if the end of
+    // the phenomenon has not been reached yet. If that moment has not been
+    // "measured" earlier, "measure" it now.
+
+    _model.step = function(do_not_update_views) {
+        if (m2t(now) + T_STEP <= T_END) {
+            now++;
+            if (!_model.moment_measured(now)) {
+                var moment = _model.measure_moment(now);
+                moment._time_ = m2t(now);
+                moments.push(moment);
+            }
+        }
+        if (!do_not_update_views) {
+            update_views();
+        }
+        return now;
     };
 
-    _view.update = function(model_name) {
-        // implement in specialized view; called by registered model on
-        // change
+    // If the phenomenon is a finite process or the "measuring" process cannot
+    // go further `T_END` will have a value that is not `Infinity`.
+
+    _model.can_finish = function() {
+        return Math.abs(T_END) !== Infinity;
     };
-    _view.models = models;
 
-    _view.type = config.type || "view";
+    // To inspect the whole phenomenon at once or inspect the last moment,
+    // `finish`ing the model will ensure that all moments during the
+    // phenomenon have been "measured".
 
-    return _view;    
+    _model.finish = function() {
+        var DO_NOT_UPDATE_VIEWS = true;
+        if (_model.can_finish()) {
+            while ((moments.length - 1) < t2m(T_END)) {
+                _model.step(DO_NOT_UPDATE_VIEWS);
+            }
+        }
+        now = moments.length - 1;
+        _model.update_views();
+        return now;
+    };
+
+    // We call the model finished if the current moment, or `now`, is the
+    // phenomenon's last moment.
+
+    _model.is_finished = function() {
+        return _model.can_finish() && m2t(now) >= T_END;
+    };
+
+    function reset_model() {
+        moments = [];
+        _model.reset();
+    }
+    _model.reset_model = reset_model;
+
+    /** 
+     * ## Actions on the model
+     *
+     */
+    _model.actions = {};
+    _model.add_action = function( action ) {
+        _model.actions[action.name] = action;
+        _model.actions[action.name].install = function() {
+            return action.callback(_model);
+        };
+    };
+    if (config.actions) {
+        var add_action = function(action_name) {
+            _model.add_action(config.actions[action_name]);
+        };
+        Object.keys(config.actions).forEach(add_action);
+    }
+    _model.action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            return _model.actions[action_name];
+        }
+    };
+    _model.remove_action = function( action ) {
+        if (_model.actions[action.name]) {
+            delete _model.actions[action.name];
+        }
+    };
+    _model.disable_action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            _model.actions[action_name].enabled = false;
+        }
+    };
+    _model.enable_action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            _model.actions[action_name].enabled = true;
+        }
+    };
+    _model.toggle_action = function( action_name ) {
+        if (_model.actions[action_name]) {
+            _model.actions[action_name].enabled = 
+                !_model.action[action_name].enabled;
+        }
+    };
+
+           
+    // ## Coordinating quantities
+    //
+    // All quantities that describe the phenomenon being modeled change in
+    // coordination with time's change. Add the model's time as a quantity to
+    // the list with quantities. To allow people to model time as part of
+    // their model, for example to describe the phenomenon accelerated, the
+    // internal time is added as quantity `_time_` and, as a result, "_time_"
+    // is not allowed as a quantity name.
+
+    _model.quantities = config.quantities || {};
+    
+    _model.quantities._time_ = {
+        hidden: true,
+        minimum: T_START,
+        maximum: T_END,
+        value: m2t(now),
+        stepsize: T_STEP,
+        unit: "ms",
+        label: "internal time",
+        monotone: true
+    };
+
+
+    _model.get_minimum = function(quantity) {
+        if (arguments.length===0) {
+            // called without any arguments: return all minima
+            var minima = {},
+                add_minimum = function(quantity) {
+                    minima[quantity] = _model.quantities[quantity].minimum;
+                };
+
+            Object.keys(_model.quantities).forEach(add_minimum);
+            return minima;
+        } else {
+            // return quantity's minimum
+            return _model.quantities[quantity].minimum;
+        }
+    };
+                    
+    _model.get_maximum = function(quantity) {
+        if (arguments.length===0) {
+            // called without any arguments: return all minima
+            var maxima = {},
+                add_maximum = function(quantity) {
+                    maxima[quantity] = _model.quantities[quantity].maximum;
+                };
+
+            Object.keys(_model.quantities).forEach(add_maximum);
+            return maxima;
+        } else {
+            // return quantity's minimum
+            return _model.quantities[quantity].maximum;
+        }
+    };
+
+
+    _model.find_moment = function(quantity, value, EPSILON) {
+        if (moments.length === 0) {
+            // no moment are measured yet, so there is nothing to be found
+
+            return -1;
+        } else {
+            var val = _appendix.quantity_value(quantity);
+
+            // pre: quantity is monotone
+            // determine if it is increasing or decreasing
+            // determine type of monotone
+            //
+            // As the first moment has been measured and we do know the
+            // minimum of this quantity, type of monotone follows.
+
+            var start = val(0),
+                INCREASING = (start === _model.get_minimum(quantity));
+
+            // Use a stupid linear search to find the moment that approaches the
+            // value best
+
+
+            var m = 0,
+                n = moments.length - 1,
+                approx = _appendix.approximates(EPSILON),
+                lowerbound,
+                upperbound;
+
+
+            if (INCREASING) {
+                lowerbound = function(moment) {
+                    return val(moment) < value;
+                };
+                upperbound = function(moment) {
+                    return val(moment) > value;
+                };
+            } else {
+                lowerbound = function(moment) {
+                    return val(moment) > value;
+                };
+                upperbound = function(moment) {
+                    return val(moment) < value;
+                };
+            }
+
+            // Increasing "function", meaning
+            //
+            //  (∀m: 0 ≤ m < |`moments`|: `val`(m) <= `val`(m+1))
+            //
+            // Therefore,
+            //
+            //  (∃m, n: 0 ≤ m < n ≤ |`moments`|: 
+            //      `val`(m) ≤ value ≤ `val`(n) ⋀
+            //      (∀p: m < p < n: `val`(p) = value))
+            //
+            // `find_moment` finds those moments m and n and returns the
+            // one closest to value or, when even close, the last moment
+            // decreasing is reverse.
+            
+
+            while (lowerbound(m)) {
+                m++;
+                if (m>n) {
+                    // 
+                    return -1;
+                }
+            }
+            return m;
+            //m--;
+            /*
+            while (upperbound(n)) {
+                n--;
+                if (n<m) {
+                    return -1;
+                }
+            }
+            //n++;
+
+
+            return (Math.abs(val(n)-value) < Math.abs(val(m)-value))?n:m;
+            */
+        }
+    };
+
+
+    _model.get = function(quantity) {
+        if (now < 0) {
+            return undefined;
+        } else {
+            return moments[now][quantity];
+        }
+    };
+    
+    _model.set = function(quantity, value) {
+        var q = _model.quantities[quantity];
+
+        if (value < q.minimum) {
+            value = q.minimum;
+        } else if (value > q.maximum) {
+            value = q.maximum;
+        }
+
+        // q.minimum ≤ value ≤ q.maximum
+
+        // has value already been "measured"?
+        // As some quantities can have the same value more often, there are
+        // potentially many moments that fit the bill. There can be an unknown
+        // amount of moments that aren't measured as well.
+        //
+        // However, some quantities will be strictly increasing or decreasing
+        // and no value will appear twice. For example, the internal time will
+        // only increase. Those quantities with property `monotone`
+        // `true`, only one value will be searched for
+        
+        var approx = _appendix.approximates(),
+            moment = -1;
+        if (q.monotone) {
+            moment = _model.find_moment(quantity, value);
+
+            if (moment === -1) {
+                // not yet "measured"
+                var DO_NOT_UPDATE_VIEWS = true;
+                _model.step(DO_NOT_UPDATE_VIEWS);
+                // THIS DOES WORK ONLY FOR INCREASING QUANTITIES. CHANGE THIS
+                // ALTER WITH FIND FUNCTION !!!!
+                while((moments[now][quantity] < value) && !_model.is_finished()) {
+                    _model.step(DO_NOT_UPDATE_VIEWS);
+                }
+            } else {
+                now = moment;
+            }
+            update_views();
+            return moments[now];
+        }
+    };
+
+    _model.data = function() {
+        return moments.slice(0, now + 1);
+    };
+
+    _model.current_moment = function(moment_only) {
+        if (moment_only) {
+            return now;
+        } else {
+            return moments[now];
+        }
+    };
+
+
+    // ## _appendix H: helper functions
+
+    _appendix.approximates = function(epsilon) {
+            var EPSILON = epsilon || 0.001,
+                fn = function(a, b) {
+                    return Math.abs(a - b) <= EPSILON;
+                };
+            fn.EPSILON = EPSILON;
+            return fn;
+        };
+    _appendix.quantity_value = function(quantity) {
+            return function(moment) {
+                return moments[moment][quantity];
+            };
+        };
+
+
+    var step = config.step_size || 1;
+    function step_size(size) {
+        if (arguments.length === 1) {
+            step = size;
+        }
+        return step;
+    }
+    _model.step_size = step_size;
+
+    function random_color() {
+        var hexes = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'],
+            colors = [],
+            i = 0;
+           
+        while (i < 6) {
+            colors.push(hexes[Math.round(Math.random()*(hexes.length - 1))]);
+            i++;
+        }
+        return "#"+ colors.join("");
+    }
+
+    var color = random_color();
+    _model.color = function(c) {
+        if (arguments.length === 1) {
+            if (c === "random") {
+                color = random_color();
+            } else {
+                color = c;
+            }
+        }
+        return color;
+    };
+    return _model;
+};    
+
+
+module.exports = model;
+
+})()
+},{}],8:[function(require,module,exports){
+
+var raphael = require("raphael-browserify");
+
+function start_of_path(path) {
+    return raphael.getPointAtLength(path, 0);
+}
+
+function end_of_path(path) {
+    return raphael.getPointAtLength(path,
+            raphael.getTotalLength());
+}
+
+function complete_path(part, fill_length) {
+    var start = part.top,
+        end = part.bottom,
+        path = part.path;
+    
+    if (fill_length) {
+        path = "m" + start.x + "," + start.y + path;
+        start = raphael.getPointAtLength(path, fill_length);
+
+        var total_length = raphael.getTotalLength(path);
+
+        path = raphael.getSubpath(path, fill_length, total_length);
+        path = raphael.pathToRelative(path);
+        path.shift(); // remove the M command
+        path = path.toString();
+    }
+   
+    var segments = raphael.parsePathString(path),
+        completed_path = "m" + start.x + "," + start.y + path;
+
+
+    completed_path += "h-" +(Math.abs(0 - end.x) * 2);
+
+    var mirror_segment = function(segment) {
+        var command = segment[0],
+            x,y, cp1, cp2,
+            mirrored_segment = "";
+
+        switch (command) {
+            case "l":
+                x = segment[1];
+                y = segment[2];
+                mirrored_segment = "l" + x + "," + (-y);
+                start = {
+                    x: start.x + x,
+                    y: start.y + y
+                };
+                break;
+            case "c":
+                cp1 = {
+                    x: segment[1],
+                    y: segment[2]
+                };
+                cp2 = {
+                    x: segment[3],
+                    y: segment[4]
+                };
+
+                x = segment[5];
+                y = segment[6];
+                end = {
+                    x: x,
+                    y: y
+                };
+                mirrored_segment = "c" + (end.x - cp2.x) + "," + (-(end.y - cp2.y)) + "," +
+                    (end.x - cp1.x) + "," + (-(end.y - cp1.y)) + "," + 
+                    (x) + "," + (-y);
+                start = {
+                    x: start.x + x,
+                    y: start.y + y
+                };
+                break;
+            case "v":
+                y = segment[1];
+                mirrored_segment = "v" + (-y);
+                start = {
+                    x: start.x,
+                    y: start.y + y
+                };
+                break;
+            case "h":
+                x = segment[1];
+                mirrored_segment = "h" + x;
+                start = {
+                    x: start.x + x,
+                    y: start.y
+                };
+                break;
+            case "m":
+                // skip
+
+                break;
+        }
+
+        return mirrored_segment;
+    };
+
+    completed_path += segments.map(mirror_segment).reverse().join("");
+
+
+    return completed_path;
+}
+
+function scale_shape(shape, scale_) {
+    var model_scale = shape.scale,
+        factor = scale_/model_scale;
+
+    var scale = function(number) {
+            return number * factor;
+        };
+
+    function scale_path(path, factor) {
+        var path_segments = raphael.parsePathString(path),
+            scale_segment = function(segment) {
+                var segment_arr = segment,
+                    command = segment_arr.shift();
+
+                return command + segment_arr.map(scale).join(",");
+            };
+
+        return path_segments.map(scale_segment).join("");
+    }
+
+    return {
+        base: {
+            path: scale_path(shape.base.path, factor),
+            bottom: {
+                x: scale(shape.base.bottom.x),
+                y: scale(shape.base.bottom.y)
+            },
+            top: {
+                x: scale(shape.base.top.x),
+                y: scale(shape.base.top.y)
+            }
+        },
+        bowl: {
+            path: scale_path(shape.bowl.path, factor),
+            bottom: {
+                x: scale(shape.bowl.bottom.x),
+                y: scale(shape.bowl.bottom.y)
+            },
+            top: {
+                x: scale(shape.bowl.top.x),
+                y: scale(shape.bowl.top.y)
+            }
+        },
+        scale: scale_,
+        factor: factor
+    };
+}
+
+module.exports = {
+    start: start_of_path,
+    end: end_of_path,
+    complete_path: complete_path,
+    scale_shape: scale_shape
 };
 
-module.exports = view;
+},{"raphael-browserify":1}],9:[function(require,module,exports){
 
-},{}],9:[function(require,module,exports){
+var view = require("../view"),
+    dom = require("../../dom/dom"),
+    ruler = require("./ruler"),
+    raphael = require("raphael-browserify"),
+    longdrink = require("./longdrink_glass"),
+    various_glass = require("./glass");
+
+var flaskfiller = function(config, scale_, dimensions_) {
+    var _flaskfiller = view(config);
+
+    var scale = scale_ || 4; // px per mm
+
+    var dimensions = dimensions_ || {
+        width: 900,
+        height: 600,
+        ruler_width: 30,
+        margins: {
+            left: 5,
+            right: 5,
+            top: 5,
+            bottom: 5
+        }
+    };
+
+    var CONTAINER = {
+            width: dimensions.width || 900,
+            height: dimensions.height || 600
+        };
+
+    var RULERS = {
+            horizontal: {
+                x:  dimensions.ruler_width + dimensions.margins.left,
+                y:  CONTAINER.height - dimensions.ruler_width - dimensions.margins.top,
+                width: CONTAINER.width - dimensions.ruler_width - dimensions.margins.left - dimensions.margins.right,
+                height: dimensions.ruler_width,
+                scale: scale,
+                orientation: "horizontal"
+            },
+            vertical: {
+                x:  0 + dimensions.margins.left,
+                y:  0 + dimensions.margins.top,
+                width: dimensions.ruler_width,
+                height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom,
+                scale: scale,
+                orientation: "vertical"
+            }
+        };
+
+    var SIMULATION = {
+            x:  dimensions.ruler_width + dimensions.margins.left,
+            y:  0 + dimensions.margins.top,
+            width: CONTAINER.width - dimensions.ruler_width - dimensions.margins.left - dimensions.margins.right,
+            height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom
+        };
+
+
+    _flaskfiller.fragment = document
+        .createDocumentFragment()
+        .appendChild(dom.create({
+            name: "figure",
+            attributes: {
+                "class": "flaskfiller"
+            }
+        }));
+
+    // There is a bug in Raphael regarding placing text on the right
+    // y-coordinate when the canvas isn't part of the DOM
+    document.body.appendChild(_flaskfiller.fragment);
+
+    var canvas = raphael(_flaskfiller.fragment, 
+            CONTAINER.width, 
+            CONTAINER.height);
+
+    var vertical_ruler = ruler(canvas, RULERS.vertical, CONTAINER.width)
+            .style({
+                "background": "white"
+            }),
+        horizontal_ruler = ruler(canvas, RULERS.horizontal, CONTAINER.height)
+            .style({
+                "background": "white"
+            }),
+        cm_label = draw_cm_label();
+
+
+
+    function draw_cm_label() {
+       var x = dimensions.margins.left + (dimensions.ruler_width / 3),
+           y = CONTAINER.height - (dimensions.ruler_width / 2) - dimensions.margins.bottom,
+           cm_label = canvas.text(x, y, "cm");
+
+       cm_label.attr({
+           "font-family": "inherit",
+           "font-size": "18pt",
+           "font-weight": "bolder",
+           "fill": "dimgray"
+       }); 
+
+       return cm_label;
+    }
+
+
+    function add_glass(model) {
+        var glass;
+        if (model.type === "longdrink") {
+            glass = longdrink(canvas, model, scale);
+        } else {
+            glass = various_glass(canvas, model, scale);
+        }
+        vertical_ruler.toFront();
+        horizontal_ruler.toFront();
+        return glass;
+    }
+
+    function update_glass(glass) {
+        glass.update_color();        
+        glass.update();
+    }
+
+    _flaskfiller.update = function(model_name) {
+        var model = _flaskfiller.get_model(model_name);
+
+        if (!model.glass) {
+            model.glass = add_glass(model.model);
+            model.glass.draw_at_bottom(SIMULATION, Math.random() * SIMULATION.width);
+        }
+
+        update_glass(model.glass);
+
+    };
+
+
+    // There is a bug in Raphael regarding placing text on the right
+    // y-coordinate when the canvas isn't part of the DOM. It has been added
+    // before and now removed again.
+    document.body.removeChild(_flaskfiller.fragment);
+    return _flaskfiller;
+
+};
+
+module.exports = flaskfiller;
+
+},{"../../dom/dom":3,"../view":18,"./glass":10,"./longdrink_glass":12,"./ruler":13,"raphael-browserify":1}],10:[function(require,module,exports){
+
+var raphael = require("raphael-browserify");
+
+
+var glass = function(canvas, model, SCALE) {
+    var _glass = canvas.set();
+
+    var GLASS_BORDER = 3;
+
+    var x = 0, 
+        y = 0, 
+        width, 
+        height;
+
+    var PADDING = 5;
+
+
+    function update() {
+        fill.attr("fill", model.color());
+        _glass.draw_at(_glass.x, _glass.y);
+    }
+
+    var fill, base_shape, bowl_shape, max_line, max_label, label, glass_pane;
+
+    function draw() {
+        label = canvas.text(x, y, model.get_maximum("volume") + " ml");
+        label.attr({
+        });
+        _glass.push(label);
+        fill = canvas.path(model.bowl_path(SCALE, true));
+        fill.attr({
+            fill: model.color(),
+            stroke: "none",
+            opacity: 0.4
+        });
+        _glass.push(fill);
+
+        max_line = canvas.path("M0,0");
+        max_line.attr({
+            stroke: "dimgray",
+            "stroke-width": 1
+        });
+        _glass.push(max_line);
+
+        max_label = canvas.text(x, y, "max");
+        max_label.attr({
+            stroke: "none",
+            fill: "dimgray",
+            "font-family": "inherit",
+            "font-size": "10pt"
+        });
+        _glass.push(max_label);
+
+        bowl_shape = canvas.path(model.bowl_path(SCALE));
+        bowl_shape.attr({
+            "stroke": "black",
+            "stroke-width": GLASS_BORDER,
+            "fill": "none"
+        });
+        _glass.push(bowl_shape);  
+
+        base_shape = canvas.path(model.base_path(SCALE));
+        base_shape.attr({
+            "stroke": "black",
+            "stroke-width": GLASS_BORDER,
+            "fill": "dimgray"
+        });
+        _glass.push(base_shape);  
+
+        glass_pane = canvas.path(model.path(SCALE));
+        glass_pane.attr({
+            fill: "white",
+            opacity: 0,
+            stroke: "white",
+            "stroke-opacity": 0,
+            "stroke-width": GLASS_BORDER
+        });
+        _glass.push(glass_pane);
+
+
+        var bbox = _glass.getBBox();
+        width = bbox.width;
+        height = bbox.height;
+
+        set_label();
+
+        glass_pane.hover(onhover, offhover);
+        glass_pane.drag(onmove, onstart, onend);
+
+        glass_pane.dblclick(run_pause);
+    }
+
+    function run_pause() {
+        if (model.is_finished()) {
+            model.action("reset").callback(model)();
+        } else {
+            model.action("start").callback(model)();
+        }
+    }
+
+    function set_label(x_, y_) {
+        var bowlbb = bowl_shape.getBBox(),
+            bowl_width = bowlbb.width,
+            bowl_height = bowlbb.height;
+
+        var x = x_, y = y_;
+
+        label.attr({
+            x: x,
+            y: y + bowl_height/2,
+            "font-size": compute_font_size(),
+            text: model.get_maximum("volume") + " ml"
+        });
+        function compute_font_size() {
+            return Math.max((((bowl_width - 2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
+        }
+    }
+    _glass.set_label = set_label;
+
+
+    var delta_x = 0, delta_y = 0;
+    function onmove(dx, dy) {
+        delta_x = dx;
+        delta_y = dy;
+        _glass.draw_at(_glass.x+dx, _glass.y+dy);
+    }
+    
+
+    function onstart() {
+        model.action("pause").callback(model)();
+        delta_x = 0;
+        delta_y = 0;
+    }
+
+    function onend() {
+        _glass.x += delta_x;
+        _glass.y += delta_y;
+    }
+
+    function onhover() {
+        _glass.attr({
+            "cursor": "move"
+        });
+    }
+
+    function offhover() {
+        _glass.attr({
+            "cursor": "default"
+        });
+    }
+
+
+    _glass.draw_at = function (x, y) {
+
+        _glass.fill.attr({path: model.bowl_path(SCALE, true, x, y)});
+        _glass.bowl_shape.attr({path: model.bowl_path(SCALE, false, x, y)});
+        _glass.base_shape.attr({path: model.base_path(SCALE, x, y)});
+        _glass.glass_pane.attr({path: model.path(SCALE, false, x, y)});
+        var MAX_LINE_WIDTH = Math.min(30, width / 2),
+            MAX_LINE_SKIP = 5,
+            MAX_LINE_Y = y + height - model.get_maximum("hoogte") * 10 * SCALE;
+        _glass.max_line.attr({
+            path: "M" + x + "," + MAX_LINE_Y + 
+                "h" + MAX_LINE_WIDTH
+        });
+        _glass.max_label.attr({
+            x: x + MAX_LINE_WIDTH / 1.5,
+            y: MAX_LINE_Y - MAX_LINE_SKIP            
+        });
+
+        _glass.set_label(x, y);
+    };
+
+    function draw_at_bottom(boundaries, distance_from_left) {
+        var bbox = _glass.glass_pane.getBBox(),
+            width = _glass.width,
+            height = _glass.height,
+            x = Math.min(boundaries.x + (distance_from_left || width), boundaries.x + (boundaries.width - width)),
+            y = boundaries.y + boundaries.height - height + 2*_glass.bowl_shape.attr("stroke-width");
+
+        _glass.draw_at(x, y);
+        _glass.x = x;
+        _glass.y = y;
+    }
+    _glass.draw_at_bottom = draw_at_bottom;
+
+    function update_color() {
+        fill.attr("fill", model.color());
+    }
+
+
+    draw();
+    _glass.height = height;
+    _glass.width = width;
+    _glass.x = x;
+    _glass.y = y;
+    _glass.draw = draw;
+    _glass.update = update;
+    _glass.update_color = update_color;
+    _glass.fill = fill;
+    _glass.label = label;
+    _glass.bowl_shape = bowl_shape;
+    _glass.base_shape = base_shape;
+    _glass.max_line = max_line;
+    _glass.max_label = max_label;
+    _glass.glass_pane = glass_pane;
+    return _glass;
+};
+
+module.exports = glass;
+
+},{"raphael-browserify":1}],11:[function(require,module,exports){
+
+
+var raphael = require("raphael-browserify");
+var dom = require("../../dom/dom");
+var ruler = require("./ruler");
+
+var glass_grafter = function(config, scale_, dimensions_) {
+    var _grafter = {};
+
+    var scale = scale_ || 4; // px per mm
+
+    var dimensions = dimensions_ || {
+        width: 600,
+        height: 400,
+        ruler_width: 30,
+        margins: {
+            left: 5,
+            right: 5,
+            top: 5,
+            bottom: 5
+        }
+    };
+
+    var CONTAINER = {
+            width: dimensions.width || 900,
+            height: dimensions.height || 600
+        };
+        
+    var HALF_WIDTH = (CONTAINER.width - dimensions.margins.left - dimensions.margins.right)/2 - dimensions.ruler_width;
+
+    var CONSTRUCTION_AREA = {
+        x: dimensions.margins.left + dimensions.ruler_width,
+        y: dimensions.margins.top,
+        width: HALF_WIDTH,
+        height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.bottom - dimensions.margins.top
+    };
+
+    var MIRROR_AREA = {
+        x: CONSTRUCTION_AREA.x + CONTAINER.width,
+        y: dimensions.margins.top,
+        width: HALF_WIDTH,
+        height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.bottom - dimensions.margins.top
+    };
+
+    var RULERS = {
+            horizontal: {
+                x:  dimensions.ruler_width + dimensions.margins.left,
+                y:  CONTAINER.height - dimensions.ruler_width - dimensions.margins.top,
+                width: (CONTAINER.width - dimensions.margins.left - dimensions.margins.right)/2 - dimensions.ruler_width,
+                height: dimensions.ruler_width,
+                scale: scale,
+                orientation: "horizontal"
+            },
+            vertical: {
+                x:  0 + dimensions.margins.left,
+                y:  0 + dimensions.margins.top,
+                width: dimensions.ruler_width,
+                height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom,
+                scale: scale,
+                orientation: "vertical"
+            }
+        };
+
+    _grafter.fragment = document
+        .createDocumentFragment()
+        .appendChild(dom.create({
+            name: "figure",
+            attributes: {
+                "class": "glassgrafter"
+            }
+        }));
+
+    // There is a bug in Raphael regarding placing text on the right
+    // y-coordinate when the canvas isn't part of the DOM
+    document.body.appendChild(_grafter.fragment);
+
+    var canvas = raphael(_grafter.fragment,
+            CONTAINER.width,
+            CONTAINER.height
+        );
+
+    var vertical_ruler = ruler(canvas, RULERS.vertical, CONTAINER.width)
+            .style({
+                "background": "white"
+            }),
+        horizontal_ruler = ruler(canvas, RULERS.horizontal, CONTAINER.height)
+            .style({
+                "background": "white"
+            }),
+        cm_label = draw_cm_label();
+
+
+
+    function draw_cm_label() {
+       var x = dimensions.margins.left + (dimensions.ruler_width / 3),
+           y = CONTAINER.height - (dimensions.ruler_width / 2) - dimensions.margins.bottom,
+           cm_label = canvas.text(x, y, "cm");
+
+       cm_label.attr({
+           "font-family": "inherit",
+           "font-size": "18pt",
+           "font-weight": "bolder",
+           "fill": "dimgray"
+       }); 
+
+       return cm_label;
+    }
+
+
+    var construction_background,
+        mirror_background,
+        base_bottom_point,
+        marriage_point,
+        bowl_top_point;
+
+    function draw() {
+        construction_background = canvas.rect(CONSTRUCTION_AREA.x,
+                CONSTRUCTION_AREA.y,
+                CONSTRUCTION_AREA.width,
+                CONSTRUCTION_AREA.height
+                );
+        construction_background.attr({
+            stroke: "dimgray",
+            "stroke-width": 2,
+            fill: "white"
+        });
+        console.log(" hasfldskdsfjk", CONSTRUCTION_AREA);
+    }
+
+
+
+    draw();
+    // There is a bug in Raphael regarding placing text on the right
+    // y-coordinate when the canvas isn't part of the DOM. It has been added
+    // before and now removed again.
+    document.body.removeChild(_grafter.fragment);
+    return _grafter;
+};
+
+module.exports = glass_grafter;
+
+},{"../../dom/dom":3,"./ruler":13,"raphael-browserify":1}],12:[function(require,module,exports){
+
+var glass = require("./glass");
+
+var longdrink_glass = function(canvas, model, SCALE, boundaries_) {
+    var HANDLE_SPACE = 15,
+        HANDLE_SIZE = 2.5;
+
+    var PADDING = 5;
+
+    var _glass = glass(canvas, model, SCALE, boundaries_);
+
+    _glass.handle = canvas.circle( 
+            _glass.x + _glass.width + HANDLE_SPACE, 
+            _glass.y - HANDLE_SPACE, 
+            HANDLE_SIZE);
+    _glass.handle.attr({
+        fill: "silver",
+        "stroke": "silver"
+    });
+    _glass.push(_glass.handle);
+    _glass.handle.hover(enable_resizing, disable_resizing);
+    _glass.handle.drag(sizemove, sizestart, sizestop);
+
+    var old_height, old_radius, delta_x, delta_y;
+    function sizemove(dx, dy) {
+        var 
+            d_height = dy / SCALE / 10,
+            d_radius = dx / 2 / SCALE / 10,
+            new_radius = old_radius + d_radius,
+            new_height = old_height - d_height,
+            area = Math.PI * new_radius * new_radius;
+
+
+        if (area*new_height >= 5){
+            delta_y = dy;
+            model.height(new_height);
+            model.radius(new_radius);
+            _glass.draw_at(_glass.x, _glass.y+dy);
+        }
+
+    }
+
+    function sizestart() {
+        delta_x = 0;
+        delta_y = 0;
+        old_height = model.height();
+        old_radius = model.radius();
+        model.action("reset").callback(model)();
+    }
+
+    function sizestop() {
+        _glass.y += delta_y;
+    }
+
+
+    function enable_resizing() {
+        _glass.handle.attr({
+            fill: "yellow",
+            stroke: "black",
+            "stroke-width": 2,
+            r: HANDLE_SIZE * 1.5,
+            cursor: "nesw-resize"
+        });
+        _glass.glass_pane.attr({
+            fill: "lightyellow",
+            opacity: 0.7
+        });
+    }
+
+    function disable_resizing() {
+        _glass.handle.attr({
+            fill: "silver",
+            stroke: "silver",
+            "stroke-width": 1,
+            r: HANDLE_SIZE,
+            cursor: "default"
+        });
+        _glass.glass_pane.attr({
+            fill: "white",
+            opacity: 0
+        });
+    }
+
+    function update_size() {
+        var bbox = _glass.glass_pane.getBBox();
+
+        _glass.width = bbox.width;
+        _glass.height = bbox.height;
+    }
+
+    _glass.draw_at = function (x, y) {
+
+        _glass.fill.attr({path: model.bowl_path(SCALE, true, x, y)});
+        _glass.bowl_shape.attr({path: model.bowl_path(SCALE, false, x, y)});
+        _glass.base_shape.attr({path: model.base_path(SCALE, x, y)});
+        _glass.glass_pane.attr({path: model.path(SCALE, false, x, y)});
+        update_size();
+        var MAX_LINE_WIDTH = Math.min(30, _glass.width / 2),
+            MAX_LINE_SKIP = 5,
+            MAX_LINE_Y = y + _glass.height - model.get_maximum("hoogte") * 10 * SCALE;
+        _glass.max_line.attr({
+            path: "M" + x + "," + MAX_LINE_Y + 
+                "h" + MAX_LINE_WIDTH
+        });
+        _glass.max_label.attr({
+            x: x + MAX_LINE_WIDTH / 1.5,
+            y: MAX_LINE_Y - MAX_LINE_SKIP            
+        });
+
+        _glass.handle.attr({
+            cx: x + _glass.width + HANDLE_SPACE, 
+            cy: y - HANDLE_SPACE
+        });
+        _glass.set_label(x, y);
+    };
+
+    _glass.set_label = function(x_, y_) {
+        var x = x_, y = y_;
+        model.compute_maxima();
+        _glass.label.attr({
+            x: x + _glass.width / 2,
+            y: y + _glass.height/2,
+            "font-size": compute_font_size(),
+            text: model.get_maximum("volume") + " ml"
+        });
+        function compute_font_size() {
+            return Math.max((((_glass.width - 2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
+        }
+    };
+
+
+
+    return _glass;
+};
+
+module.exports = longdrink_glass;
+
+},{"./glass":10}],13:[function(require,module,exports){
+
+var ruler = function(canvas, config, MEASURE_LINE_WIDTH) {
+    var _ruler = canvas.set();
+
+    var x = config.x || 0,
+        y = config.y || 0,
+        width = config.width || 50,
+        height = config.height || 500,
+        scale = config.scale || 2,
+        orientation = config.orientation || "vertical";
+
+    var background,
+        ticks,
+        labels,
+        measure_line,
+        glass_pane;
+
+    draw();
+    style({
+        background: "yellow",
+        stroke: "dimgray",
+        stroke_width: 2,
+        font_size: "12pt"
+    });
+
+
+    function move_measuring_line(e, x_, y_) {
+        var path;
+
+        if (orientation === "horizontal") {
+            path = "M" + (x_) + "," + (y + height) + "v-" + MEASURE_LINE_WIDTH;
+        } else {
+            path = "M" + x + "," + (y_) + "h" + MEASURE_LINE_WIDTH;
+        }
+        measure_line.attr({
+            "path": path
+        });
+    }
+
+    function show_measuring_line() {
+        glass_pane.mousemove(move_measuring_line);
+        measure_line.show();
+    }
+
+    function hide_measuring_line() {
+        glass_pane.unmousemove(move_measuring_line);
+        measure_line.hide();
+    }
+
+    
+    function draw() {
+        background = canvas.rect(x, y, width, height);
+        _ruler.push(background);
+        _ruler.push(draw_ticks());
+        _ruler.push(draw_labels());
+        measure_line = canvas.path("M0,0");
+        measure_line.attr({
+            stroke: "crimson",
+            "stroke-width": 2,
+            "stroke-opacity": 0.5
+        });
+        _ruler.push(measure_line);
+        measure_line.hide();
+        glass_pane = canvas.rect(x, y, width, height);
+        glass_pane.attr({
+            fill: "white",
+            opacity: 0,
+            stroke: "white",
+            "stroke-opacity": 0
+        });
+        _ruler.push(glass_pane);
+
+        glass_pane.mouseover(show_measuring_line);
+        glass_pane.mouseout(hide_measuring_line);
+
+        function draw_labels() {
+            labels = canvas.set();
+            
+            var ONE_CM_IN_PX = scale * 10,
+                cm = 0;
+
+            if (orientation === "vertical") {
+                var h = y + height,
+                    y_end = y + ONE_CM_IN_PX,
+                    x_start = x + (width/4);
+
+                while (h > y_end) {
+                    h = h - ONE_CM_IN_PX;
+                    cm++;
+                    labels.push(canvas.text(x_start, h, cm));
+                }
+            } else {
+                var w = x,
+                    x_end = x + width - ONE_CM_IN_PX,
+                    y_start = y + (height/(4/3));
+
+                while (w < x_end) {
+                    w = w + ONE_CM_IN_PX;
+                    cm++;
+                    labels.push(canvas.text(w, y_start, cm));
+                }
+            }
+
+
+            return labels;
+        }
+
+        function draw_ticks() {
+            var CM_SIZE = 13,
+                HALF_CM_SIZE = 8,
+                MM_SIZE = 5,
+                cm_ticks = canvas.path(create_ticks_path(0, CM_SIZE)),
+                half_cm_ticks = canvas.path(create_ticks_path(scale*5, HALF_CM_SIZE));
+
+            ticks = canvas.set();
+            cm_ticks.attr("stroke-width", 1);
+            ticks.push(cm_ticks);
+            half_cm_ticks.attr("stroke-width", 1);
+            ticks.push(half_cm_ticks);
+            [1, 2, 3, 4, 6, 7, 8, 9].forEach(draw_mm_ticks);
+
+            function draw_mm_ticks(step) {
+                  var mm_ticks = canvas.path(create_ticks_path(scale*step, MM_SIZE));
+                  mm_ticks.attr("stroke-width", 0.5);
+                  ticks.push(mm_ticks);
+            }
+
+            function create_ticks_path(step, size) {
+                var ONE_CM_IN_PX = scale * 10,
+                    ticks_path;
+                if (orientation === "vertical") {
+                    var h = y + height + step,
+                        y_end = y + ONE_CM_IN_PX,
+                        x_start = x + width;
+
+                    while (h > y_end) {
+                        h = h - ONE_CM_IN_PX;
+                        ticks_path += "M" + x_start + "," + h + "h-" + size;
+                    }
+                } else {
+                    var w = x - step,
+                        x_end = x + width - ONE_CM_IN_PX,
+                        y_start = y;
+
+                    while (w < x_end) {
+                        w = w + ONE_CM_IN_PX;
+                        ticks_path += "M" + w + "," + y_start + "v" + size;
+                    }
+                }
+
+                return ticks_path;
+            }
+
+            return ticks;
+        }
+
+    }
+
+    function style(config) {
+        if (config.background) {
+            background.attr("fill", config.background);
+        }
+        if (config.stroke) {
+            background.attr("stroke", config.stroke);
+            ticks.attr("stroke", config.stroke);
+
+        }
+        if (config.stroke_width) {
+            background.attr("stroke-width", config.stroke_width);
+        }
+        if (config.font_size) {
+            labels.attr("font-size", config.font_size);
+        }
+        if (config.font_family) {
+            labels.attr("font-family", config.font_family);
+        }
+
+        return _ruler;
+    }
+
+    _ruler.style = style;
+
+    return _ruler;
+
+};
+
+module.exports = ruler;
+
+},{}],14:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -7404,75 +8201,693 @@ module.exports = view;
  * DEALINGS IN THE SOFTWARE.
  */
 
-var dom = {
-    create: function(spec) {
-        var elt;
-       
-        if (spec.name === "textNode") {
-           elt = document.createTextNode(spec.value);
-        } else {
-           elt = document.createElement(spec.name);
+var view = require("./view"),
+    dom = require("../dom/dom");
+
+var graph = function(config_, horizontal_, vertical_, dimensions_) {
+
+    var config = Object.create(config_);
+    config.type = "graph";
+    var _graph = view(config);
+
+    var horizontal = horizontal_,
+        vertical = vertical_;
+
+
+    var dimensions = dimensions_ || {
+        width: 900,
+        height: 600,
+        margin: {
+            top: 10,
+            right: 20,
+            left: 80,
+            bottom: 80
         }
+    };
 
-        var set_attribute = function(attr) {
-                elt.setAttribute(attr, spec.attributes[attr]);
-            };
+    var CONTAINER = {
+            width: dimensions.width || 900,
+            height: dimensions.height || 600
+        };
+    var MARGINS = {
+            top:dimensions.margin.top || 10,
+            right:dimensions.margin.right || 20,
+            left:dimensions.margin.left || 60,
+            bottom:dimensions.margin.bottom || 60
+        };
+    var GRAPH = {
+            width: CONTAINER.width - MARGINS.left - MARGINS.right,
+            height: CONTAINER.height - MARGINS.top - MARGINS.bottom
+        };
 
-        if (spec.attributes) {
-            Object.keys(spec.attributes).forEach(set_attribute);
-        }
 
-        if (spec.children) {
-            var append = function(child) {
-                elt.appendChild(dom.create(child));
-            };
-            spec.children.forEach(append);
-        }
-
-        if (spec.on) {
-            if (typeof spec.on === "Array") {
-                spec.on.forEach(function(on) {
-                    elt.addEventListener( on.type, on.callback );
-                });
-            } else {
-                elt.addEventListener( spec.on.type, spec.on.callback );
+    _graph.fragment = document
+        .createDocumentFragment()
+        .appendChild(dom.create({
+            name: "figure",
+            attributes: {
+                "class": "graph"
             }
-        }
+        }));
 
-        if (spec.value) {
-            if (spec.name === "input") {
-                elt.value = spec.value;
+    var horizontal_axis, vertical_axis;
+
+    var mouse_actions = [
+        {
+            name: "tangent_triangle",
+            icon: "icon-crop",
+            on: show_tangent_triangle,
+            off: hide_tangent_triangle
+        }, {
+            name: "locally_zoom",
+            icon: "icon-zoom-in",
+            on: show_zoom,
+            off: hide_zoom
+        }
+    ];
+
+    var current_action = config.default_action || "measure_point";
+
+    function toggle_action(action) {
+
+        return function() {
+            if (!this.hasAttribute("data-toggled")) {
+                this.setAttribute("data-toggled", true);
+                // enable mouse thingie
+                action.on();
             } else {
-                elt.innerHTML = spec.value;
+                this.removeAttribute("data-toggled");
+                // diable mouse thingie
+                action.off();
             }
-        }
+        };
 
-        if (spec.style) {
-            var set_style = function(style_name) {
-                elt.style[style_name] = spec.style[style_name];
-            };
-            Object.keys(spec.style).forEach(set_style);
-        }
-
-        return elt;
-    },
-    invert_color: function(color) {
-        var R = parseInt(color.slice(1,3), 16),
-            G = parseInt(color.slice(3,5), 16),
-            B = parseInt(color.slice(5,7), 16),
-            inverted_color = "#" +       
-               (255 - R).toString(16) +
-               (255 - G).toString(16) +
-               (255 - B).toString(16);
-
-        console.log(color, inverted_color);
-        return inverted_color;
     }
+             
+    function show_tangent_triangle() {
+            var tangent_triangle = svg.select("g.tangent_triangle");
+            if (tangent_triangle) tangent_triangle.style("visibility", "visible");
+    }
+
+    function hide_tangent_triangle() {
+            var tangent_triangle = svg.select("g.tangent_triangle");
+            if (tangent_triangle) tangent_triangle.style("visibility", "hidden");
+    }
+
+    function show_zoom() {
+        console.log("start zooming");
+    }
+
+    function hide_zoom() {
+        console.log("stop zooming");
+    }
+
+
+    function create_caption() {
+        var get_name = function(q) {
+                return _graph.quantities[q].name;
+            },
+            quantity_names = Object.keys(_graph.quantities),
+            horizontal_selected_index = quantity_names.indexOf(
+                    horizontal),
+            vertical_selected_index = quantity_names.indexOf(
+                    vertical),
+            create_option = function(selected_index) {
+                return function(quantity_name, index) {
+                    var option = {
+                        name: "option",
+                        value: quantity_name
+                    };
+                    if (index === selected_index) {
+                        option.attributes = {
+                            selected: true
+                        };
+                    }
+                    return option;
+                };
+            },
+            horizontal_quantity_list = quantity_names.map(
+                    create_option(horizontal_selected_index)),
+            vertical_quantity_list = quantity_names.map(
+                    create_option(vertical_selected_index));
+
+        var create_action = function(action) {
+                var attributes = {
+                        "class": "action",
+                        "data-action": action.name
+                    };
+
+                    if (current_action === action.name) {
+                        attributes["data-toggled"] = true;
+                    }
+                    return {
+                        name: "button",
+                        attributes: attributes,
+                        children: [{
+                            name: "i",
+                            attributes: {
+                               "class": action.icon
+                            }
+                        }],
+                        on: {
+                            type: "click",
+                            callback: toggle_action(action)
+                        }
+
+                    };
+        };
+        var actions_elts = mouse_actions.map(create_action);
+
+        _graph.fragment.appendChild(dom.create({
+                name: "figcaption",
+                children: [
+                {
+                    name: "select",
+                    children: horizontal_quantity_list,
+                    on: {
+                        type: "change",
+                        callback: function(event) {
+                            var quantity = event.target.value;
+                            set_axis(quantity, "horizontal");
+                        }
+                    }
+                }, 
+                {
+                    name: "textNode",
+                    value: " - "
+                }, 
+                {
+                    name: "select",
+                    attributes: {
+
+                    },
+                    children: vertical_quantity_list,
+                    on: {
+                        type: "change",
+                        callback: function(event) {
+                            var quantity = event.target.value;
+                            set_axis(quantity, "vertical");
+                        }
+                    }
+                },
+                {
+                    name: "textNode",
+                    value: " grafiek — "
+                } 
+                ].concat(actions_elts)
+            }));
+    }
+    create_caption();
+
+    var svg = d3.select(_graph.fragment).append("svg")
+            .attr("width", CONTAINER.width)
+            .attr("height", CONTAINER.height)
+            .append("g")
+                .attr("transform", "translate(" + 
+                        MARGINS.left + "," + 
+                        MARGINS.right + ")");
+
+
+    var showline = true,
+        showtailpoints = false;
+
+    function draw_tailpoints(model_name) {
+        var model = _graph.get_model(model_name).model,
+            step = function(value, index) {
+                var step_size = model.step_size() || 1;
+
+                return (index % step_size === 0) && (index !== 0);
+            },
+            data = model.data().filter(step),
+            x_scale = horizontal_axis.scale,
+            x_quantity = horizontal_axis.quantity,
+            y_scale = vertical_axis.scale,
+            y_quantity = vertical_axis.quantity;
+
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.parentNode.removeChild(model_tailpoints);
+        }
+
+
+        svg.select("g.tailpoints")
+                .append("g")
+                .attr("class", model_name)
+                .selectAll("line")
+                .data(data)
+                .enter()
+                .append("line")
+                .attr("x1", function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .attr("y1", function(d) {
+                    return y_scale(d[y_quantity.name]);
+                })
+                .attr("x2", function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .attr("y2", y_scale(0))
+                .attr("stroke", model.color || "red")
+                .style("stroke-width", 1)
+//                .style("stroke-opacity", 0.7)
+//                .style("stroke-dasharray", [3,1])
+                ;
+        svg.select("g.tailpoints g." + model_name)
+                .selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("cx", function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .attr("cy", function(d) {
+                    return y_scale(d[y_quantity.name]);
+                })
+                .attr("r", 2)
+                .attr("stroke", "black")
+                .attr("fill", "white")
+                .style("stroke-width", 1.5)
+                .on("mouseover.tooltip", add_tooltip(model_name))
+                .on("mouseout.tooltip", remove_tooltip(model_name))
+                .on("mouseover.tangent_triangle", add_tangent_triangle(model_name))
+                .on("mouseout.tangent_triangle", remove_tangent_triangle(model_name))
+                ;
+
+        model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (!showtailpoints) {
+            model_tailpoints.style.visibility = "hidden";
+        }            
+    }
+
+    function draw_line(model_name) {
+        var model = _graph.get_model(model_name).model,
+            data = model.data(),
+            x_scale = horizontal_axis.scale,
+            x_quantity = horizontal_axis.quantity,
+            y_scale = vertical_axis.scale,
+            y_quantity = vertical_axis.quantity;
+
+
+        var line = d3.svg.line()
+                .x(function(d) {
+                    return x_scale(d[x_quantity.name]);
+                })
+                .y(function(d) {
+                    return y_scale(d[y_quantity.name]);
+                })
+                .interpolate("cardinal")
+                .tension(1);
+                
+
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.parentNode.removeChild(model_line);
+        }
+
+
+        svg.select("g.lines")
+                .append("g")
+                .attr("class", "line " + model_name)
+                .selectAll("path." + model_name)
+                .data([data])
+                .enter()
+                .append("path")
+                .attr("d", line)
+                .attr("class", "graph")
+                .attr("fill", "none")
+                .attr("stroke", model.color || "red")
+                .style("stroke-width", 3)
+                .on("mouseover.tooltip", add_tooltip(model_name))
+                .on("mousemove.tooltip", add_tooltip(model_name))
+                .on("mouseout.tooltip", remove_tooltip(model_name))
+                .on("mouseover.tangent_triangle", add_tangent_triangle(model_name))
+                .on("mousemove.tangent_triangle", add_tangent_triangle(model_name))
+                .on("mouseout.tangent_triangle", remove_tangent_triangle(model_name))
+                ;
+
+        model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (!showline) {
+            model_line.style.visibility = "hidden";
+        }            
+
+    }
+
+    var tooltip = d3.select("body")
+        .append("div")
+        .attr("class", "tooltip")
+        .style("position", "absolute")
+        .style("visibility", "hidden")
+        .style("opacity", 0.7);
+
+    function add_tooltip(model_name) {
+        return function(d, i) {
+            var PADDING = 10;
+            var line = svg.select("g.lines g.line." + model_name + " path");
+            line.style("cursor", "crosshair");
+
+            var container = _graph.fragment.querySelector("svg > g"),
+                point = d3.mouse(container),
+                x_scale = horizontal_axis.scale,
+                x_quantity = horizontal_axis.quantity,
+                y_scale = vertical_axis.scale,
+                y_quantity = vertical_axis.quantity,
+                x = x_scale.invert(point[0]).toFixed(x_quantity.precision || 0),
+                y = y_scale.invert(point[1]).toFixed(y_quantity.precision || 0),
+                x_unit = x_quantity.unit,
+                y_unit = y_quantity.unit;
+                            
+
+            tooltip.html( x + " " + x_unit + "; " + y + " " + y_unit);
+
+            tooltip
+                .style("left", (d3.event.pageX + PADDING*2) + "px")     
+                .style("top", (d3.event.pageY - PADDING) + "px");   
+
+            tooltip.style("visibility", "visible");
+        };
+    }
+
+    function remove_tooltip(model_name) {
+        return function() {
+            var line = svg.select("g.lines g.line." + model_name + " path");
+            line.style("cursor", "default");
+            tooltip.style("visibility", "hidden");
+        };
+    }
+
+
+
+    var tangent_triangle = svg
+        .append("g")
+        .classed("tangent_triangle", true);
+    tangent_triangle.append("line")
+        .classed("tangent", true)
+        .style({
+            "stroke-width": 3,
+            "stroke": "crimson"
+        });
+
+    function add_tangent_triangle(model_name) {
+        return function(d, i) {
+            var container = _graph.fragment.querySelector("svg > g"),
+                path = d3.event.target || d3.event.srcElement,
+                point = d3.mouse(container);
+
+
+            var length_at_point = 0,
+                total_length = path.getTotalLength(),
+                INTERVAL = 50;
+
+            while (path.getPointAtLength(length_at_point).x < point[0] && 
+                    length_at_point < total_length) {
+                        length_at_point += INTERVAL;
+                    }
+
+            length_at_point -= INTERVAL;
+
+            while (path.getPointAtLength(length_at_point).x < point[0] && 
+                    length_at_point < total_length) {
+                        length_at_point++;
+                    }
+
+
+            var x_scale = horizontal_axis.scale,
+                x_quantity = horizontal_axis.quantity,
+                y_scale = vertical_axis.scale,
+                y_quantity = vertical_axis.quantity,
+                x_unit = x_quantity.unit,
+                y_unit = y_quantity.unit,
+                cur = {
+                    x: x_scale.invert(point[0]).toFixed(x_quantity.precision || 0),
+                    y: y_scale.invert(point[1]).toFixed(y_quantity.precision || 0)
+                };
+
+            var prev,
+                next,
+                delta;
+
+            if (length_at_point > 1 && length_at_point < (total_length - 1)) {
+                prev = path.getPointAtLength(length_at_point - 0.1);
+                next = path.getPointAtLength(length_at_point + 0.1);
+                delta = {
+                    x: next.x - prev.x,
+                    y: next.y - prev.y
+                };
+                console.log(prev, next, delta, point);
+            } else {
+
+                // don't worry about the first
+                // and last pixel or so
+                return;
+            }
+
+        
+
+
+            var tangent = tangent_triangle.select("g.tangent_triangle line.tangent");
+
+            var LENGTH = 200;
+
+            point = path.getPointAtLength(length_at_point);
+            var x1 = point.x - delta.x * LENGTH,
+                y1 = point.y - delta.y * LENGTH,
+                x2 = point.x + delta.x * LENGTH,
+                y2 = point.y + delta.y * LENGTH;
+
+console.log(x1, y1, x2, y2);
+            tangent.attr("x1", x1)
+                .attr("y1", y1)
+                .attr("x2", x2)
+                .attr("y2", y2);
+
+
+            svg.select("g.tangent_triangle").style("opacity", 1);
+        };
+    }
+
+    function remove_tangent_triangle(model_name) {
+        return function() {
+            var tangent_triangle = svg.select("g.tangent_triangle");
+            tangent_triangle.style("opacity", 0);
+        };
+    }
+
+
+    function set_axis(quantity_name, orientation) {
+        var quantity = _graph.quantities[quantity_name],
+            create_scale = function(quantity, orientation) {
+                var range;
+                if (orientation === "horizontal") {
+                    range = [0, GRAPH.width];
+                } else {
+                    range = [GRAPH.height, 0];
+                }
+                return d3.scale.linear()
+                    .range(range)
+                    .domain([quantity.minimum, quantity.maximum]);
+            },
+            scale = create_scale(quantity, orientation),
+            create_axis = function(quantity, orientation) {
+                var axis;
+                if (orientation === "horizontal") {
+                    axis = d3.svg.axis()
+                        .scale(scale)
+                        .tickSubdivide(3);
+                } else {
+                    axis = d3.svg.axis()
+                        .scale(scale)
+                        .orient("left")
+                        .tickSubdivide(3);
+                }
+                return axis;
+            },
+            axis = create_axis(quantity, orientation);
+       
+        if (orientation === "horizontal") {
+            horizontal = quantity_name;
+            //  create axes    
+            var xaxisg = _graph.fragment.querySelector("g.x.axis");
+            if (xaxisg) {
+                xaxisg.parentNode.removeChild(xaxisg);
+            }
+
+            svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", "translate(0," + GRAPH.height + ")")
+                .call(axis);
+
+            var xgridg = _graph.fragment.querySelector("g.x.grid");
+            if (xgridg) {
+                xgridg.parentNode.removeChild(xgridg);
+            }
+
+            svg.append("g")
+                .attr("class", "x grid")
+                .attr("transform", "translate(0," + GRAPH.height + ")")
+                .call(axis.tickSize(- GRAPH.height, 0, 0).tickFormat(""));
+
+            var xlabel = _graph.fragment.querySelector("text.x.label");
+            if (xlabel) {
+                xlabel.parentNode.removeChild(xlabel);
+            }
+
+            svg.append('text')
+                .attr('text-anchor', 'middle')
+                .attr("class", "x label")
+                .text(quantity.label)
+                    .attr('x', GRAPH.width / 2)
+                    .attr('y', CONTAINER.height - (MARGINS.bottom / 2));
+
+            horizontal_axis = {
+                quantity: quantity,
+                scale: scale,
+                axis: axis
+            };
+        } else {
+            // vertical axis
+            vertical = quantity_name;
+            var yaxisg = _graph.fragment.querySelector("g.y.axis");
+            if (yaxisg) {
+                yaxisg.parentNode.removeChild(yaxisg);
+            }
+
+            svg.append("g")
+                .attr("class",  "y axis")
+                .call(axis);
+
+            var ygridg = _graph.fragment.querySelector("g.y.grid");
+            if (ygridg) {
+                ygridg.parentNode.removeChild(ygridg);
+            }
+
+            svg.append("g")
+                .attr("class", "y grid")
+                .call(axis.tickSize(- GRAPH.width, 0, 0).tickFormat(""));
+
+            var ylabel = _graph.fragment.querySelector("text.y.label");
+            if (ylabel) {
+                ylabel.parentNode.removeChild(ylabel);
+            }
+
+            svg.append('text')
+                .attr('text-anchor', 'middle')
+                .attr("class", "y label")
+                .text(quantity.label)
+                    .attr('transform', 'rotate(-270,0,0)')
+                    .attr('x', GRAPH.height / 2)
+                    .attr('y', MARGINS.left * (5/6) );
+
+            vertical_axis = {
+                quantity: quantity,
+                scale: scale,
+                axis: axis
+            };
+        }
+
+        update_lines();
+        update_tailpoints();
+        
+    }
+
+    function update_lines() {
+        Object.keys(_graph.models).forEach(draw_line);
+    }
+
+    function update_tailpoints() {
+        Object.keys(_graph.models).forEach(draw_tailpoints);
+    }
+
+    function create_graph() {
+
+        // scales and axes (make all axis pre-made?)
+        set_axis(horizontal, "horizontal");
+        set_axis(vertical, "vertical");
+        svg.append("g")
+            .attr("class", "lines");
+        svg.append("g")
+            .attr("class", "tailpoints");
+
+        tangent_triangle.style("visibility", "hidden");
+
+
+    }
+    create_graph();
+
+    
+    _graph.remove = function(model_name) {
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.parentnode.removechild(model_line);
+        }
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.parentNode.removeChild(model_tailpoints);
+        }
+    };
+
+    _graph.update_all = function() {
+        _graph.compute_extrema();
+        set_axis(horizontal, "horizontal");
+        set_axis(vertical, "vertical");
+        Object.keys(_graph.models).forEach(_graph.update);
+    };
+
+
+    _graph.update = function(model_name) {
+        var model = _graph.get_model(model_name);
+        draw_line(model_name);
+        draw_tailpoints(model_name);
+    };
+
+    _graph.show_tailpoints = function(model_name) {
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.style.visibility = "visible";
+        }
+        showtailpoints = true;
+    };
+
+    _graph.hide_tailpoints = function(model_name) {
+        var model_tailpoints = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name);
+        if (model_tailpoints) {
+            model_tailpoints.style.visibility = "hidden";
+        }
+        showtailpoints = false;
+    };
+
+
+    _graph.show_line = function(model_name) {
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.style.visibility = "visible";
+        }
+        showline = true;
+    };
+
+    _graph.hide_line = function(model_name) {
+        var model_line = _graph.fragment
+            .querySelector("svg g.lines g.line." + model_name);
+        if (model_line) {
+            model_line.style.visibility = "hidden";
+        }
+        showline = false;
+    };
+
+    return _graph;
 };
 
-module.exports = dom;
+module.exports = graph;
 
-},{}],10:[function(require,module,exports){
+},{"../dom/dom":3,"./view":18}],15:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -7840,1088 +9255,22 @@ var table = function(config) {
 
 module.exports = table;
 
-},{"../dom/dom":9,"./view":8}],11:[function(require,module,exports){
-/*
- * Copyright (C) 2013 Huub de Beer
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- */
-
-var view = require("./view"),
-    dom = require("../dom/dom");
-
-var graph = function(config_, horizontal_, vertical_, dimensions_) {
-
-    var config = Object.create(config_);
-    config.type = "graph";
-    var _graph = view(config);
-
-    var horizontal = horizontal_,
-        vertical = vertical_;
-
-
-    var dimensions = dimensions_ || {
-        width: 900,
-        height: 600,
-        margin: {
-            top: 10,
-            right: 20,
-            left: 80,
-            bottom: 80
-        }
-    };
-
-    var CONTAINER = {
-            width: dimensions.width || 900,
-            height: dimensions.height || 600
-        };
-    var MARGINS = {
-            top:dimensions.margin.top || 10,
-            right:dimensions.margin.right || 20,
-            left:dimensions.margin.left || 60,
-            bottom:dimensions.margin.bottom || 60
-        };
-    var GRAPH = {
-            width: CONTAINER.width - MARGINS.left - MARGINS.right,
-            height: CONTAINER.height - MARGINS.top - MARGINS.bottom
-        };
-
-
-    _graph.fragment = document
-        .createDocumentFragment()
-        .appendChild(dom.create({
-            name: "figure",
-            attributes: {
-                "class": "graph"
-            }
-        }));
-
-    var svg = d3.select(_graph.fragment).append("svg")
-            .attr("width", CONTAINER.width)
-            .attr("height", CONTAINER.height)
-            .append("g")
-                .attr("transform", "translate(" + 
-                        MARGINS.left + "," + 
-                        MARGINS.right + ")");
-
-    var horizontal_axis, vertical_axis;
-
-    var showline = true,
-        showtailpoints = false;
-
-    function draw_tailpoints(model_name) {
-        var model = _graph.get_model(model_name).model,
-            step = function(value, index) {
-                var step_size = model.step_size() || 1;
-
-                return (index % step_size === 0) && (index !== 0);
-            },
-            data = model.data().filter(step),
-            x_scale = horizontal_axis.scale,
-            x_quantity = horizontal_axis.quantity,
-            y_scale = vertical_axis.scale,
-            y_quantity = vertical_axis.quantity;
-
-        var model_tailpoints = _graph.fragment
-            .querySelector("svg g.tailpoints g." + model_name);
-        if (model_tailpoints) {
-            model_tailpoints.parentNode.removeChild(model_tailpoints);
-        }
-
-
-        svg.select("g.tailpoints")
-                .append("g")
-                .attr("class", model_name)
-                .selectAll("line")
-                .data(data)
-                .enter()
-                .append("line")
-                .attr("x1", function(d) {
-                    return x_scale(d[x_quantity.name]);
-                })
-                .attr("y1", function(d) {
-                    return y_scale(d[y_quantity.name]);
-                })
-                .attr("x2", function(d) {
-                    return x_scale(d[x_quantity.name]);
-                })
-                .attr("y2", y_scale(0))
-                .attr("stroke", model.color || "red")
-                .style("stroke-width", 1)
-//                .style("stroke-opacity", 0.7)
-//                .style("stroke-dasharray", [3,1])
-                ;
-        svg.select("g.tailpoints g." + model_name)
-                .selectAll("circle")
-                .data(data)
-                .enter()
-                .append("circle")
-                .attr("cx", function(d) {
-                    return x_scale(d[x_quantity.name]);
-                })
-                .attr("cy", function(d) {
-                    return y_scale(d[y_quantity.name]);
-                })
-                .attr("r", 2)
-                .attr("stroke", "black")
-                .attr("fill", "white")
-                .style("stroke-width", 1.5)
-                .on("mouseover", add_tooltip(model_name))
-                .on("mouseout", remove_tooltip(model_name))
-                ;
-
-        model_tailpoints = _graph.fragment
-            .querySelector("svg g.tailpoints g." + model_name);
-        if (!showtailpoints) {
-            model_tailpoints.style.visibility = "hidden";
-        }            
-    }
-
-    function draw_line(model_name) {
-        var model = _graph.get_model(model_name).model,
-            data = model.data(),
-            x_scale = horizontal_axis.scale,
-            x_quantity = horizontal_axis.quantity,
-            y_scale = vertical_axis.scale,
-            y_quantity = vertical_axis.quantity;
-
-
-        var line = d3.svg.line()
-                .x(function(d) {
-                    return x_scale(d[x_quantity.name]);
-                })
-                .y(function(d) {
-                    return y_scale(d[y_quantity.name]);
-                })
-                .interpolate("cardinal")
-                .tension(1);
-                
-
-        var model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
-        if (model_line) {
-            model_line.parentNode.removeChild(model_line);
-        }
-
-
-        svg.select("g.lines")
-                .append("g")
-                .attr("class", "line " + model_name)
-                .selectAll("path." + model_name)
-                .data([data])
-                .enter()
-                .append("path")
-                .attr("d", line)
-                .attr("class", "graph")
-                .attr("fill", "none")
-                .attr("stroke", model.color || "red")
-                .style("stroke-width", 3)
-                .on("mouseover", add_tooltip(model_name))
-                .on("mousemove", add_tooltip(model_name))
-                .on("mouseout", remove_tooltip(model_name));
-
-        model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
-        if (!showline) {
-            model_line.style.visibility = "hidden";
-        }            
-
-    }
-
-    var tooltip = d3.select("body")
-        .append("div")
-        .attr("class", "tooltip")
-        .style("position", "absolute")
-        .style("visibility", "hidden")
-        .style("opacity", 0.7);
-
-    function add_tooltip(model_name) {
-        return function(d, i) {
-            var PADDING = 10;
-            var line = svg.select("g.lines g.line." + model_name + " path");
-            line.style("cursor", "crosshair");
-
-            var container = _graph.fragment.querySelector("svg > g"),
-                point = d3.mouse(container),
-                x_scale = horizontal_axis.scale,
-                x_quantity = horizontal_axis.quantity,
-                y_scale = vertical_axis.scale,
-                y_quantity = vertical_axis.quantity,
-                x = x_scale.invert(point[0]).toFixed(x_quantity.precision || 0),
-                y = y_scale.invert(point[1]).toFixed(y_quantity.precision || 0),
-                x_unit = x_quantity.unit,
-                y_unit = y_quantity.unit;
-                            
-
-            tooltip.html( x + " " + x_unit + "; " + y + " " + y_unit);
-
-            tooltip
-                .style("left", (d3.event.pageX + PADDING*2) + "px")     
-                .style("top", (d3.event.pageY - PADDING) + "px");   
-
-            tooltip.style("visibility", "visible");
-        };
-    }
-
-    function remove_tooltip(model_name) {
-        return function() {
-            var line = svg.select("g.lines g.line." + model_name + " path");
-            line.style("cursor", "default");
-            tooltip.style("visibility", "hidden");
-        };
-    }
-
-
-    function create_caption() {
-        var get_name = function(q) {
-                return _graph.quantities[q].name;
-            },
-            quantity_names = Object.keys(_graph.quantities),
-            horizontal_selected_index = quantity_names.indexOf(
-                    horizontal),
-            vertical_selected_index = quantity_names.indexOf(
-                    vertical),
-            create_option = function(selected_index) {
-                return function(quantity_name, index) {
-                    var option = {
-                        name: "option",
-                        value: quantity_name
-                    };
-                    if (index === selected_index) {
-                        option.attributes = {
-                            selected: true
-                        };
-                    }
-                    return option;
-                };
-            },
-            horizontal_quantity_list = quantity_names.map(
-                    create_option(horizontal_selected_index)),
-            vertical_quantity_list = quantity_names.map(
-                    create_option(vertical_selected_index));
-
-        _graph.fragment.appendChild(dom.create({
-                name: "figcaption",
-                children: [
-                {
-                    name: "select",
-                    children: horizontal_quantity_list,
-                    on: {
-                        type: "change",
-                        callback: function(event) {
-                            var quantity = event.target.value;
-                            set_axis(quantity, "horizontal");
-                        }
-                    }
-                }, 
-                {
-                    name: "textNode",
-                    value: " - "
-                }, 
-                {
-                    name: "select",
-                    attributes: {
-
-                    },
-                    children: vertical_quantity_list,
-                    on: {
-                        type: "change",
-                        callback: function(event) {
-                            var quantity = event.target.value;
-                            set_axis(quantity, "vertical");
-                        }
-                    }
-                },
-                {
-                    name: "textNode",
-                    value: " grafiek"
-                }            
-                ]
-            }));
-    }
-    create_caption();
-
-
-    function set_axis(quantity_name, orientation) {
-        var quantity = _graph.quantities[quantity_name],
-            create_scale = function(quantity, orientation) {
-                var range;
-                if (orientation === "horizontal") {
-                    range = [0, GRAPH.width];
-                } else {
-                    range = [GRAPH.height, 0];
-                }
-                return d3.scale.linear()
-                    .range(range)
-                    .domain([quantity.minimum, quantity.maximum]);
-            },
-            scale = create_scale(quantity, orientation),
-            create_axis = function(quantity, orientation) {
-                var axis;
-                if (orientation === "horizontal") {
-                    axis = d3.svg.axis()
-                        .scale(scale)
-                        .tickSubdivide(3);
-                } else {
-                    axis = d3.svg.axis()
-                        .scale(scale)
-                        .orient("left")
-                        .tickSubdivide(3);
-                }
-                return axis;
-            },
-            axis = create_axis(quantity, orientation);
-       
-        if (orientation === "horizontal") {
-            horizontal = quantity_name;
-            //  create axes    
-            var xaxisg = _graph.fragment.querySelector("g.x.axis");
-            if (xaxisg) {
-                xaxisg.parentNode.removeChild(xaxisg);
-            }
-
-            svg.append("g")
-                .attr("class", "x axis")
-                .attr("transform", "translate(0," + GRAPH.height + ")")
-                .call(axis);
-
-            var xgridg = _graph.fragment.querySelector("g.x.grid");
-            if (xgridg) {
-                xgridg.parentNode.removeChild(xgridg);
-            }
-
-            svg.append("g")
-                .attr("class", "x grid")
-                .attr("transform", "translate(0," + GRAPH.height + ")")
-                .call(axis.tickSize(- GRAPH.height, 0, 0).tickFormat(""));
-
-            var xlabel = _graph.fragment.querySelector("text.x.label");
-            if (xlabel) {
-                xlabel.parentNode.removeChild(xlabel);
-            }
-
-            svg.append('text')
-                .attr('text-anchor', 'middle')
-                .attr("class", "x label")
-                .text(quantity.label)
-                    .attr('x', GRAPH.width / 2)
-                    .attr('y', CONTAINER.height - (MARGINS.bottom / 2));
-
-            horizontal_axis = {
-                quantity: quantity,
-                scale: scale,
-                axis: axis
-            };
-        } else {
-            // vertical axis
-            vertical = quantity_name;
-            var yaxisg = _graph.fragment.querySelector("g.y.axis");
-            if (yaxisg) {
-                yaxisg.parentNode.removeChild(yaxisg);
-            }
-
-            svg.append("g")
-                .attr("class",  "y axis")
-                .call(axis);
-
-            var ygridg = _graph.fragment.querySelector("g.y.grid");
-            if (ygridg) {
-                ygridg.parentNode.removeChild(ygridg);
-            }
-
-            svg.append("g")
-                .attr("class", "y grid")
-                .call(axis.tickSize(- GRAPH.width, 0, 0).tickFormat(""));
-
-            var ylabel = _graph.fragment.querySelector("text.y.label");
-            if (ylabel) {
-                ylabel.parentNode.removeChild(ylabel);
-            }
-
-            svg.append('text')
-                .attr('text-anchor', 'middle')
-                .attr("class", "y label")
-                .text(quantity.label)
-                    .attr('transform', 'rotate(-270,0,0)')
-                    .attr('x', GRAPH.height / 2)
-                    .attr('y', MARGINS.left * (5/6) );
-
-            vertical_axis = {
-                quantity: quantity,
-                scale: scale,
-                axis: axis
-            };
-        }
-
-        update_lines();
-        update_tailpoints();
-        
-    }
-
-    function update_lines() {
-        Object.keys(_graph.models).forEach(draw_line);
-    }
-
-    function update_tailpoints() {
-        Object.keys(_graph.models).forEach(draw_tailpoints);
-    }
-
-    function create_graph() {
-
-        // scales and axes (make all axis pre-made?)
-        set_axis(horizontal, "horizontal");
-        set_axis(vertical, "vertical");
-        svg.append("g")
-            .attr("class", "lines");
-        svg.append("g")
-            .attr("class", "tailpoints");
-
-    }
-    create_graph();
-
-    
-    _graph.remove = function(model_name) {
-        var model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
-        if (model_line) {
-            model_line.parentnode.removechild(model_line);
-        }
-        var model_tailpoints = _graph.fragment
-            .querySelector("svg g.tailpoints g." + model_name);
-        if (model_tailpoints) {
-            model_tailpoints.parentNode.removeChild(model_tailpoints);
-        }
-    };
-
-    _graph.update_all = function() {
-        _graph.compute_extrema();
-        set_axis(horizontal, "horizontal");
-        set_axis(vertical, "vertical");
-        Object.keys(_graph.models).forEach(_graph.update);
-    };
-
-
-    _graph.update = function(model_name) {
-        var model = _graph.get_model(model_name);
-        draw_line(model_name);
-        draw_tailpoints(model_name);
-    };
-
-    _graph.show_tailpoints = function(model_name) {
-        var model_tailpoints = _graph.fragment
-            .querySelector("svg g.tailpoints g." + model_name);
-        if (model_tailpoints) {
-            model_tailpoints.style.visibility = "visible";
-        }
-        showtailpoints = true;
-    };
-
-    _graph.hide_tailpoints = function(model_name) {
-        var model_tailpoints = _graph.fragment
-            .querySelector("svg g.tailpoints g." + model_name);
-        if (model_tailpoints) {
-            model_tailpoints.style.visibility = "hidden";
-        }
-        showtailpoints = false;
-    };
-
-
-    _graph.show_line = function(model_name) {
-        var model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
-        if (model_line) {
-            model_line.style.visibility = "visible";
-        }
-        showline = true;
-    };
-
-    _graph.hide_line = function(model_name) {
-        var model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
-        if (model_line) {
-            model_line.style.visibility = "hidden";
-        }
-        showline = false;
-    };
-
-    return _graph;
-};
-
-module.exports = graph;
-
-},{"./view":8,"../dom/dom":9}],12:[function(require,module,exports){
-
-var ruler = function(canvas, config, MEASURE_LINE_WIDTH) {
-    var _ruler = canvas.set();
-
-    var x = config.x || 0,
-        y = config.y || 0,
-        width = config.width || 50,
-        height = config.height || 500,
-        scale = config.scale || 2,
-        orientation = config.orientation || "vertical";
-
-    var background,
-        ticks,
-        labels,
-        measure_line,
-        glass_pane;
-
-    draw();
-    style({
-        background: "yellow",
-        stroke: "dimgray",
-        stroke_width: 2,
-        font_size: "12pt"
-    });
-
-
-    function move_measuring_line(e, x_, y_) {
-        var path;
-
-        if (orientation === "horizontal") {
-            path = "M" + (x_) + "," + (y + height) + "v-" + MEASURE_LINE_WIDTH;
-        } else {
-            path = "M" + x + "," + (y_) + "h" + MEASURE_LINE_WIDTH;
-        }
-        measure_line.attr({
-            "path": path
-        });
-    }
-
-    function show_measuring_line() {
-        glass_pane.mousemove(move_measuring_line);
-        measure_line.show();
-    }
-
-    function hide_measuring_line() {
-        glass_pane.unmousemove(move_measuring_line);
-        measure_line.hide();
-    }
-
-    
-    function draw() {
-        background = canvas.rect(x, y, width, height);
-        _ruler.push(background);
-        _ruler.push(draw_ticks());
-        _ruler.push(draw_labels());
-        measure_line = canvas.path("M0,0");
-        measure_line.attr({
-            stroke: "crimson",
-            "stroke-width": 2,
-            "stroke-opacity": 0.5
-        });
-        _ruler.push(measure_line);
-        measure_line.hide();
-        glass_pane = canvas.rect(x, y, width, height);
-        glass_pane.attr({
-            fill: "white",
-            opacity: 0,
-            stroke: "white",
-            "stroke-opacity": 0
-        });
-        _ruler.push(glass_pane);
-
-        glass_pane.mouseover(show_measuring_line);
-        glass_pane.mouseout(hide_measuring_line);
-
-        function draw_labels() {
-            labels = canvas.set();
-            
-            var ONE_CM_IN_PX = scale * 10,
-                cm = 0;
-
-            if (orientation === "vertical") {
-                var h = y + height,
-                    y_end = y + ONE_CM_IN_PX,
-                    x_start = x + (width/4);
-
-                while (h > y_end) {
-                    h = h - ONE_CM_IN_PX;
-                    cm++;
-                    labels.push(canvas.text(x_start, h, cm));
-                }
-            } else {
-                var w = x,
-                    x_end = x + width - ONE_CM_IN_PX,
-                    y_start = y + (height/(4/3));
-
-                while (w < x_end) {
-                    w = w + ONE_CM_IN_PX;
-                    cm++;
-                    labels.push(canvas.text(w, y_start, cm));
-                }
-            }
-
-
-            return labels;
-        }
-
-        function draw_ticks() {
-            var CM_SIZE = 13,
-                HALF_CM_SIZE = 8,
-                MM_SIZE = 5,
-                cm_ticks = canvas.path(create_ticks_path(0, CM_SIZE)),
-                half_cm_ticks = canvas.path(create_ticks_path(scale*5, HALF_CM_SIZE));
-
-            ticks = canvas.set();
-            cm_ticks.attr("stroke-width", 1);
-            ticks.push(cm_ticks);
-            half_cm_ticks.attr("stroke-width", 1);
-            ticks.push(half_cm_ticks);
-            [1, 2, 3, 4, 6, 7, 8, 9].forEach(draw_mm_ticks);
-
-            function draw_mm_ticks(step) {
-                  var mm_ticks = canvas.path(create_ticks_path(scale*step, MM_SIZE));
-                  mm_ticks.attr("stroke-width", 0.5);
-                  ticks.push(mm_ticks);
-            }
-
-            function create_ticks_path(step, size) {
-                var ONE_CM_IN_PX = scale * 10,
-                    ticks_path;
-                if (orientation === "vertical") {
-                    var h = y + height + step,
-                        y_end = y + ONE_CM_IN_PX,
-                        x_start = x + width;
-
-                    while (h > y_end) {
-                        h = h - ONE_CM_IN_PX;
-                        ticks_path += "M" + x_start + "," + h + "h-" + size;
-                    }
-                } else {
-                    var w = x - step,
-                        x_end = x + width - ONE_CM_IN_PX,
-                        y_start = y;
-
-                    while (w < x_end) {
-                        w = w + ONE_CM_IN_PX;
-                        ticks_path += "M" + w + "," + y_start + "v" + size;
-                    }
-                }
-
-                return ticks_path;
-            }
-
-            return ticks;
-        }
-
-    }
-
-    function style(config) {
-        if (config.background) {
-            background.attr("fill", config.background);
-        }
-        if (config.stroke) {
-            background.attr("stroke", config.stroke);
-            ticks.attr("stroke", config.stroke);
-
-        }
-        if (config.stroke_width) {
-            background.attr("stroke-width", config.stroke_width);
-        }
-        if (config.font_size) {
-            labels.attr("font-size", config.font_size);
-        }
-        if (config.font_family) {
-            labels.attr("font-family", config.font_family);
-        }
-
-        return _ruler;
-    }
-
-    _ruler.style = style;
-
-    return _ruler;
-
-};
-
-module.exports = ruler;
-
-},{}],13:[function(require,module,exports){
-
-var glass = require("./glass");
-
-var longdrink_glass = function(canvas, model, SCALE, boundaries_) {
-    var HANDLE_SPACE = 15,
-        HANDLE_SIZE = 2.5;
-
-    var PADDING = 5;
-
-    var _glass = glass(canvas, model, SCALE, boundaries_);
-
-    _glass.handle = canvas.circle( 
-            _glass.x + _glass.width + HANDLE_SPACE, 
-            _glass.y - HANDLE_SPACE, 
-            HANDLE_SIZE);
-    _glass.handle.attr({
-        fill: "silver",
-        "stroke": "silver"
-    });
-    _glass.push(_glass.handle);
-    _glass.handle.hover(enable_resizing, disable_resizing);
-    _glass.handle.drag(sizemove, sizestart, sizestop);
-
-    var old_height, old_radius, delta_x, delta_y;
-    function sizemove(dx, dy) {
-        var 
-            d_height = dy / SCALE / 10,
-            d_radius = dx / 2 / SCALE / 10,
-            new_radius = old_radius + d_radius,
-            new_height = old_height - d_height,
-            area = Math.PI * new_radius * new_radius;
-
-
-        if (area*new_height >= 5){
-            delta_y = dy;
-            model.height(new_height);
-            model.radius(new_radius);
-            _glass.draw_at(_glass.x, _glass.y+dy);
-        }
-
-    }
-
-    function sizestart() {
-        delta_x = 0;
-        delta_y = 0;
-        old_height = model.height();
-        old_radius = model.radius();
-        model.action("reset").callback(model)();
-    }
-
-    function sizestop() {
-        _glass.y += delta_y;
-    }
-
-
-    function enable_resizing() {
-        _glass.handle.attr({
-            fill: "yellow",
-            stroke: "black",
-            "stroke-width": 2,
-            r: HANDLE_SIZE * 1.5,
-            cursor: "nesw-resize"
-        });
-        _glass.glass_pane.attr({
-            fill: "lightyellow",
-            opacity: 0.7
-        });
-    }
-
-    function disable_resizing() {
-        _glass.handle.attr({
-            fill: "silver",
-            stroke: "silver",
-            "stroke-width": 1,
-            r: HANDLE_SIZE,
-            cursor: "default"
-        });
-        _glass.glass_pane.attr({
-            fill: "white",
-            opacity: 0
-        });
-    }
-
-    function update_size() {
-        var bbox = _glass.glass_pane.getBBox();
-
-        _glass.width = bbox.width;
-        _glass.height = bbox.height;
-    }
-
-    _glass.draw_at = function (x, y) {
-
-        _glass.fill.attr({path: model.bowl_path(SCALE, true, x, y)});
-        _glass.bowl_shape.attr({path: model.bowl_path(SCALE, false, x, y)});
-        _glass.base_shape.attr({path: model.base_path(SCALE, x, y)});
-        _glass.glass_pane.attr({path: model.path(SCALE, false, x, y)});
-        update_size();
-        var MAX_LINE_WIDTH = Math.min(30, _glass.width / 2),
-            MAX_LINE_SKIP = 5,
-            MAX_LINE_Y = y + _glass.height - model.get_maximum("hoogte") * 10 * SCALE;
-        _glass.max_line.attr({
-            path: "M" + x + "," + MAX_LINE_Y + 
-                "h" + MAX_LINE_WIDTH
-        });
-        _glass.max_label.attr({
-            x: x + MAX_LINE_WIDTH / 1.5,
-            y: MAX_LINE_Y - MAX_LINE_SKIP            
-        });
-
-        _glass.handle.attr({
-            cx: x + _glass.width + HANDLE_SPACE, 
-            cy: y - HANDLE_SPACE
-        });
-        _glass.set_label(x, y);
-    };
-
-    _glass.set_label = function(x_, y_) {
-        var x = x_, y = y_;
-        model.compute_maxima();
-        _glass.label.attr({
-            x: x + _glass.width / 2,
-            y: y + _glass.height/2,
-            "font-size": compute_font_size(),
-            text: model.get_maximum("volume") + " ml"
-        });
-        function compute_font_size() {
-            return Math.max((((_glass.width - 2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
-        }
-    };
-
-
-
-    return _glass;
-};
-
-module.exports = longdrink_glass;
-
-},{"./glass":14}],14:[function(require,module,exports){
-
-var raphael = require("raphael-browserify");
-
-
-var glass = function(canvas, model, SCALE) {
-    var _glass = canvas.set();
-
-    var GLASS_BORDER = 3;
-
-    var x = 0, 
-        y = 0, 
-        width, 
-        height;
-
-    var PADDING = 5;
-
-
-    function update() {
-        fill.attr("fill", model.color());
-        _glass.draw_at(_glass.x, _glass.y);
-    }
-
-    var fill, base_shape, bowl_shape, max_line, max_label, label, glass_pane;
-
-    function draw() {
-        label = canvas.text(x, y, model.get_maximum("volume") + " ml");
-        label.attr({
-        });
-        _glass.push(label);
-        fill = canvas.path(model.bowl_path(SCALE, true));
-        fill.attr({
-            fill: model.color(),
-            stroke: "none",
-            opacity: 0.4
-        });
-        _glass.push(fill);
-
-        max_line = canvas.path("M0,0");
-        max_line.attr({
-            stroke: "dimgray",
-            "stroke-width": 1
-        });
-        _glass.push(max_line);
-
-        max_label = canvas.text(x, y, "max");
-        max_label.attr({
-            stroke: "none",
-            fill: "dimgray",
-            "font-family": "inherit",
-            "font-size": "10pt"
-        });
-        _glass.push(max_label);
-
-        bowl_shape = canvas.path(model.bowl_path(SCALE));
-        bowl_shape.attr({
-            "stroke": "black",
-            "stroke-width": GLASS_BORDER,
-            "fill": "none"
-        });
-        _glass.push(bowl_shape);  
-
-        base_shape = canvas.path(model.base_path(SCALE));
-        base_shape.attr({
-            "stroke": "black",
-            "stroke-width": GLASS_BORDER,
-            "fill": "dimgray"
-        });
-        _glass.push(base_shape);  
-
-        glass_pane = canvas.path(model.path(SCALE));
-        glass_pane.attr({
-            fill: "white",
-            opacity: 0,
-            stroke: "white",
-            "stroke-opacity": 0,
-            "stroke-width": GLASS_BORDER
-        });
-        _glass.push(glass_pane);
-
-
-        var bbox = _glass.getBBox();
-        width = bbox.width;
-        height = bbox.height;
-
-        set_label();
-
-        glass_pane.hover(onhover, offhover);
-        glass_pane.drag(onmove, onstart, onend);
-
-        glass_pane.dblclick(run_pause);
-    }
-
-    function run_pause() {
-        if (model.is_finished()) {
-            model.action("reset").callback(model)();
-        } else {
-            model.action("start").callback(model)();
-        }
-    }
-
-    function set_label(x_, y_) {
-        var bowlbb = bowl_shape.getBBox(),
-            bowl_width = bowlbb.width,
-            bowl_height = bowlbb.height;
-
-        var x = x_, y = y_;
-
-        label.attr({
-            x: x,
-            y: y + bowl_height/2,
-            "font-size": compute_font_size(),
-            text: model.get_maximum("volume") + " ml"
-        });
-        function compute_font_size() {
-            return Math.max((((bowl_width - 2*PADDING)/ ((model.get_maximum("volume") + "").length + 3)) - PADDING), 8) + "px";
-        }
-    }
-    _glass.set_label = set_label;
-
-
-    var delta_x = 0, delta_y = 0;
-    function onmove(dx, dy) {
-        delta_x = dx;
-        delta_y = dy;
-        _glass.draw_at(_glass.x+dx, _glass.y+dy);
-    }
-    
-
-    function onstart() {
-        model.action("pause").callback(model)();
-        delta_x = 0;
-        delta_y = 0;
-    }
-
-    function onend() {
-        _glass.x += delta_x;
-        _glass.y += delta_y;
-    }
-
-    function onhover() {
-        _glass.attr({
-            "cursor": "move"
-        });
-    }
-
-    function offhover() {
-        _glass.attr({
-            "cursor": "default"
-        });
-    }
-
-
-    _glass.draw_at = function (x, y) {
-
-        _glass.fill.attr({path: model.bowl_path(SCALE, true, x, y)});
-        _glass.bowl_shape.attr({path: model.bowl_path(SCALE, false, x, y)});
-        _glass.base_shape.attr({path: model.base_path(SCALE, x, y)});
-        _glass.glass_pane.attr({path: model.path(SCALE, false, x, y)});
-        var MAX_LINE_WIDTH = Math.min(30, width / 2),
-            MAX_LINE_SKIP = 5,
-            MAX_LINE_Y = y + height - model.get_maximum("hoogte") * 10 * SCALE;
-        _glass.max_line.attr({
-            path: "M" + x + "," + MAX_LINE_Y + 
-                "h" + MAX_LINE_WIDTH
-        });
-        _glass.max_label.attr({
-            x: x + MAX_LINE_WIDTH / 1.5,
-            y: MAX_LINE_Y - MAX_LINE_SKIP            
-        });
-
-        _glass.set_label(x, y);
-    };
-
-    function draw_at_bottom(boundaries, distance_from_left) {
-        var bbox = _glass.glass_pane.getBBox(),
-            width = _glass.width,
-            height = _glass.height,
-            x = Math.min(boundaries.x + (distance_from_left || width), boundaries.x + (boundaries.width - width)),
-            y = boundaries.y + boundaries.height - height + 2*_glass.bowl_shape.attr("stroke-width");
-
-        _glass.draw_at(x, y);
-        _glass.x = x;
-        _glass.y = y;
-    }
-    _glass.draw_at_bottom = draw_at_bottom;
-
-    function update_color() {
-        fill.attr("fill", model.color());
-    }
-
-
-    draw();
-    _glass.height = height;
-    _glass.width = width;
-    _glass.x = x;
-    _glass.y = y;
-    _glass.draw = draw;
-    _glass.update = update;
-    _glass.update_color = update_color;
-    _glass.fill = fill;
-    _glass.label = label;
-    _glass.bowl_shape = bowl_shape;
-    _glass.base_shape = base_shape;
-    _glass.max_line = max_line;
-    _glass.max_label = max_label;
-    _glass.glass_pane = glass_pane;
-    return _glass;
-};
-
-module.exports = glass;
-
-},{"raphael-browserify":6}],15:[function(require,module,exports){
+},{"../dom/dom":3,"./view":18}],16:[function(require,module,exports){
 
 var view = require("../view"),
+    draw_thermometer = require("./thermometer"),
     dom = require("../../dom/dom"),
-    ruler = require("./ruler"),
-    raphael = require("raphael-browserify"),
-    longdrink = require("./longdrink_glass"),
-    various_glass = require("./glass");
+    raphael = require("raphael-browserify");
 
-var flaskfiller = function(config, scale_, dimensions_) {
-    var _flaskfiller = view(config);
+var temperaturetyper = function(config, scale_, dimensions_) {
+    
+    var _temperaturetyper = view(config);
 
     var scale = scale_ || 4; // px per mm
 
     var dimensions = dimensions_ || {
-        width: 900,
-        height: 600,
-        ruler_width: 30,
+        width: 300,
+        height: 350,
         margins: {
             left: 5,
             right: 5,
@@ -8931,123 +9280,140 @@ var flaskfiller = function(config, scale_, dimensions_) {
     };
 
     var CONTAINER = {
-            width: dimensions.width || 900,
-            height: dimensions.height || 600
+            width: dimensions.width,
+            height: dimensions.height
         };
 
-    var RULERS = {
-            horizontal: {
-                x:  dimensions.ruler_width + dimensions.margins.left,
-                y:  CONTAINER.height - dimensions.ruler_width - dimensions.margins.top,
-                width: CONTAINER.width - dimensions.ruler_width - dimensions.margins.left - dimensions.margins.right,
-                height: dimensions.ruler_width,
-                scale: scale,
-                orientation: "horizontal"
-            },
-            vertical: {
-                x:  0 + dimensions.margins.left,
-                y:  0 + dimensions.margins.top,
-                width: dimensions.ruler_width,
-                height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom,
-                scale: scale,
-                orientation: "vertical"
-            }
-        };
+    
 
-    var SIMULATION = {
-            x:  dimensions.ruler_width + dimensions.margins.left,
-            y:  0 + dimensions.margins.top,
-            width: CONTAINER.width - dimensions.ruler_width - dimensions.margins.left - dimensions.margins.right,
-            height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom
-        };
-
-
-    _flaskfiller.fragment = document
+    _temperaturetyper.fragment = document
         .createDocumentFragment()
         .appendChild(dom.create({
             name: "figure",
             attributes: {
-                "class": "flaskfiller"
+                "class": "temperaturetyper"
             }
         }));
 
+
+    var message = _temperaturetyper.fragment.appendChild(
+            dom.create({
+                name: "div",
+                attributes: {
+                    "class": "message"
+                },
+                value: "Activate to start measuring"
+            }));
+    var measuring_container = _temperaturetyper.fragment.appendChild(
+            dom.create({
+                name: "div",
+                attributes: {
+                    "class": "container"
+                }
+            }));
+    measuring_container.style.height = CONTAINER.height;
+    measuring_container.style.width = CONTAINER.width;
+
+    var measuring_simulation = measuring_container.appendChild(
+            dom.create({
+                name: "figure",
+                attributes: {
+                    "class": "simulation"
+                }
+            }));
+
+    var measuring_data = measuring_container.appendChild(
+            dom.create({
+                name: "textarea",
+                attributes: {
+                    "class": "data",
+                    "cols": 25,
+                    "rows": 20
+                },
+                style: {
+                    "overflow-y": "auto",
+                    "overflow-x": "hidden"
+                },
+                on: {
+                    type: "keydown",
+                    callback: add_new_measurement
+                },
+                value: format_time(0) + "\t\t"
+            }));
+
+
+
+
     // There is a bug in Raphael regarding placing text on the right
     // y-coordinate when the canvas isn't part of the DOM
-    document.body.appendChild(_flaskfiller.fragment);
+    document.body.appendChild(_temperaturetyper.fragment);
 
-    var canvas = raphael(_flaskfiller.fragment, 
+    var canvas = raphael(measuring_simulation, 
             CONTAINER.width, 
             CONTAINER.height);
-
-    var vertical_ruler = ruler(canvas, RULERS.vertical, CONTAINER.width)
-            .style({
-                "background": "white"
-            }),
-        horizontal_ruler = ruler(canvas, RULERS.horizontal, CONTAINER.height)
-            .style({
-                "background": "white"
-            }),
-        cm_label = draw_cm_label();
+    
+    var thermometer = draw_thermometer(canvas);
 
 
+    var time = 0;
+    function format_time(time) {
+        // time in 0.1 seconds
+        var seconds,
+            minutes = "00",
+            milliseconds;
 
-    function draw_cm_label() {
-       var x = dimensions.margins.left + (dimensions.ruler_width / 3),
-           y = CONTAINER.height - (dimensions.ruler_width / 2) - dimensions.margins.bottom,
-           cm_label = canvas.text(x, y, "cm");
-
-       cm_label.attr({
-           "font-family": "inherit",
-           "font-size": "18pt",
-           "font-weight": "bolder",
-           "fill": "dimgray"
-       }); 
-
-       return cm_label;
-    }
-
-
-    function add_glass(model) {
-        var glass;
-        if (model.type === "longdrink") {
-            glass = longdrink(canvas, model, scale);
-        } else {
-            glass = various_glass(canvas, model, scale);
+        if (time >= 600) {
+            minutes = ("0" + Math.floor((time / 600))).substr(-2);
         }
-        vertical_ruler.toFront();
-        horizontal_ruler.toFront();
-        return glass;
+        seconds = ("0" + Math.floor((time % 600) / 10)).substr(-2);
+        milliseconds = ((time % 600) % 10);
+
+        return "" + minutes + ":" + seconds + "," + milliseconds;
     }
 
-    function update_glass(glass) {
-        glass.update_color();        
-        glass.update();
+    function add_new_measurement(event) {
+        var key = event.key || event.keyCode;
+        if (key === 13 || key === 10 || key === "Enter") {
+            // enter - key
+            event.preventDefault();
+            time++;
+            var lastline = this.value.substr(this.value.lastIndexOf("\n")+1),
+                temperature = parseFloat(lastline.substr(lastline.lastIndexOf("\t")+1));
+            if (!isNaN(temperature)) {
+                if (-20 <= temperature && temperature <= 100) {
+                    thermometer.set_temperature(temperature);
+                }
+            }
+            
+            this.value += "\n" + format_time(time) + "\t\t";
+            return false;
+        } else if (key === 9 || key === "Tab") {
+            // tab - key
+            event.preventDefault();
+            this.value += "\t";
+            return false;
+        } 
     }
 
-    _flaskfiller.update = function(model_name) {
-        var model = _flaskfiller.get_model(model_name);
-
-        if (!model.glass) {
-            model.glass = add_glass(model.model);
-            model.glass.draw_at_bottom(SIMULATION, Math.random() * SIMULATION.width);
-        }
-
-        update_glass(model.glass);
-
+    _temperaturetyper.update = function(model_name) {
     };
+
+    _temperaturetyper.remove = function(model_name) {
+    };
+
 
 
     // There is a bug in Raphael regarding placing text on the right
     // y-coordinate when the canvas isn't part of the DOM. It has been added
     // before and now removed again.
-    document.body.removeChild(_flaskfiller.fragment);
-    return _flaskfiller;
+    document.body.removeChild(_temperaturetyper.fragment);
+    return _temperaturetyper;
 
 };
 
-module.exports = flaskfiller;
+module.exports = temperaturetyper;
 
-},{"../view":8,"../../dom/dom":9,"./ruler":12,"./longdrink_glass":13,"./glass":14,"raphael-browserify":6}],16:[function(require,module,exports){
+},{"../../dom/dom":3,"../view":18,"./thermometer":17,"raphael-browserify":1}],17:[function(require,module,exports){
 
 var thermometer = function(canvas, dimensions_) {
 
@@ -9256,165 +9622,125 @@ var thermometer = function(canvas, dimensions_) {
 
 module.exports = thermometer;
 
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
+/*
+ * Copyright (C) 2013 Huub de Beer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
 
-var view = require("../view"),
-    draw_thermometer = require("./thermometer"),
-    dom = require("../../dom/dom"),
-    raphael = require("raphael-browserify");
+var view = function(config) {
+    var _view = {},
+        _appendix = {};
 
-var temperaturetyper = function(config, scale_, dimensions_) {
-    
-    var _temperaturetyper = view(config);
-
-    var scale = scale_ || 4; // px per mm
-
-    var dimensions = dimensions_ || {
-        width: 300,
-        height: 350,
-        margins: {
-            left: 5,
-            right: 5,
-            top: 5,
-            bottom: 5
-        }
-    };
-
-    var CONTAINER = {
-            width: dimensions.width,
-            height: dimensions.height
+    // Quantities to show
+    var show = function(quantity) {
+            return !config.quantities[quantity].hidden;
+        },
+        quantities = {},
+        add_quantity = function(q) {
+            var quantity = config.quantities[q];
+            quantities[quantity.name] = Object.create(quantity);
         };
+    Object.keys(config.quantities).filter(show).forEach(add_quantity);
+    _view.quantities = quantities;
 
     
+    // Observer pattern
 
-    _temperaturetyper.fragment = document
-        .createDocumentFragment()
-        .appendChild(dom.create({
-            name: "figure",
-            attributes: {
-                "class": "temperaturetyper"
-            }
-        }));
+    var models = {};
 
+    _view.compute_extrema = function() {
+        // WARNING SOMEHOW CHANGES THE QUANTITIES OF THE MODELS ...
+        var compute_maximum = function(quantity_name){
+                return function(max, model_name) {
+                    var model = models[model_name].model;
+                    return Math.max(max, model.get_maximum(quantity_name));
+                };
+            },
+            compute_minimum = function(quantity_name){
+                return function(min, model_name) {
+                    var model = models[model_name].model;
+                    return Math.min(min, model.get_minimum(quantity_name));
+                };
+            },
+            compute_quantity_extrema = function(quantity_name) {
+                var quantity = _view.quantities[quantity_name];
 
-    var message = _temperaturetyper.fragment.appendChild(
-            dom.create({
-                name: "div",
-                attributes: {
-                    "class": "message"
-                },
-                value: "Activate to start measuring"
-            }));
-    var measuring_container = _temperaturetyper.fragment.appendChild(
-            dom.create({
-                name: "div",
-                attributes: {
-                    "class": "container"
-                }
-            }));
-    measuring_container.style.height = CONTAINER.height;
-    measuring_container.style.width = CONTAINER.width;
+                quantity.minimum = Object.keys(models)
+                    .reduce(compute_minimum(quantity_name), Infinity);
+                quantity.maximum = Object.keys(models)
+                    .reduce(compute_maximum(quantity_name), -Infinity);
+            };
 
-    var measuring_simulation = measuring_container.appendChild(
-            dom.create({
-                name: "figure",
-                attributes: {
-                    "class": "simulation"
-                }
-            }));
+        Object.keys(_view.quantities)
+            .forEach(compute_quantity_extrema);
+    };
 
-    var measuring_data = measuring_container.appendChild(
-            dom.create({
-                name: "textarea",
-                attributes: {
-                    "class": "data",
-                    "cols": 25,
-                    "rows": 20
-                },
-                style: {
-                    "overflow-y": "auto",
-                    "overflow-x": "hidden"
-                },
-                on: {
-                    type: "keydown",
-                    callback: add_new_measurement
-                },
-                value: format_time(0) + "\t\t"
-            }));
-
-
-
-
-    // There is a bug in Raphael regarding placing text on the right
-    // y-coordinate when the canvas isn't part of the DOM
-    document.body.appendChild(_temperaturetyper.fragment);
-
-    var canvas = raphael(measuring_simulation, 
-            CONTAINER.width, 
-            CONTAINER.height);
-    
-    var thermometer = draw_thermometer(canvas);
-
-
-    var time = 0;
-    function format_time(time) {
-        // time in 0.1 seconds
-        var seconds,
-            minutes = "00",
-            milliseconds;
-
-        if (time >= 600) {
-            minutes = ("0" + Math.floor((time / 600))).substr(-2);
+    _view.register = function(model) {
+        var model_found = Object.keys(models).indexOf(model.name);
+        if (model_found === -1) {
+            models[model.name] = {
+                model: model
+            };
+            _view.compute_extrema();
+            model.register(this);
+            _view.update(model.name);
         }
-        seconds = ("0" + Math.floor((time % 600) / 10)).substr(-2);
-        milliseconds = ((time % 600) % 10);
-
-        return "" + minutes + ":" + seconds + "," + milliseconds;
-    }
-
-    function add_new_measurement(event) {
-        var key = event.key || event.keyCode;
-        if (key === 13 || key === 10 || key === "Enter") {
-            // enter - key
-            event.preventDefault();
-            time++;
-            var lastline = this.value.substr(this.value.lastIndexOf("\n")+1),
-                temperature = parseFloat(lastline.substr(lastline.lastIndexOf("\t")+1));
-            if (!isNaN(temperature)) {
-                if (-20 <= temperature && temperature <= 100) {
-                    thermometer.set_temperature(temperature);
-                }
-            }
-            
-            this.value += "\n" + format_time(time) + "\t\t";
-            return false;
-        } else if (key === 9 || key === "Tab") {
-            // tab - key
-            event.preventDefault();
-            this.value += "\t";
-            return false;
-        } 
-    }
-
-    _temperaturetyper.update = function(model_name) {
     };
 
-    _temperaturetyper.remove = function(model_name) {
+    _view.unregister = function(model_name) {
+        if (models[model_name]) {
+            _view.remove(model_name);
+            models[model_name].model.unregister(this);
+            delete models[model_name];
+            _view.compute_extrema();
+            _view.update_all();
+        }
     };
 
+    _view.get_model = function(model_name) {
+        return models[model_name];
+    };
 
+    _view.remove = function(model_name) {
+        // implement in specialized view; called by unregister
+    };
 
-    // There is a bug in Raphael regarding placing text on the right
-    // y-coordinate when the canvas isn't part of the DOM. It has been added
-    // before and now removed again.
-    document.body.removeChild(_temperaturetyper.fragment);
-    return _temperaturetyper;
+    _view.update_all = function() {
+        Object.keys(models).forEach(_view.update);
+    };
 
+    _view.update = function(model_name) {
+        // implement in specialized view; called by registered model on
+        // change
+    };
+    _view.models = models;
+
+    _view.type = config.type || "view";
+
+    return _view;    
 };
 
-module.exports = temperaturetyper;
+module.exports = view;
 
-},{"../view":8,"./thermometer":16,"../../dom/dom":9,"raphael-browserify":6}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 
 var model = require("../src/models/equation");
 var long_model = require("../src/models/longdrink_glass");
@@ -9589,10 +9915,10 @@ var body = document.querySelector("body");
 
 //var scale = 10;
 
-var glassgrafter = gg({});
+//var glassgrafter = gg({});
 
 
-body.appendChild(glassgrafter.fragment);
+//body.appendChild(glassgrafter.fragment);
 body.appendChild(repr3.fragment);
 body.appendChild(repr.fragment);
 body.appendChild(repr2.fragment);
@@ -9607,146 +9933,5 @@ repr3.register(longdrinkglas);
 repr3.register(cocktailglas);
 
 
-},{"../src/models/equation":1,"../src/models/longdrink_glass":3,"../src/models/glass":7,"../src/views/view":8,"../src/views/table":10,"../src/views/graph":11,"../src/views/flaskfiller/flaskfiller":15,"../src/views/temperaturetyper/temperaturetyper":17,"../src/views/flaskfiller/glass_grafter":19,"../src/actions/actions":4}],19:[function(require,module,exports){
-
-
-var raphael = require("raphael-browserify");
-var dom = require("../../dom/dom");
-var ruler = require("./ruler");
-
-var glass_grafter = function(config, scale_, dimensions_) {
-    var _grafter = {};
-
-    var scale = scale_ || 4; // px per mm
-
-    var dimensions = dimensions_ || {
-        width: 600,
-        height: 400,
-        ruler_width: 30,
-        margins: {
-            left: 5,
-            right: 5,
-            top: 5,
-            bottom: 5
-        }
-    };
-
-    var CONTAINER = {
-            width: dimensions.width || 900,
-            height: dimensions.height || 600
-        };
-        
-    var HALF_WIDTH = (CONTAINER.width - dimensions.margins.left - dimensions.margins.right)/2 - dimensions.ruler_width;
-
-    var CONSTRUCTION_AREA = {
-        x: dimensions.margins.left + dimensions.ruler_width,
-        y: dimensions.margins.top,
-        width: HALF_WIDTH,
-        height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.bottom - dimensions.margins.top
-    };
-
-    var MIRROR_AREA = {
-        x: CONSTRUCTION_AREA.x + CONTAINER.width,
-        y: dimensions.margins.top,
-        width: HALF_WIDTH,
-        height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.bottom - dimensions.margins.top
-    };
-
-    var RULERS = {
-            horizontal: {
-                x:  dimensions.ruler_width + dimensions.margins.left,
-                y:  CONTAINER.height - dimensions.ruler_width - dimensions.margins.top,
-                width: (CONTAINER.width - dimensions.margins.left - dimensions.margins.right)/2 - dimensions.ruler_width,
-                height: dimensions.ruler_width,
-                scale: scale,
-                orientation: "horizontal"
-            },
-            vertical: {
-                x:  0 + dimensions.margins.left,
-                y:  0 + dimensions.margins.top,
-                width: dimensions.ruler_width,
-                height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom,
-                scale: scale,
-                orientation: "vertical"
-            }
-        };
-
-    _grafter.fragment = document
-        .createDocumentFragment()
-        .appendChild(dom.create({
-            name: "figure",
-            attributes: {
-                "class": "glassgrafter"
-            }
-        }));
-
-    // There is a bug in Raphael regarding placing text on the right
-    // y-coordinate when the canvas isn't part of the DOM
-    document.body.appendChild(_grafter.fragment);
-
-    var canvas = raphael(_grafter.fragment,
-            CONTAINER.width,
-            CONTAINER.height
-        );
-
-    var vertical_ruler = ruler(canvas, RULERS.vertical, CONTAINER.width)
-            .style({
-                "background": "white"
-            }),
-        horizontal_ruler = ruler(canvas, RULERS.horizontal, CONTAINER.height)
-            .style({
-                "background": "white"
-            }),
-        cm_label = draw_cm_label();
-
-
-
-    function draw_cm_label() {
-       var x = dimensions.margins.left + (dimensions.ruler_width / 3),
-           y = CONTAINER.height - (dimensions.ruler_width / 2) - dimensions.margins.bottom,
-           cm_label = canvas.text(x, y, "cm");
-
-       cm_label.attr({
-           "font-family": "inherit",
-           "font-size": "18pt",
-           "font-weight": "bolder",
-           "fill": "dimgray"
-       }); 
-
-       return cm_label;
-    }
-
-
-    var construction_background,
-        mirror_background,
-        base_bottom_point,
-        marriage_point,
-        bowl_top_point;
-
-    function draw() {
-        construction_background = canvas.rect(CONSTRUCTION_AREA.x,
-                CONSTRUCTION_AREA.y,
-                CONSTRUCTION_AREA.width,
-                CONSTRUCTION_AREA.height
-                );
-        construction_background.attr({
-            stroke: "dimgray",
-            fill: "red"
-        });
-        console.log(" hasfldskdsfjk", CONSTRUCTION_AREA);
-    }
-
-
-
-    draw();
-    // There is a bug in Raphael regarding placing text on the right
-    // y-coordinate when the canvas isn't part of the DOM. It has been added
-    // before and now removed again.
-    document.body.removeChild(_grafter.fragment);
-    return _grafter;
-};
-
-module.exports = glass_grafter;
-
-},{"../../dom/dom":9,"./ruler":12,"raphael-browserify":6}]},{},[18])
+},{"../src/actions/actions":2,"../src/models/equation":4,"../src/models/glass":5,"../src/models/longdrink_glass":6,"../src/views/flaskfiller/flaskfiller":9,"../src/views/flaskfiller/glass_grafter":11,"../src/views/graph":14,"../src/views/table":15,"../src/views/temperaturetyper/temperaturetyper":16,"../src/views/view":18}]},{},[19])
 ;
