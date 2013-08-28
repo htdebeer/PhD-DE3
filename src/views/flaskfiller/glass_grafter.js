@@ -3,6 +3,7 @@
 var raphael = require("raphael-browserify");
 var dom = require("../../dom/dom");
 var ruler = require("./ruler");
+var contour_line = require("./contour_line");
 
 var glass_grafter = function(config, scale_, dimensions_) {
     var _grafter = {};
@@ -28,15 +29,15 @@ var glass_grafter = function(config, scale_, dimensions_) {
         
     var HALF_WIDTH = (CONTAINER.width - dimensions.margins.left - dimensions.margins.right)/2 - dimensions.ruler_width;
 
-    var CONSTRUCTION_AREA = {
-        x: dimensions.margins.left + dimensions.ruler_width,
+    var MIRROR_AREA = {
+        x: dimensions.margins.left,
         y: dimensions.margins.top,
         width: HALF_WIDTH,
         height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.bottom - dimensions.margins.top
     };
 
-    var MIRROR_AREA = {
-        x: CONSTRUCTION_AREA.x + CONTAINER.width,
+    var CONSTRUCTION_AREA = {
+        x: MIRROR_AREA.x + MIRROR_AREA.width,
         y: dimensions.margins.top,
         width: HALF_WIDTH,
         height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.bottom - dimensions.margins.top
@@ -44,7 +45,7 @@ var glass_grafter = function(config, scale_, dimensions_) {
 
     var RULERS = {
             horizontal: {
-                x:  dimensions.ruler_width + dimensions.margins.left,
+                x:  CONSTRUCTION_AREA.x,
                 y:  CONTAINER.height - dimensions.ruler_width - dimensions.margins.top,
                 width: (CONTAINER.width - dimensions.margins.left - dimensions.margins.right)/2 - dimensions.ruler_width,
                 height: dimensions.ruler_width,
@@ -52,7 +53,7 @@ var glass_grafter = function(config, scale_, dimensions_) {
                 orientation: "horizontal"
             },
             vertical: {
-                x:  0 + dimensions.margins.left,
+                x:  dimensions.margins.left + HALF_WIDTH*2,
                 y:  0 + dimensions.margins.top,
                 width: dimensions.ruler_width,
                 height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom,
@@ -92,7 +93,7 @@ var glass_grafter = function(config, scale_, dimensions_) {
 
 
     function draw_cm_label() {
-       var x = dimensions.margins.left + (dimensions.ruler_width / 3),
+       var x = dimensions.margins.left + 2*HALF_WIDTH + (dimensions.ruler_width / 2),
            y = CONTAINER.height - (dimensions.ruler_width / 2) - dimensions.margins.bottom,
            cm_label = canvas.text(x, y, "cm");
 
@@ -108,10 +109,7 @@ var glass_grafter = function(config, scale_, dimensions_) {
 
 
     var construction_background,
-        mirror_background,
-        base_bottom_point,
-        marriage_point,
-        bowl_top_point;
+        mirror_background;
 
     function draw() {
         construction_background = canvas.rect(CONSTRUCTION_AREA.x,
@@ -124,12 +122,98 @@ var glass_grafter = function(config, scale_, dimensions_) {
             "stroke-width": 2,
             fill: "white"
         });
-        console.log(" hasfldskdsfjk", CONSTRUCTION_AREA);
+
+        mirror_background = canvas.rect(MIRROR_AREA.x,
+                MIRROR_AREA.y,
+                MIRROR_AREA.width,
+                MIRROR_AREA.height
+                );
+        mirror_background.attr({
+            stroke: "dimgray",
+            "stroke-width": 2,
+            fill: "silver",
+            "fill-opacity": 0.5
+        });
+
+    }
+
+    function create_point(x, y, type) {
+        
+        var point = canvas.circle(x, y);
+        switch (type) {
+            case "interval":
+                point.attr({
+                    r: 5,
+                    "stroke": "black",
+                    fill: "white"
+                });
+                break;
+            case "segment":
+                point.attr({
+                    r: 2,
+                    stroke: "black",
+                    fill: "black"
+                });
+                break;
+            case "control":
+                point.attr({
+                    r: 2,
+                    stroke: "gray",
+                    fill: "gray"
+                });
+                break;
+        }
+        return point;
     }
 
 
 
+    var shape = {
+            bowl: {
+                top: {
+                    x: 100,
+                    y: 0
+                },
+                bottom: {
+                    x: 10,
+                    y: 100
+                },
+                path: "l-90,100"
+            },
+            base: {
+                top: {
+                    x: 10,
+                    y: 100
+                },
+                bottom: {
+                    x: 70,
+                    y: 200
+                },
+                path: "v90 h50 c5,2.5,7.5,7.5,10,10"
+            },
+            scale: 3  
+        };
+
+    function reshape(shape) {
+        var bottom_y = CONSTRUCTION_AREA.y + CONSTRUCTION_AREA.height,
+            delta_x = HALF_WIDTH + dimensions.margins.left,
+            delta_y = bottom_y - shape.base.bottom.y;
+
+       shape.base.bottom.y = shape.base.bottom.y + delta_y; 
+       shape.base.bottom.x = shape.base.bottom.x + delta_x; 
+       shape.base.top.y = shape.base.top.y + delta_y; 
+       shape.base.top.x = shape.base.top.x + delta_x; 
+       shape.bowl.bottom.y = shape.bowl.bottom.y + delta_y; 
+       shape.bowl.bottom.x = shape.bowl.bottom.x + delta_x; 
+       shape.bowl.top.y = shape.bowl.top.y + delta_y; 
+       shape.bowl.top.x = shape.bowl.top.x + delta_x; 
+
+       return shape;
+    }
+
+
     draw();
+    var points = contour_line(canvas, reshape(shape), CONSTRUCTION_AREA);
     // There is a bug in Raphael regarding placing text on the right
     // y-coordinate when the canvas isn't part of the DOM. It has been added
     // before and now removed again.

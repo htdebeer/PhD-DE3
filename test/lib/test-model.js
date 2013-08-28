@@ -7356,6 +7356,329 @@ module.exports = {
 
 },{"raphael-browserify":1}],9:[function(require,module,exports){
 
+
+var paths = require("../../svg/path");
+
+var contour_line = function(canvas, shape_, BOUNDARIES) {
+
+    var _contour_line = {};
+
+    var points = [],
+        bottom_point,
+        marriage_point,
+        top_point;
+
+    function create_point(x, y, type) {
+        var r, attributes;
+        switch(type) {
+            case "part":
+                r = 3;
+                attributes = {
+                    fill: "white",
+                    stroke: "black",
+                    "stroke-width": 2
+                };
+                break;
+            case "segment":
+                r = 2;
+                attributes = {
+                    fill: "black",
+                    stroke: "black"
+                };
+                break;
+            case "control":
+                r = 2;
+                attributes = {
+                    fill: "silver",
+                    stroke: "silver"
+                };
+                break;
+        }
+                  
+        var point = canvas.circle(x, y, r);
+        point.type = type;
+        point.x = function() {return point.attr("cx");};
+        point.y = function() {return point.attr("cy");};
+        point.attr(attributes);
+        point.drag( move(point), start_move(point), end_move(point) );
+        if (type==="segment") point.dblclick(remove_point(point));
+        return point;
+    }
+
+    function move(point) {
+        return function (dx, dy, x, y, event) {
+        };
+    }
+
+    function start_move(point) {
+        return function (x, y, event) {
+        };
+    }
+
+    function end_move(point) {
+        return function (event) {
+        };
+    }
+
+    function remove_point(point) {
+        return function (event) {
+            console.log("removed this point");
+        };
+    }
+
+    function parse_segment(segment) {
+        var command = segment.charAt(0),
+            elts = segment.slice(1).split(/ |,/),
+            specification = {
+                command: command
+            };
+
+        switch (command) {
+            case "v":
+                specification.length = parseFloat(elts[0]);
+                break;
+            case "h":
+                specification.length = parseFloat(elts[0]);
+                break;
+            case "l":
+                specification.x = parseFloat(elts[0]);
+                specification.y = parseFloat(elts[1]);
+                break;
+            case "c":
+                specification.cp1 = {
+                    x: parseFloat(elts[0]),
+                    y: parseFloat(elts[1])
+                };
+                specification.cp2 = {
+                    x: parseFloat(elts[2]),
+                    y: parseFloat(elts[3])
+                };
+                specification.x = parseFloat(elts[4]);
+                specification.y = parseFloat(elts[5]);
+                break;
+        }
+        return specification;
+    }
+
+    _contour_line.insert = function(x, y, index, type, segment) {
+        var point = create_point(x, y, type);
+        point.segment = segment.command;
+
+        if (index > 0) {
+            point.prev = points[index-1];
+            point.prev.next = point;
+        }
+        if (index < points.length - 1) {
+            point.next = points[index+1];
+            point.next.prev = point;
+        }
+
+        points.splice(index, 0, point);
+        return point;
+    };
+
+    _contour_line.remove = function(index) {
+      
+        var point = points[index];
+        if (point.type === "part") {
+            throw new Error("cannot remove part-point");
+        }
+
+        var prev = point.prev,
+            next = point.next;
+        prev.next = next;
+        next.prev = prev;        
+        point.remove();
+        delete points.splice(index, 1);
+    };
+
+    function populate_points(shape) {
+        var part = shape.bowl,
+            path = part.path,
+            segments = path.split(/ /);
+
+        var i = 0, next_point,
+            x = part.top.x,
+            y = part.top.y
+            ;
+        
+        next_point = add_point(segments, x, y, i, "part");
+        top_point = points[i];
+        i++;
+        while (i < segments.length) {
+            next_point = add_point(segments, next_point.x, next_point.y, i, "segment");
+            i++;
+        }
+
+        var j = i;
+
+        part = shape.base;
+        path = part.path;
+        segments = path.split(/ /);
+        i = 0;
+        x = part.top.x;
+        y = part.top.y;
+
+        next_point = add_point(segments, x, y, i, "part");
+        marriage_point = points[j];
+        i++;
+        while (i < segments.length) {
+            next_point = add_point(segments, next_point.x, next_point.y, i, "segment");
+            i++;
+        }
+
+        add_point([], next_point.x, next_point.y, j+i, "part");
+        bottom_point = points[i+j];
+        
+        function add_point(segments, x, y, index, type) {
+            var new_x = x, new_y = y, new_index;
+
+            var segment_string = segments[index] || "";
+            var segment = parse_segment(segment_string) || [];
+
+            _contour_line.insert(
+                x,
+                y,
+                index,
+                type,
+                segment
+            );
+
+            switch (segment.command) {
+                case "v":
+                    new_y = y + segment.length;
+                    break;
+                case "l":
+                    new_x = x + segment.x;
+                    new_y = y + segment.y;
+                    break;
+                case "c":
+                    new_x = x + segment.x;
+                    new_y = y + segment.y;
+                    break;
+                case "h":
+                    new_x = x + segment.length;
+                    break;
+                default:
+                    new_x = 0;
+                    new_y = 0;
+                    break;
+            }
+            
+            return {
+                x: new_x,
+                y: new_y
+            };
+        }
+
+    }
+
+
+
+
+    function path_segment(point) {
+        var path = "",
+            x = point.next.x() - point.x(),
+            y = point.next.y() - point.y();
+        console.log(point, x, y);
+        switch (point.segment) {
+            case "v":
+                path = "v" + point.length;
+                break;
+            case "h":
+                path = "h" + point.length;
+                break;
+            case "l":
+                path = "l" + x + "," + y;
+                break;
+            case "c":
+                path = "c" + cp1.x + "," + cp1.y + "," +
+                    cp2.x + "," + cp2.y + "," +
+                    x + "," + y;
+                break;
+        }
+        return path;
+    }
+
+
+    function part_path(start) {
+        var cur = start,
+            paths =[];
+        paths.push(path_segment(cur));
+        while (cur.next.type !== "part") {
+            paths.push(path_segment(cur));
+            cur = cur.next;
+        }
+        console.log(paths);
+        return paths.join(" ");
+    }
+
+    _contour_line.shape = function() {
+        return {
+            bowl: {
+                top: {
+                    x: top_point.x(),
+                    y: top_point.y()
+                },
+                bottom: {
+                    x: marriage_point.x(),
+                    y: marriage_point.y()
+                },
+                path: part_path(top_point)
+            },
+            base: {
+                top: {
+                    x: marriage_point.x(),
+                    y: marriage_point.y()
+                },
+                bottom: {
+                    x: bottom_point.x(),
+                    y: bottom_point.y()
+                },
+                path: part_path(marriage_point)
+            },
+            scale: shape_.scale
+        };
+    };
+
+
+    var path = canvas.path("M0,0"), 
+        mirror = canvas.path("M0,0")
+            ;
+
+    path.attr({
+        "stroke-width": 2
+    });
+    mirror.attr({
+        "stroke-width": 2
+    });
+    function draw() {
+        var shape = _contour_line.shape();
+        var p = shape.bowl.path + paths.complete_path(shape.bowl);
+
+        path.attr({
+            path: "M" + shape.bowl.top.x + "," + shape.bowl.top.y + p
+        });
+        mirror.attr({
+            path: "M" + shape.base.top.x + "," + shape.base.top.y + shape.base.path
+        });
+
+
+    }
+
+
+    populate_points(shape_);
+    draw();
+    _contour_line.bottom = bottom_point;
+    _contour_line.marriage = marriage_point;
+    _contour_line.top = top_point;
+    return _contour_line;
+};
+
+module.exports = contour_line;
+
+},{"../../svg/path":8}],10:[function(require,module,exports){
+
 var view = require("../view"),
     dom = require("../../dom/dom"),
     ruler = require("./ruler"),
@@ -7497,7 +7820,7 @@ var flaskfiller = function(config, scale_, dimensions_) {
 
 module.exports = flaskfiller;
 
-},{"../../dom/dom":3,"../view":18,"./glass":10,"./longdrink_glass":12,"./ruler":13,"raphael-browserify":1}],10:[function(require,module,exports){
+},{"../../dom/dom":3,"../view":19,"./glass":11,"./longdrink_glass":13,"./ruler":14,"raphael-browserify":1}],11:[function(require,module,exports){
 
 var raphael = require("raphael-browserify");
 
@@ -7709,12 +8032,13 @@ var glass = function(canvas, model, SCALE) {
 
 module.exports = glass;
 
-},{"raphael-browserify":1}],11:[function(require,module,exports){
+},{"raphael-browserify":1}],12:[function(require,module,exports){
 
 
 var raphael = require("raphael-browserify");
 var dom = require("../../dom/dom");
 var ruler = require("./ruler");
+var contour_line = require("./contour_line");
 
 var glass_grafter = function(config, scale_, dimensions_) {
     var _grafter = {};
@@ -7740,15 +8064,15 @@ var glass_grafter = function(config, scale_, dimensions_) {
         
     var HALF_WIDTH = (CONTAINER.width - dimensions.margins.left - dimensions.margins.right)/2 - dimensions.ruler_width;
 
-    var CONSTRUCTION_AREA = {
-        x: dimensions.margins.left + dimensions.ruler_width,
+    var MIRROR_AREA = {
+        x: dimensions.margins.left,
         y: dimensions.margins.top,
         width: HALF_WIDTH,
         height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.bottom - dimensions.margins.top
     };
 
-    var MIRROR_AREA = {
-        x: CONSTRUCTION_AREA.x + CONTAINER.width,
+    var CONSTRUCTION_AREA = {
+        x: MIRROR_AREA.x + MIRROR_AREA.width,
         y: dimensions.margins.top,
         width: HALF_WIDTH,
         height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.bottom - dimensions.margins.top
@@ -7756,7 +8080,7 @@ var glass_grafter = function(config, scale_, dimensions_) {
 
     var RULERS = {
             horizontal: {
-                x:  dimensions.ruler_width + dimensions.margins.left,
+                x:  CONSTRUCTION_AREA.x,
                 y:  CONTAINER.height - dimensions.ruler_width - dimensions.margins.top,
                 width: (CONTAINER.width - dimensions.margins.left - dimensions.margins.right)/2 - dimensions.ruler_width,
                 height: dimensions.ruler_width,
@@ -7764,7 +8088,7 @@ var glass_grafter = function(config, scale_, dimensions_) {
                 orientation: "horizontal"
             },
             vertical: {
-                x:  0 + dimensions.margins.left,
+                x:  dimensions.margins.left + HALF_WIDTH*2,
                 y:  0 + dimensions.margins.top,
                 width: dimensions.ruler_width,
                 height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom,
@@ -7804,7 +8128,7 @@ var glass_grafter = function(config, scale_, dimensions_) {
 
 
     function draw_cm_label() {
-       var x = dimensions.margins.left + (dimensions.ruler_width / 3),
+       var x = dimensions.margins.left + 2*HALF_WIDTH + (dimensions.ruler_width / 2),
            y = CONTAINER.height - (dimensions.ruler_width / 2) - dimensions.margins.bottom,
            cm_label = canvas.text(x, y, "cm");
 
@@ -7820,10 +8144,7 @@ var glass_grafter = function(config, scale_, dimensions_) {
 
 
     var construction_background,
-        mirror_background,
-        base_bottom_point,
-        marriage_point,
-        bowl_top_point;
+        mirror_background;
 
     function draw() {
         construction_background = canvas.rect(CONSTRUCTION_AREA.x,
@@ -7836,12 +8157,98 @@ var glass_grafter = function(config, scale_, dimensions_) {
             "stroke-width": 2,
             fill: "white"
         });
-        console.log(" hasfldskdsfjk", CONSTRUCTION_AREA);
+
+        mirror_background = canvas.rect(MIRROR_AREA.x,
+                MIRROR_AREA.y,
+                MIRROR_AREA.width,
+                MIRROR_AREA.height
+                );
+        mirror_background.attr({
+            stroke: "dimgray",
+            "stroke-width": 2,
+            fill: "silver",
+            "fill-opacity": 0.5
+        });
+
+    }
+
+    function create_point(x, y, type) {
+        
+        var point = canvas.circle(x, y);
+        switch (type) {
+            case "interval":
+                point.attr({
+                    r: 5,
+                    "stroke": "black",
+                    fill: "white"
+                });
+                break;
+            case "segment":
+                point.attr({
+                    r: 2,
+                    stroke: "black",
+                    fill: "black"
+                });
+                break;
+            case "control":
+                point.attr({
+                    r: 2,
+                    stroke: "gray",
+                    fill: "gray"
+                });
+                break;
+        }
+        return point;
     }
 
 
 
+    var shape = {
+            bowl: {
+                top: {
+                    x: 100,
+                    y: 0
+                },
+                bottom: {
+                    x: 10,
+                    y: 100
+                },
+                path: "l-90,100"
+            },
+            base: {
+                top: {
+                    x: 10,
+                    y: 100
+                },
+                bottom: {
+                    x: 70,
+                    y: 200
+                },
+                path: "v90 h50 c5,2.5,7.5,7.5,10,10"
+            },
+            scale: 3  
+        };
+
+    function reshape(shape) {
+        var bottom_y = CONSTRUCTION_AREA.y + CONSTRUCTION_AREA.height,
+            delta_x = HALF_WIDTH + dimensions.margins.left,
+            delta_y = bottom_y - shape.base.bottom.y;
+
+       shape.base.bottom.y = shape.base.bottom.y + delta_y; 
+       shape.base.bottom.x = shape.base.bottom.x + delta_x; 
+       shape.base.top.y = shape.base.top.y + delta_y; 
+       shape.base.top.x = shape.base.top.x + delta_x; 
+       shape.bowl.bottom.y = shape.bowl.bottom.y + delta_y; 
+       shape.bowl.bottom.x = shape.bowl.bottom.x + delta_x; 
+       shape.bowl.top.y = shape.bowl.top.y + delta_y; 
+       shape.bowl.top.x = shape.bowl.top.x + delta_x; 
+
+       return shape;
+    }
+
+
     draw();
+    var points = contour_line(canvas, reshape(shape), CONSTRUCTION_AREA);
     // There is a bug in Raphael regarding placing text on the right
     // y-coordinate when the canvas isn't part of the DOM. It has been added
     // before and now removed again.
@@ -7851,7 +8258,7 @@ var glass_grafter = function(config, scale_, dimensions_) {
 
 module.exports = glass_grafter;
 
-},{"../../dom/dom":3,"./ruler":13,"raphael-browserify":1}],12:[function(require,module,exports){
+},{"../../dom/dom":3,"./contour_line":9,"./ruler":14,"raphael-browserify":1}],13:[function(require,module,exports){
 
 var glass = require("./glass");
 
@@ -7989,7 +8396,7 @@ var longdrink_glass = function(canvas, model, SCALE, boundaries_) {
 
 module.exports = longdrink_glass;
 
-},{"./glass":10}],13:[function(require,module,exports){
+},{"./glass":11}],14:[function(require,module,exports){
 
 var ruler = function(canvas, config, MEASURE_LINE_WIDTH) {
     var _ruler = canvas.set();
@@ -8178,7 +8585,7 @@ var ruler = function(canvas, config, MEASURE_LINE_WIDTH) {
 
 module.exports = ruler;
 
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -8887,7 +9294,7 @@ console.log(x1, y1, x2, y2);
 
 module.exports = graph;
 
-},{"../dom/dom":3,"./view":18}],15:[function(require,module,exports){
+},{"../dom/dom":3,"./view":19}],16:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -9255,7 +9662,7 @@ var table = function(config) {
 
 module.exports = table;
 
-},{"../dom/dom":3,"./view":18}],16:[function(require,module,exports){
+},{"../dom/dom":3,"./view":19}],17:[function(require,module,exports){
 
 var view = require("../view"),
     draw_thermometer = require("./thermometer"),
@@ -9413,7 +9820,7 @@ var temperaturetyper = function(config, scale_, dimensions_) {
 
 module.exports = temperaturetyper;
 
-},{"../../dom/dom":3,"../view":18,"./thermometer":17,"raphael-browserify":1}],17:[function(require,module,exports){
+},{"../../dom/dom":3,"../view":19,"./thermometer":18,"raphael-browserify":1}],18:[function(require,module,exports){
 
 var thermometer = function(canvas, dimensions_) {
 
@@ -9622,7 +10029,7 @@ var thermometer = function(canvas, dimensions_) {
 
 module.exports = thermometer;
 
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 /*
  * Copyright (C) 2013 Huub de Beer
  *
@@ -9740,7 +10147,7 @@ var view = function(config) {
 
 module.exports = view;
 
-},{}],19:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 
 var model = require("../src/models/equation");
 var long_model = require("../src/models/longdrink_glass");
@@ -9908,17 +10315,17 @@ config = {
 var repr = table(config);
 var repr2 = graph(config, "tijd", "hoogte");
 var repr3 = ff(config);
-var repr4 = tt(config);
+//var repr4 = tt(config);
 var body = document.querySelector("body");
 
 //body.appendChild(repr4.fragment);
 
 //var scale = 10;
 
-//var glassgrafter = gg({});
+var glassgrafter = gg({});
 
 
-//body.appendChild(glassgrafter.fragment);
+body.appendChild(glassgrafter.fragment);
 body.appendChild(repr3.fragment);
 body.appendChild(repr.fragment);
 body.appendChild(repr2.fragment);
@@ -9933,5 +10340,5 @@ repr3.register(longdrinkglas);
 repr3.register(cocktailglas);
 
 
-},{"../src/actions/actions":2,"../src/models/equation":4,"../src/models/glass":5,"../src/models/longdrink_glass":6,"../src/views/flaskfiller/flaskfiller":9,"../src/views/flaskfiller/glass_grafter":11,"../src/views/graph":14,"../src/views/table":15,"../src/views/temperaturetyper/temperaturetyper":16,"../src/views/view":18}]},{},[19])
+},{"../src/actions/actions":2,"../src/models/equation":4,"../src/models/glass":5,"../src/models/longdrink_glass":6,"../src/views/flaskfiller/flaskfiller":10,"../src/views/flaskfiller/glass_grafter":12,"../src/views/graph":15,"../src/views/table":16,"../src/views/temperaturetyper/temperaturetyper":17,"../src/views/view":19}]},{},[20])
 ;
