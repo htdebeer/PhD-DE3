@@ -9,9 +9,6 @@ var glass = function(name, config) {
         flow_rate = config.flow_rate || 50,
         shape = config.shape;
 
-
-
-
     var quantities = {
         hoogte: {
             minimum: 0,
@@ -152,7 +149,7 @@ var glass = function(name, config) {
             vol = 0,
             time = 0;
 
-        var l = l_end,
+        var l = l_end-1,
             prev = point(l),
             cur = prev,
             delta_time = 0,

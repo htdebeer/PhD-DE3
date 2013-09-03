@@ -28,6 +28,11 @@ var table = function(config) {
 
     var TOGGLED_COLOR = "gold";
 
+    var hide_actions = config.hide_actions || [];
+    function show_this_action(action_name) {
+        return hide_actions.indexOf(action_name) === -1;
+    }
+
 
     var table_fragment = document
         .createDocumentFragment()
@@ -247,7 +252,7 @@ var table = function(config) {
                     };
                 }
             },
-            actions_elts = Object.keys(model.actions).map(create_action_elt);
+            actions_elts = Object.keys(model.actions).filter(show_this_action).map(create_action_elt);
 
         row = table_body.appendChild(
                 dom.create( {

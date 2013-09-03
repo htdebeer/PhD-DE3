@@ -23,17 +23,17 @@
 var view = require("./view"),
     dom = require("../dom/dom");
 
-var graph = function(config_, horizontal_, vertical_, dimensions_) {
+var graph = function(config_) {
 
     var config = Object.create(config_);
     config.type = "graph";
     var _graph = view(config);
 
-    var horizontal = horizontal_,
-        vertical = vertical_;
+    var horizontal = config_.horizontal,
+        vertical = config_.vertical;
 
 
-    var dimensions = dimensions_ || {
+    var dimensions = config_.dimensions || {
         width: 900,
         height: 600,
         margin: {

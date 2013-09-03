@@ -6,12 +6,12 @@ var view = require("../view"),
     longdrink = require("./longdrink_glass"),
     various_glass = require("./glass");
 
-var flaskfiller = function(config, scale_, dimensions_) {
+var flaskfiller = function(config) {
     var _flaskfiller = view(config);
 
-    var scale = scale_ || 4; // px per mm
+    var scale = config.scale || 3.5; // px per mm
 
-    var dimensions = dimensions_ || {
+    var dimensions = config.dimensions || {
         width: 900,
         height: 600,
         ruler_width: 30,
@@ -107,8 +107,7 @@ var flaskfiller = function(config, scale_, dimensions_) {
         } else {
             glass = various_glass(canvas, model, scale);
         }
-        vertical_ruler.toFront();
-        horizontal_ruler.toFront();
+        glass.toFront();
         return glass;
     }
 

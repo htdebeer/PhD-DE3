@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="nl">
+    <head>
+        <meta charset="utf-8">
+        <title>Test</title>
+        <link rel="stylesheet" href="main.css">
+        <link rel="stylesheet" href="../lib/font-awesome/css/font-awesome.min.css">
+    </head>
+    <body>
+        <figure id="sim"></figure>
+        <figure id="graph"></figure>
+        <table id="measure"></table>
+        <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+        <script src="../lib/flaskfiller.js"></script>
+        <script>
+            var models = [
+                {
+                    name: "cocktailglas",
+                    type: "glass",
+                    shape: {
+                        bowl: {
+                            top: {
+                                x: 100,
+                                y: 0
+                            },
+                            bottom: {
+                                x: 10,
+                                y: 100
+                            },
+                            path: "l-90,100"
+                        },
+                        base: {
+                            top: {
+                                x: 10,
+                                y: 100
+                            },
+                            bottom: {
+                                x: 70,
+                                y: 200
+                            },
+                            path: "v90h50c5,2.5,7.5,7.5,10,10"
+                        },
+                        scale: 3  
+                    },
+                    register: true
+                }, {
+                    name: "longdrinkglas",
+                    type: "longdrink",
+                    radius: 1.7,
+                    height: 7.8,
+                    register: true
+                }, {
+                    name: "partyglass",
+                    type: "predefined",
+                    register: false
+                }
+            ];
+
+            var hide_actions = [
+                    "line_graph", 
+                    "point_tail_graph",
+                    "measure_triangle",
+                    "local_zoom"
+            ];
+
+
+            flaskfiller({
+                models: models,
+                simulation: {
+                    id: "sim",
+                    width: 600,
+                    height: 400
+                },
+                table: {
+                    id: "measure",
+                    hide_actions: [
+                        "toggle_line",
+                        "toggle_tailpoints",
+                        "step_size"
+                        ]
+                }
+
+            });
+
+        </script>
+    </body>
+</html>
