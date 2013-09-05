@@ -140,7 +140,7 @@ var actions = function(config) {
         icon: "icon-picture",
         tooltip: "Show/hide the line graph of this model",
         enabled: true,
-        toggled: true,
+        toggled: false,
         callback: function(model) {
             return function() {
                 if (this.hasAttribute("data-toggled")) {

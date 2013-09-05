@@ -8,8 +8,8 @@
     </head>
     <body>
         <figure id="sim"></figure>
-        <figure id="graph"></figure>
         <table id="measure"></table>
+        <figure id="graph"></figure>
         <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
         <script src="../lib/flaskfiller.js"></script>
         <script>
@@ -72,12 +72,20 @@
                     height: 400
                 },
                 table: {
-                    id: "measure",
+                    id: "measure"
+//                     hide_actions: [
+//                         "toggle_line",
+//                         "toggle_tailpoints",
+//                         "step_size"
+//                         ]
+                },
+                graph: {
+                    id: "graph",
+                    width: 600,
+                    height: 400,
                     hide_actions: [
-                        "toggle_line",
-                        "toggle_tailpoints",
-                        "step_size"
-                        ]
+                        "locally_zoom"
+                    ]
                 }
 
             });

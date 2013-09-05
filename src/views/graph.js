@@ -33,10 +33,10 @@ var graph = function(config_) {
         vertical = config_.vertical;
 
 
-    var dimensions = config_.dimensions || {
-        width: 900,
-        height: 600,
-        margin: {
+    var dimensions = {
+        width: config.dimensions.width,
+        height: config.dimensions.height,
+        margins: {
             top: 10,
             right: 20,
             left: 80,
@@ -49,10 +49,10 @@ var graph = function(config_) {
             height: dimensions.height || 600
         };
     var MARGINS = {
-            top:dimensions.margin.top || 10,
-            right:dimensions.margin.right || 20,
-            left:dimensions.margin.left || 60,
-            bottom:dimensions.margin.bottom || 60
+            top:dimensions.margins.top || 10,
+            right:dimensions.margins.right || 20,
+            left:dimensions.margins.left || 60,
+            bottom:dimensions.margins.bottom || 60
         };
     var GRAPH = {
             width: CONTAINER.width - MARGINS.left - MARGINS.right,
@@ -84,6 +84,13 @@ var graph = function(config_) {
             off: hide_zoom
         }
     ];
+            
+    var hide_actions = config.hide_actions || [];
+    function show_this_action(action) {
+        return hide_actions.indexOf(action.name) === -1;
+    }
+
+    mouse_actions = mouse_actions.filter(show_this_action);
 
     var current_action = config.default_action || "measure_point";
 
@@ -182,21 +189,6 @@ var graph = function(config_) {
                 children: [
                 {
                     name: "select",
-                    children: horizontal_quantity_list,
-                    on: {
-                        type: "change",
-                        callback: function(event) {
-                            var quantity = event.target.value;
-                            set_axis(quantity, "horizontal");
-                        }
-                    }
-                }, 
-                {
-                    name: "textNode",
-                    value: " - "
-                }, 
-                {
-                    name: "select",
                     attributes: {
 
                     },
@@ -211,7 +203,22 @@ var graph = function(config_) {
                 },
                 {
                     name: "textNode",
-                    value: " grafiek — "
+                    value: " - "
+                }, 
+                {
+                    name: "select",
+                    children: horizontal_quantity_list,
+                    on: {
+                        type: "change",
+                        callback: function(event) {
+                            var quantity = event.target.value;
+                            set_axis(quantity, "horizontal");
+                        }
+                    }
+                }, 
+                {
+                    name: "textNode",
+                    value: " grafiek "
                 } 
                 ].concat(actions_elts)
             }));
@@ -227,7 +234,7 @@ var graph = function(config_) {
                         MARGINS.right + ")");
 
 
-    var showline = true,
+    var showline = false,
         showtailpoints = false;
 
     function draw_tailpoints(model_name) {
@@ -456,7 +463,6 @@ var graph = function(config_) {
                     x: next.x - prev.x,
                     y: next.y - prev.y
                 };
-                console.log(prev, next, delta, point);
             } else {
 
                 // don't worry about the first
@@ -477,7 +483,6 @@ var graph = function(config_) {
                 x2 = point.x + delta.x * LENGTH,
                 y2 = point.y + delta.y * LENGTH;
 
-console.log(x1, y1, x2, y2);
             tangent.attr("x1", x1)
                 .attr("y1", y1)
                 .attr("x2", x2)
