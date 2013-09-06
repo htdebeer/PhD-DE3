@@ -128,9 +128,6 @@ var model = function(name, config) {
     var views = [];
     var update_views = function() {
         var update_view = function(view) {
-            if (view.update_all) {
-                view.update_all();
-            }
             view.update(_model.name);
         };
         views.forEach(update_view);
@@ -141,6 +138,7 @@ var model = function(name, config) {
         var view_found = views.indexOf(view);
         if (view_found === -1) {
             views.push(view);
+            views.forEach(function(v) { if(v.update_all) v.update_all();});
         }
     };
 
@@ -489,6 +487,53 @@ var model = function(name, config) {
         }
     };
 
+    _model.graphs_shown = {
+        tailpoints: false,
+        line: false
+    };
+
+   
+
+     _model.show_graph = function(kind) {
+        var graphs = _model.get_views_of_type("graph");
+
+        function show_this_graph(g) {
+            switch(kind) {
+                case "line":
+                    g.show_line(_model.name);
+                    break;
+                case "tailpoints":
+                    g.show_tailpoints(_model.name);
+                    break;
+            }
+        }
+        graphs.forEach(show_this_graph);
+        _model.graphs_shown[kind] = true;
+
+    };
+
+    _model.hide_graph = function(kind) {
+        var graphs = _model.get_views_of_type("graph");
+
+        function hide_this_graph(g) {
+            switch(kind) {
+                case "line":
+                    g.hide_line(_model.name);
+                    break;
+                case "tailpoints":
+                    g.hide_tailpoints(_model.name);
+                    break;
+            }
+        }
+        graphs.forEach(hide_this_graph);
+        _model.graphs_shown[kind] = false;
+
+    };
+
+    _model.graph_is_shown = function(kind) {
+        return _model.graphs_shown[kind];
+    };
+
 
     // ## _appendix H: helper functions
 
@@ -507,7 +552,7 @@ var model = function(name, config) {
         };
 
 
-    var step = config.step_size || 1;
+    var step = config.step_size || 5;
     function step_size(size) {
         if (arguments.length === 1) {
             step = size;

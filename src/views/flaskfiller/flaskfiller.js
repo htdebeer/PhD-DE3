@@ -128,6 +128,11 @@ var flaskfiller = function(config) {
 
     };
 
+    _flaskfiller.remove = function(model_name) {
+        var model = _flaskfiller.get_model(model_name);
+        model.glass.remove();
+    };
+
 
     // There is a bug in Raphael regarding placing text on the right
     // y-coordinate when the canvas isn't part of the DOM. It has been added

@@ -52,7 +52,7 @@ var glass = function(name, config) {
             end: quantities.tijd.maximum*1000,
             step: step
         },        
-        action_list = config.actions || ["start", "pause", "reset", "finish","toggle_line", "toggle_tailpoints", "step_size", "remove"],
+        action_list = config.actions || ["start", "pause", "reset", "finish","toggle_line", "toggle_tailpoints", "step_size"],
         default_actions = require("../actions/actions")({speed: step});
 
     function create_actions(action_list) {
@@ -213,7 +213,7 @@ var glass = function(name, config) {
 
         _model.quantities.tijd.maximum = max.tijd.toFixed(quantities.tijd.precision);
         _model.quantities.hoogte.maximum = max.hoogte.toFixed(quantities.hoogte.precision);
-        _model.quantities.hoogte.minimum = min.hoogte.toFixed(quantities.hoogte.precision);
+        _model.quantities.hoogte.minimum = 0;//min.hoogte.toFixed(quantities.hoogte.precision);
         _model.quantities.volume.maximum = max.volume.toFixed(quantities.volume.precision);
     }
 

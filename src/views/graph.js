@@ -196,8 +196,8 @@ var graph = function(config_) {
                     on: {
                         type: "change",
                         callback: function(event) {
-                            var quantity = event.target.value;
-                            set_axis(quantity, "vertical");
+                            vertical = event.target.value;
+                            _graph.update_all();
                         }
                     }
                 },
@@ -211,8 +211,8 @@ var graph = function(config_) {
                     on: {
                         type: "change",
                         callback: function(event) {
-                            var quantity = event.target.value;
-                            set_axis(quantity, "horizontal");
+                            horizontal = event.target.value;
+                            _graph.update_all();
                         }
                     }
                 }, 
@@ -240,9 +240,9 @@ var graph = function(config_) {
     function draw_tailpoints(model_name) {
         var model = _graph.get_model(model_name).model,
             step = function(value, index) {
-                var step_size = model.step_size() || 1;
+                var step_size = model.step_size();
 
-                return (index % step_size === 0) && (index !== 0);
+                return (index % step_size === 0);// && (index !== 0);
             },
             data = model.data().filter(step),
             x_scale = horizontal_axis.scale,
@@ -296,15 +296,14 @@ var graph = function(config_) {
                 .style("stroke-width", 1.5)
                 .on("mouseover.tooltip", add_tooltip(model_name))
                 .on("mouseout.tooltip", remove_tooltip(model_name))
-                .on("mouseover.tangent_triangle", add_tangent_triangle(model_name))
-                .on("mouseout.tangent_triangle", remove_tangent_triangle(model_name))
                 ;
 
-        model_tailpoints = _graph.fragment
-            .querySelector("svg g.tailpoints g." + model_name);
-        if (!showtailpoints) {
-            model_tailpoints.style.visibility = "hidden";
-        }            
+        if (model.graph_is_shown("tailpoints")) {
+            _graph.show_tailpoints(model_name);
+        } else {
+            _graph.hide_tailpoints(model_name);
+        }
+
     }
 
     function draw_line(model_name) {
@@ -314,7 +313,6 @@ var graph = function(config_) {
             x_quantity = horizontal_axis.quantity,
             y_scale = vertical_axis.scale,
             y_quantity = vertical_axis.quantity;
-
 
         var line = d3.svg.line()
                 .x(function(d) {
@@ -328,16 +326,16 @@ var graph = function(config_) {
                 
 
         var model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
+            .querySelector("svg g.lines g." + model_name);
         if (model_line) {
             model_line.parentNode.removeChild(model_line);
         }
 
-
         svg.select("g.lines")
                 .append("g")
-                .attr("class", "line " + model_name)
-                .selectAll("path." + model_name)
+                .classed(model_name, true)
+                .classed("line", true)
+                .selectAll("path")
                 .data([data])
                 .enter()
                 .append("path")
@@ -354,11 +352,11 @@ var graph = function(config_) {
                 .on("mouseout.tangent_triangle", remove_tangent_triangle(model_name))
                 ;
 
-        model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
-        if (!showline) {
-            model_line.style.visibility = "hidden";
-        }            
+        if (model.graph_is_shown("line")) {
+            _graph.show_line(model_name);
+        } else {
+            _graph.hide_line(model_name);
+        }
 
     }
 
@@ -612,8 +610,8 @@ var graph = function(config_) {
             };
         }
 
-        update_lines();
-        update_tailpoints();
+//        update_lines();
+//        update_tailpoints();
         
     }
 
@@ -640,14 +638,15 @@ var graph = function(config_) {
 
     }
     create_graph();
+    _graph.update_all();
 
-    
     _graph.remove = function(model_name) {
         var model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
+            .querySelector("svg g.lines g." + model_name);
         if (model_line) {
-            model_line.parentnode.removechild(model_line);
+            model_line.parentNode.removeChild(model_line);
         }
+
         var model_tailpoints = _graph.fragment
             .querySelector("svg g.tailpoints g." + model_name);
         if (model_tailpoints) {
@@ -664,7 +663,6 @@ var graph = function(config_) {
 
 
     _graph.update = function(model_name) {
-        var model = _graph.get_model(model_name);
         draw_line(model_name);
         draw_tailpoints(model_name);
     };
@@ -675,7 +673,6 @@ var graph = function(config_) {
         if (model_tailpoints) {
             model_tailpoints.style.visibility = "visible";
         }
-        showtailpoints = true;
     };
 
     _graph.hide_tailpoints = function(model_name) {
@@ -684,26 +681,23 @@ var graph = function(config_) {
         if (model_tailpoints) {
             model_tailpoints.style.visibility = "hidden";
         }
-        showtailpoints = false;
     };
 
 
     _graph.show_line = function(model_name) {
         var model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
+            .querySelector("svg g.lines g." + model_name);
         if (model_line) {
             model_line.style.visibility = "visible";
         }
-        showline = true;
     };
 
     _graph.hide_line = function(model_name) {
         var model_line = _graph.fragment
-            .querySelector("svg g.lines g.line." + model_name);
+            .querySelector("svg g.lines g." + model_name);
         if (model_line) {
             model_line.style.visibility = "hidden";
         }
-        showline = false;
     };
 
     return _graph;

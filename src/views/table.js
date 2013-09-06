@@ -33,6 +33,32 @@ var table = function(config) {
         return hide_actions.indexOf(action_name) === -1;
     }
 
+    function remove_action(model) {
+        return {
+            name: "remove",
+            group: "edit",
+            icon: "icon-remove",
+            tooltip: "Remove this model",
+            enabled: true,
+            callback: function(model) {
+                return function() {
+                    config.microworld.unregister(model.name);
+                };
+            }
+        };
+    }
+
+
+    function add_model() {
+        return function() {
+            if (this.selectedIndex > 0) {
+                var selected_option = this.options[this.selectedIndex].value;
+                var model = config.models[selected_option];
+                config.microworld.register(model);
+                this.selectedIndex = 0;
+            }
+        };
+    }
 
     var table_fragment = document
         .createDocumentFragment()
@@ -44,20 +70,32 @@ var table = function(config) {
         var table_foot = table_fragment
             .appendChild(dom.create({name: "tfoot"}));
 
-        var model_list = {
-            name: "ol",
-            attributes: {
-                "class": "list"
-            },
-            children: [
-                {
-                    name: "li",
-                    value: "sdfsdf"
-                }, {
-                    name: "li",
-                    value: "sdfsdfsd"
+
+        function create_option(model, index) {
+            return {
+                name: "option",
+                value: model.name.split("_").join(" "),
+                attributes: {
+                    value: index
                 }
-            ]
+            };
+        }
+
+        var model_list = {
+            name: "select",
+            attributes: {
+            },
+            children: [{
+                name: "option",
+                value: "toevoegen ...",
+                attributes: {
+                    value: -1
+                }
+            }].concat(config.models.map(create_option)),
+            on: {
+                type: "change",
+                callback: add_model()
+            }
         };
 
         table_foot.appendChild(dom.create({
@@ -66,7 +104,6 @@ var table = function(config) {
                 {
                     name: "th",
                     attributes: {
-                        "class": "corner action",
                         "data-list": true
                     },
                     children: [
@@ -80,7 +117,7 @@ var table = function(config) {
                     name: "th",
                     attributes: {
                         "class": "corner",
-                        "colspan": Object.keys(_table.quantities).length + 1
+                        "colspan": Object.keys(_table.quantities).length + 2
                     }
                 }
             ]
@@ -88,6 +125,7 @@ var table = function(config) {
 
     };
     create_foot();
+
 
     var create_head = function() {
         var table_head = table_fragment
@@ -113,7 +151,7 @@ var table = function(config) {
 
                     head.appendChild( dom.create({
                         name: "th",
-                        value: quantity.label
+                        value: quantity.name
                     }));
                 };                            
 
@@ -251,8 +289,11 @@ var table = function(config) {
 
                     };
                 }
-            },
-            actions_elts = Object.keys(model.actions).filter(show_this_action).map(create_action_elt);
+            };
+
+
+            model.add_action(remove_action());
+            var actions_elts = Object.keys(model.actions).filter(show_this_action).map(create_action_elt);
 
         row = table_body.appendChild(
                 dom.create( {
@@ -262,7 +303,7 @@ var table = function(config) {
                     },
                     children: [{
                         name: "td",
-                        value: model.name,
+                        value: model.name.split("_").join(" "),
                         attributes: { "class": model.name }
                     },{
                         name: "td",

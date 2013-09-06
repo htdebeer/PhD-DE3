@@ -63,7 +63,8 @@ var glass = function(canvas, model, SCALE) {
         base_shape.attr({
             "stroke": "black",
             "stroke-width": GLASS_BORDER,
-            "fill": "dimgray"
+            "fill": "dimgray",
+            "fill-opacity": 0.1
         });
         _glass.push(base_shape);  
 
@@ -158,13 +159,21 @@ var glass = function(canvas, model, SCALE) {
         _glass.glass_pane.attr({path: model.path(SCALE, false, x, y)});
         var MAX_LINE_WIDTH = Math.min(30, width / 2),
             MAX_LINE_SKIP = 5,
-            MAX_LINE_Y = y + height - model.get_maximum("hoogte") * 10 * SCALE;
+            BORDERS_ADD = _glass.bowl_shape.attr("stroke-width") * 2 + 1,
+            MAX_LINE_Y = y + height - model.get_maximum("hoogte") * 10 * SCALE - BORDERS_ADD,
+            INTERSECTIONS = raphael.pathIntersection(
+                   _glass.bowl_shape.attr("path"),
+                  "M0," + MAX_LINE_Y + "h1000"),
+            MAX_LINE_X = Math.min.apply(null,INTERSECTIONS.map(function(e) {return e.x;})) || x
+            ;
+
+
         _glass.max_line.attr({
-            path: "M" + x + "," + MAX_LINE_Y + 
+            path: "M" + MAX_LINE_X + "," + MAX_LINE_Y + 
                 "h" + MAX_LINE_WIDTH
         });
         _glass.max_label.attr({
-            x: x + MAX_LINE_WIDTH / 1.5,
+            x: MAX_LINE_X + MAX_LINE_WIDTH / 1.5,
             y: MAX_LINE_Y - MAX_LINE_SKIP            
         });
 

@@ -45,10 +45,41 @@
                     register: true
                 }, {
                     name: "longdrinkglas",
+                    type: "glass",
+                    shape: {
+                        bowl: {
+                            top: {
+                                x: 50,
+                                y: 0
+                            },
+                            bottom: {
+                                x: 50,
+                                y: 75
+                            },
+                            path: "v75"
+                        },
+                        base: {
+                            top: {
+                                x: 50,
+                                y: 75
+                            },
+                            bottom: {
+                                x: 50,
+                                y: 80
+                            },
+                            path: "v5"
+                        },
+                        scale: 3  
+                    },
+                    register: false
+                }, {
+                    name: "rekbaar_longdrinkglas",
+                    prefix: "rekbaar_longdrinkglas",
                     type: "longdrink",
-                    radius: 1.7,
-                    height: 7.8,
-                    register: true
+                    radius: 1.1,
+                    height: 5.8,
+                    register: false,
+                    multiple: true
                 }, {
                     name: "partyglass",
                     type: "predefined",
@@ -78,7 +109,8 @@
 //                         "toggle_tailpoints",
 //                         "step_size"
 //                         ]
-                },
+                    }
+                    ,
                 graph: {
                     id: "graph",
                     width: 600,

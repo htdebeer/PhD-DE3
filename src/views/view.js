@@ -74,16 +74,14 @@ var view = function(config) {
             models[model.name] = {
                 model: model
             };
-            _view.compute_extrema();
-            model.register(this);
-            _view.update(model.name);
+            model.register(_view);
         }
     };
 
     _view.unregister = function(model_name) {
         if (models[model_name]) {
+            models[model_name].model.unregister(_view);
             _view.remove(model_name);
-            models[model_name].model.unregister(this);
             delete models[model_name];
             _view.compute_extrema();
             _view.update_all();

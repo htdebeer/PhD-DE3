@@ -117,21 +117,6 @@ var actions = function(config) {
         }
     };
 
-    // Remove model actions
-    
-    _actions.remove = {
-        name: "remove",
-        group: "edit",
-        icon: "icon-remove",
-        tooltip: "Remove this model",
-        enabled: true,
-        callback: function(model) {
-            return function() {
-                model.unregister();
-            };
-        }
-    };
-
     // Toggle view action
 
     _actions.toggle_line = {
@@ -143,12 +128,12 @@ var actions = function(config) {
         toggled: false,
         callback: function(model) {
             return function() {
-                if (this.hasAttribute("data-toggled")) {
+                if (model.graph_is_shown("line")) {
                     this.removeAttribute("data-toggled");
-                    model.get_views_of_type("graph")[0].hide_line(model.name);
+                    model.hide_graph("line");
                 } else {
                     this.setAttribute("data-toggled", true);
-                    model.get_views_of_type("graph")[0].show_line(model.name);
+                    model.show_graph("line");
                 }
             };
         }
@@ -163,12 +148,12 @@ var actions = function(config) {
         toggled: false,
         callback: function(model) {
             return function() {
-                if (this.hasAttribute("data-toggled")) {
+                if (model.graph_is_shown("tailpoints")) {
                     this.removeAttribute("data-toggled");
-                    model.get_views_of_type("graph")[0].hide_tailpoints(model.name);
+                    model.hide_graph("tailpoints");
                 } else {
                     this.setAttribute("data-toggled", true);
-                    model.get_views_of_type("graph")[0].show_tailpoints(model.name);
+                    model.show_graph("tailpoints");
                 }
             };
         }

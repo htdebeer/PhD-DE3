@@ -110,7 +110,7 @@ var longdrink_glass = function(name, config) {
             end: quantities.tijd.maximum*1000,
             step: step
         },
-        action_list = config.actions || ["start", "pause", "reset", "finish","toggle_line", "toggle_tailpoints", "step_size", "remove"],
+        action_list = config.actions || ["start", "pause", "reset", "finish","toggle_line", "toggle_tailpoints", "step_size"],
         default_actions = require("../actions/actions")({speed: step});
     
     var _model = model(name, {

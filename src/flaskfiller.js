@@ -8,6 +8,8 @@ var glass_model = require("./models/glass"),
 
 window.flaskfiller = window.flaskfiller || function flaskfiller(config) {
 
+    var microworld = {};
+
     var flow_rate = config.flow_rate || 50; // ml per sec
     var scale = config.scale || 3.5; // px per mm
     var quantities = {
@@ -29,8 +31,8 @@ window.flaskfiller = window.flaskfiller || function flaskfiller(config) {
             value: 0,
             label: "tijd in sec",
             unit: "sec",
-            stepsize: 0.1,
-            precision: 1,
+            stepsize: 0.01,
+            precision: 2,
             monotone: true
         },
         volume: {
@@ -51,14 +53,28 @@ window.flaskfiller = window.flaskfiller || function flaskfiller(config) {
         views.simulation = create_view(config.simulation, simulation);
     }
     if (config.table) {
-        views.table = create_view(config.table, table);
+        views.table = create_view(config.table, table, config.models);
     }
     if (config.graph) {
         views.graph = create_view(config.graph, graph);
     }
 
-    var models = [];
+    var models = {};
     config.models.filter(register_model).forEach(register);
+
+
+
+    function unregister(model_name) {
+
+        Object.keys(views).forEach(remove_model);
+        
+        function remove_model(view) {
+            views[view].unregister(model_name);
+        }
+
+        delete models[model_name];
+        
+    }
 
     function register_model(model_spec) {
         return model_spec.register;
@@ -66,6 +82,15 @@ window.flaskfiller = window.flaskfiller || function flaskfiller(config) {
 
     function register(model_spec) {
         var model;
+        if (model_spec.multiple) {
+            if (!model_spec.prefix) {
+                throw new Error("when a model has option 'multiple', it should also have option 'prefix'.");
+            }
+            model_spec.name = generate_unique_name(model_spec.prefix);
+        } else if (models[model_spec.name]) {
+            // cannot create the same model twice
+            return;
+        }
         switch(model_spec.type) {
             case "glass":
                 model = glass_model(model_spec.name, {
@@ -85,17 +110,39 @@ window.flaskfiller = window.flaskfiller || function flaskfiller(config) {
             case "predefined":
                 break;
         }
-        model.step();
-        model.reset();
 
         Object.keys(views).forEach(add_model);
+        models[model_spec.name] = model_spec;
 
         function add_model(view) {
             views[view].register(model);
         }
+        
+        function generate_unique_name(prefix) {
+            function has_prefix(elt) {
+                return elt.substr(0, prefix.length) === prefix;
+            }
+
+
+            function postfix(elt) {
+                return parseInt(elt.substr(prefix.length + 1), 10);
+            }
+
+            function max(arr) {
+                if (arr.length > 0 ) {
+                    return Math.max.apply(null, arr);
+                } else {
+                    return 0;
+                }
+            }
+           
+            var suffix = max(Object.keys(models).filter(has_prefix).map(postfix)) + 1;
+            return prefix + "_" + suffix;
+        }
     }
 
-    function create_view(config, view_creator) {
+
+    function create_view(config, view_creator, models) {
         var elt = document.getElementById(config.id);
         if (!elt) {
             throw new Error("Unable to find element with id=" + config.id);
@@ -117,12 +164,19 @@ window.flaskfiller = window.flaskfiller || function flaskfiller(config) {
                         bottom: 5
                     }
                 },
-                hide_actions: config.hide_actions || []
+                hide_actions: config.hide_actions || [],
+                models: models,
+                microworld: microworld
             });
 
         elt.appendChild(view.fragment);
 
         return view;
     }
+
+
+    microworld.register = register;
+    microworld.unregister = unregister;
+    return microworld;
 };
 

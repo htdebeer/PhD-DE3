@@ -27,10 +27,14 @@ var ruler = function(canvas, config, MEASURE_LINE_WIDTH) {
     function move_measuring_line(e, x_, y_) {
         var path;
 
+        var svgbb = canvas.canvas.getBoundingClientRect(),
+            plus_left = svgbb.left +  window.pageXOffset,
+            plus_top = svgbb.top + window.pageYOffset;
+
         if (orientation === "horizontal") {
-            path = "M" + (x_) + "," + (y + height) + "v-" + MEASURE_LINE_WIDTH;
+            path = "M" + (x_ - plus_left) + "," + (y + height) + "v-" + MEASURE_LINE_WIDTH;
         } else {
-            path = "M" + x + "," + (y_) + "h" + MEASURE_LINE_WIDTH;
+            path = "M" + x + "," + (y_ - plus_top) + "h" + MEASURE_LINE_WIDTH;
         }
         measure_line.attr({
             "path": path

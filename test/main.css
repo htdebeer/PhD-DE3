@@ -71,8 +71,9 @@ td.color {
 
 
 tfoot th select {
-    padding: 0;
-    border: none;
+    padding: 0.25ex;
+    margin: 0.25ex;
+    border: 1px solid white;
     font-family: inherit;
     font-size: inherit;
     text-align: right;
