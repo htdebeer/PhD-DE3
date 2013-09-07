@@ -6,6 +6,8 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
 
     var _contour_line = {};
 
+    var SCALE = shape_.scale;
+
     var points = [],
         bottom_point,
         marriage_point,
@@ -48,13 +50,67 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
         return point;
     }
 
+    var original_x = 0, original_y = 0;
     function move(point) {
-        return function (dx, dy, x, y, event) {
+
+        function moveable(new_x, new_y) {
+            if (BOUNDARIES.x < new_x && new_x < BOUNDARIES.x + BOUNDARIES.width) {
+                switch (point.name) {
+                    case "top":
+                        if (BOUNDARIES.y < new_y && new_y < point.next.y()) {
+                            return true;
+                        } else {
+                            return false;
+                        }
+                        break;
+                    case "bottom":
+                        return true;
+                    default:
+                        if (point.prev.y() < new_y && new_y < point.next.y()) {
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    }
+            } else {
+                return false;
+            }
+            return true;
+        }
+
+        return function (dx, dy) {
+            var new_x = original_x + dx,
+                new_y;    
+            if (point.name === "bottom") {
+                new_y = original_y;
+            } else {
+                new_y = original_y + dy;
+            }
+            if (moveable(new_x, new_y)) {
+                update_point(point, new_x, new_y);
+                draw();
+            }
         };
     }
 
+    function update_point(point, x, y) {
+        if (point.name !== "top" && (
+                    point.prev.segment.command === "c" ||
+                    point.prev.segment.command === "l")) {
+            point.prev.segment.x = x;
+            point.prev.segment.y = y;
+        }
+        
+        point.attr({
+            "cx": x,
+            "cy": y
+        });
+    }
+
     function start_move(point) {
-        return function (x, y, event) {
+        return function () {
+            original_x = point.x();
+            original_y = point.y();
         };
     }
 
@@ -65,7 +121,8 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
 
     function remove_point(point) {
         return function (event) {
-            console.log("removed this point");
+            var index = points.indexOf(point);
+            _contour_line.remove(index);    
         };
     }
 
@@ -105,7 +162,7 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
 
     _contour_line.insert = function(x, y, index, type, segment) {
         var point = create_point(x, y, type);
-        point.segment = segment.command;
+        point.segment = segment;
 
         if (index > 0) {
             point.prev = points[index-1];
@@ -116,6 +173,7 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
             point.next.prev = point;
         }
 
+        point.name = "";
         points.splice(index, 0, point);
         return point;
     };
@@ -131,8 +189,15 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
             next = point.next;
         prev.next = next;
         next.prev = prev;        
+        prev.segment = {
+            command: "l",
+            x: next.x() - prev.x(),
+            y: next.y() - prev.y()
+        };
         point.remove();
-        delete points.splice(index, 1);
+        delete points[index];
+        points.splice(index, 1);
+        draw();
     };
 
     function populate_points(shape) {
@@ -147,13 +212,14 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
         
         next_point = add_point(segments, x, y, i, "part");
         top_point = points[i];
+        top_point.name = "top";
         i++;
         while (i < segments.length) {
             next_point = add_point(segments, next_point.x, next_point.y, i, "segment");
             i++;
         }
 
-        var j = i;
+        var bowl_number_of_points = i;
 
         part = shape.base;
         path = part.path;
@@ -162,19 +228,22 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
         x = part.top.x;
         y = part.top.y;
 
-        next_point = add_point(segments, x, y, i, "part");
-        marriage_point = points[j];
+        next_point = add_point(segments, x, y, i, "part", bowl_number_of_points);
+        marriage_point = points[bowl_number_of_points];
+        marriage_point.name = "marriage";
         i++;
         while (i < segments.length) {
-            next_point = add_point(segments, next_point.x, next_point.y, i, "segment");
+            next_point = add_point(segments, next_point.x, next_point.y, i, "segment", bowl_number_of_points);
             i++;
         }
 
-        add_point([], next_point.x, next_point.y, j+i, "part");
-        bottom_point = points[i+j];
-        
-        function add_point(segments, x, y, index, type) {
-            var new_x = x, new_y = y, new_index;
+        add_point([], next_point.x, next_point.y, i, "part", bowl_number_of_points);
+        bottom_point = points[i+bowl_number_of_points];
+        bottom_point.name = "bottom";
+
+        function add_point(segments, x, y, index, type, addendum) {
+            var new_x = x, new_y = y, new_index,
+                add_to_index = addendum || 0;
 
             var segment_string = segments[index] || "";
             var segment = parse_segment(segment_string) || [];
@@ -182,7 +251,7 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
             _contour_line.insert(
                 x,
                 y,
-                index,
+                index + addendum,
                 type,
                 segment
             );
@@ -213,7 +282,6 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
                 y: new_y
             };
         }
-
     }
 
 
@@ -223,20 +291,19 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
         var path = "",
             x = point.next.x() - point.x(),
             y = point.next.y() - point.y();
-        console.log(point, x, y);
-        switch (point.segment) {
+        switch (point.segment.command) {
             case "v":
-                path = "v" + point.length;
+                path = "v" + point.segment.length;
                 break;
             case "h":
-                path = "h" + point.length;
+                path = "h" + point.segment.length;
                 break;
             case "l":
                 path = "l" + x + "," + y;
                 break;
             case "c":
-                path = "c" + cp1.x + "," + cp1.y + "," +
-                    cp2.x + "," + cp2.y + "," +
+                path = "c" + point.segment.cp1.x + "," + point.segment.cp1.y + "," +
+                    point.segment.cp2.x + "," + point.segment.cp2.y + "," +
                     x + "," + y;
                 break;
         }
@@ -249,10 +316,9 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
             paths =[];
         paths.push(path_segment(cur));
         while (cur.next.type !== "part") {
-            paths.push(path_segment(cur));
             cur = cur.next;
+            paths.push(path_segment(cur));
         }
-        console.log(paths);
         return paths.join(" ");
     }
 
@@ -285,27 +351,58 @@ var contour_line = function(canvas, shape_, BOUNDARIES) {
     };
 
 
-    var path = canvas.path("M0,0"), 
-        mirror = canvas.path("M0,0")
+    var bowl_path = canvas.path("M0,0"), 
+        base_path = canvas.path("M0,0")
             ;
 
-    path.attr({
-        "stroke-width": 2
+    base_path.attr({
+        "stroke-width":4,
+        "fill": "dimgray",
+        "fill-opacity": 0.5
     });
-    mirror.attr({
-        "stroke-width": 2
+    bowl_path.attr({
+        "stroke-width": 4,
+        "fill": "none"
     });
+
+    bowl_path.click(add_point);
+
+    var add_point_dot = canvas.circle(0,0,6);
+    add_point_dot.attr({
+        fill: "orange",
+        "fill-opacity": 0.5,
+        stroke: "dimgray"
+    });
+    add_point_dot.hide();
+
+    function add_point(event, x, y) {
+        console.log(x, y);
+        // find point directly above
+    }
+
+
+    function normalize_shape(shape) {
+        var MID_X = BOUNDARIES.x;
+        shape.bowl.top.x -= MID_X;
+        shape.bowl.bottom.x -= MID_X;
+        shape.base.top.x -= MID_X;
+        shape.base.bottom.x -= MID_X;
+        return shape;
+    }
+
     function draw() {
-        var shape = _contour_line.shape();
-        var p = shape.bowl.path + paths.complete_path(shape.bowl);
+        var shape = normalize_shape(_contour_line.shape());
+        var x = BOUNDARIES.x,
+            y = 0;
 
-        path.attr({
-            path: "M" + shape.bowl.top.x + "," + shape.bowl.top.y + p
-        });
-        mirror.attr({
-            path: "M" + shape.base.top.x + "," + shape.base.top.y + shape.base.path
+        bowl_path.attr({
+            path: "M" + x + "," + y + paths.complete_path(shape.bowl)
         });
 
+        p = paths.complete_path(shape.base);
+        base_path.attr({
+            path: "M" + x + "," + y + paths.complete_path(shape.base) + "z"
+        });
 
     }
 

@@ -7,6 +7,7 @@
         <link rel="stylesheet" href="../lib/font-awesome/css/font-awesome.min.css">
     </head>
     <body>
+        <figure id="grafter"></figure>
         <figure id="sim"></figure>
         <table id="measure"></table>
         <figure id="graph"></figure>
@@ -97,6 +98,11 @@
 
             flaskfiller({
                 models: models,
+                glassgrafter: {
+                    id: "grafter",
+                    width: 600,
+                    height: 500
+                },
                 simulation: {
                     id: "sim",
                     width: 600,

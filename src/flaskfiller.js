@@ -3,7 +3,9 @@ var glass_model = require("./models/glass"),
     longdrink_model = require("./models/longdrink_glass"),
     simulation = require("./views/flaskfiller/flaskfiller"),
     table = require("./views/table"),
-    graph = require("./views/graph");
+    graph = require("./views/graph"),
+    glassgrafter = require("./views/flaskfiller/glass_grafter")
+    ;
 
 
 window.flaskfiller = window.flaskfiller || function flaskfiller(config) {
@@ -58,6 +60,16 @@ window.flaskfiller = window.flaskfiller || function flaskfiller(config) {
     if (config.graph) {
         views.graph = create_view(config.graph, graph);
     }
+
+    if (config.glassgrafter) {
+        var gg = glassgrafter(config.glassgrafter);
+        var elt = document.getElementById(config.glassgrafter.id);
+        if (!elt) {
+            throw new Error("Unable to find element with id=" + config.glassgrafter.id);
+        }
+        elt.appendChild(gg.fragment);
+    }
+        
 
     var models = {};
     config.models.filter(register_model).forEach(register);

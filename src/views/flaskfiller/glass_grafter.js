@@ -5,12 +5,37 @@ var dom = require("../../dom/dom");
 var ruler = require("./ruler");
 var contour_line = require("./contour_line");
 
-var glass_grafter = function(config, scale_, dimensions_) {
+var glass_grafter = function(config) {
     var _grafter = {};
 
-    var scale = scale_ || 4; // px per mm
+    var scale = config.scale || (config.shape)?(config.shape.scale || 3):3; // px per mm
+    var shape = config.shape || {
+            bowl: {
+                top: {
+                    x: 100,
+                    y: 0
+                },
+                bottom: {
+                    x: 10,
+                    y: 100
+                },
+                path: "l-90,100"
+            },
+            base: {
+                top: {
+                    x: 10,
+                    y: 100
+                },
+                bottom: {
+                    x: 70,
+                    y: 200
+                },
+                path: "l0,90 l50,0 c5,2.5,7.5,7.5,10,10"
+            },
+            scale: scale
+        };
 
-    var dimensions = dimensions_ || {
+    var dimensions = config.dimensions || {
         width: 600,
         height: 400,
         ruler_width: 30,
@@ -168,31 +193,6 @@ var glass_grafter = function(config, scale_, dimensions_) {
 
 
 
-    var shape = {
-            bowl: {
-                top: {
-                    x: 100,
-                    y: 0
-                },
-                bottom: {
-                    x: 10,
-                    y: 100
-                },
-                path: "l-90,100"
-            },
-            base: {
-                top: {
-                    x: 10,
-                    y: 100
-                },
-                bottom: {
-                    x: 70,
-                    y: 200
-                },
-                path: "v90 h50 c5,2.5,7.5,7.5,10,10"
-            },
-            scale: 3  
-        };
 
     function reshape(shape) {
         var bottom_y = CONSTRUCTION_AREA.y + CONSTRUCTION_AREA.height,
@@ -213,7 +213,10 @@ var glass_grafter = function(config, scale_, dimensions_) {
 
 
     draw();
+    vertical_ruler.toFront();
+    horizontal_ruler.toFront();
     var points = contour_line(canvas, reshape(shape), CONSTRUCTION_AREA);
+    mirror_background.toFront();
     // There is a bug in Raphael regarding placing text on the right
     // y-coordinate when the canvas isn't part of the DOM. It has been added
     // before and now removed again.
