@@ -50,6 +50,7 @@ var longdrink_glass = function(canvas, model, SCALE, boundaries_) {
 
     function sizestop() {
         _glass.y += delta_y;
+        model.get_views_of_type("graph").forEach(function(v) {v.update_all();});
     }
 
 

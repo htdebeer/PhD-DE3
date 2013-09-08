@@ -1,6 +1,7 @@
 
 var glass_model = require("./models/glass"),
     longdrink_model = require("./models/longdrink_glass"),
+    predefined = require("./predefined_glasses"),
     simulation = require("./views/flaskfiller/flaskfiller"),
     table = require("./views/table"),
     graph = require("./views/graph"),
@@ -120,6 +121,7 @@ window.flaskfiller = window.flaskfiller || function flaskfiller(config) {
                 });
                 break;
             case "predefined":
+                model = predefined(model_spec.name, flow_rate);
                 break;
         }
 

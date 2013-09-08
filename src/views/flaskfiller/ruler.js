@@ -1,6 +1,12 @@
 
-var ruler = function(canvas, config, MEASURE_LINE_WIDTH) {
+var ruler = function(canvas, config, MEASURE_LINE_WIDTH_) {
     var _ruler = canvas.set();
+
+    var MEASURE_LINE_WIDTH = MEASURE_LINE_WIDTH_;
+    if (config.reverse) {
+        MEASURE_LINE_WIDTH = -MEASURE_LINE_WIDTH_;
+    }
+        
 
     var x = config.x || 0,
         y = config.y || 0,

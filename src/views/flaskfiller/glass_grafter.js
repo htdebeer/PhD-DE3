@@ -36,8 +36,8 @@ var glass_grafter = function(config) {
         };
 
     var dimensions = config.dimensions || {
-        width: 600,
-        height: 400,
+        width: 500,
+        height: 500,
         ruler_width: 30,
         margins: {
             left: 5,
@@ -83,7 +83,8 @@ var glass_grafter = function(config) {
                 width: dimensions.ruler_width,
                 height: CONTAINER.height - dimensions.ruler_width - dimensions.margins.top - dimensions.margins.bottom,
                 scale: scale,
-                orientation: "vertical"
+                orientation: "vertical",
+                reverse: true
             }
         };
 
@@ -129,8 +130,56 @@ var glass_grafter = function(config) {
            "fill": "dimgray"
        }); 
 
+       cm_label.click(function() {
+           points.print_shape();
+       });
+
        return cm_label;
     }
+
+
+    var ACTION_PADDING = 15,
+        ACTION_WIDTH = 20,
+        ACTION_HEIGHT = 15,
+        ACTION_SEP = 5,
+        ACTION_AREA = {
+        x: MIRROR_AREA.x + ACTION_PADDING,
+        y: MIRROR_AREA.y + MIRROR_AREA.height + ACTION_PADDING
+        };
+    var remove_action = draw_action("remove", 0);
+    var straight_action = draw_action("straight", 1);
+    var curve_action = draw_action("curve", 2);
+
+    function draw_action(name, index) {
+        var action = canvas.set();
+        
+        var x = ACTION_AREA.x + index*(ACTION_SEP * ACTION_WIDTH) + ACTION_SEP,
+            y = ACTION_AREA.y;
+
+        var background = canvas.rect(x, y, ACTION_WIDTH, ACTION_HEIGHT);
+        background.attr({
+            fill: "gold",
+            stroke: "dimgray"
+        });
+        action.push(background);
+
+        var label = canvas.text(x, y, name);
+        action.push(label);
+        action.attr({
+
+        });
+        action.click(function() {
+            points.current_action = name;
+            if (name === "curve") {
+                points.show_control_points();
+            } else {
+                points.hide_control_points();
+            }
+            console.log(points.current_action);
+        });
+        return action;
+    }
+
 
 
     var construction_background,

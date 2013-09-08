@@ -16,64 +16,6 @@
         <script>
             var models = [
                 {
-                    name: "cocktailglas",
-                    type: "glass",
-                    shape: {
-                        bowl: {
-                            top: {
-                                x: 100,
-                                y: 0
-                            },
-                            bottom: {
-                                x: 10,
-                                y: 100
-                            },
-                            path: "l-90,100"
-                        },
-                        base: {
-                            top: {
-                                x: 10,
-                                y: 100
-                            },
-                            bottom: {
-                                x: 70,
-                                y: 200
-                            },
-                            path: "v90h50c5,2.5,7.5,7.5,10,10"
-                        },
-                        scale: 3  
-                    },
-                    register: true
-                }, {
-                    name: "longdrinkglas",
-                    type: "glass",
-                    shape: {
-                        bowl: {
-                            top: {
-                                x: 50,
-                                y: 0
-                            },
-                            bottom: {
-                                x: 50,
-                                y: 75
-                            },
-                            path: "v75"
-                        },
-                        base: {
-                            top: {
-                                x: 50,
-                                y: 75
-                            },
-                            bottom: {
-                                x: 50,
-                                y: 80
-                            },
-                            path: "v5"
-                        },
-                        scale: 3  
-                    },
-                    register: false
-                }, {
                     name: "rekbaar_longdrinkglas",
                     prefix: "rekbaar_longdrinkglas",
                     type: "longdrink",
@@ -82,7 +24,39 @@
                     register: false,
                     multiple: true
                 }, {
-                    name: "partyglass",
+                    name: "longdrinkglas",
+                    type: "predefined",
+                    register: false
+                }, {
+                    name: "klein_longdrinkglas",
+                    type: "predefined",
+                    register: false
+                }, {
+                    name: "groter_longdrinkglas",
+                    type: "predefined",
+                    register: false
+                }, {
+                    name: "breed_longdrinkglas",
+                    type: "predefined",
+                    register: false
+                }, {
+                    name: "klein_cocktailglas",
+                    type: "predefined",
+                    register: false
+                }, {
+                    name: "wijnglas",
+                    type: "predefined",
+                    register: false
+                }, {
+                    name: "bierglas",
+                    type: "predefined",
+                    register: true
+                }, {
+                    name: "cognacglas",
+                    type: "predefined",
+                    register: false
+                }, {
+                    name: "cocktailglas",
                     type: "predefined",
                     register: false
                 }
@@ -100,13 +74,13 @@
                 models: models,
                 glassgrafter: {
                     id: "grafter",
-                    width: 600,
-                    height: 500
+                    width: 500,
+                    height: 800
                 },
                 simulation: {
                     id: "sim",
                     width: 600,
-                    height: 400
+                    height: 600
                 },
                 table: {
                     id: "measure"
