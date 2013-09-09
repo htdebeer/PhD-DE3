@@ -311,14 +311,14 @@ var model = function(name, config) {
             // called without any arguments: return all minima
             var minima = {},
                 add_minimum = function(quantity) {
-                    minima[quantity] = _model.quantities[quantity].minimum;
+                    minima[quantity] = parseFloat(_model.quantities[quantity].minimum);
                 };
 
             Object.keys(_model.quantities).forEach(add_minimum);
             return minima;
         } else {
             // return quantity's minimum
-            return _model.quantities[quantity].minimum;
+            return parseFloat(_model.quantities[quantity].minimum);
         }
     };
                     
@@ -327,14 +327,14 @@ var model = function(name, config) {
             // called without any arguments: return all minima
             var maxima = {},
                 add_maximum = function(quantity) {
-                    maxima[quantity] = _model.quantities[quantity].maximum;
+                    maxima[quantity] = parseFloat(_model.quantities[quantity].maximum);
                 };
 
             Object.keys(_model.quantities).forEach(add_maximum);
             return maxima;
         } else {
             // return quantity's minimum
-            return _model.quantities[quantity].maximum;
+            return parseFloat(_model.quantities[quantity].maximum);
         }
     };
 
@@ -355,7 +355,8 @@ var model = function(name, config) {
             // minimum of this quantity, type of monotone follows.
 
             var start = val(0),
-                INCREASING = (start === _model.get_minimum(quantity));
+                INCREASING = (start !== _model.get_maximum(quantity));
+
 
             // Use a stupid linear search to find the moment that approaches the
             // value best
@@ -363,7 +364,6 @@ var model = function(name, config) {
 
             var m = 0,
                 n = moments.length - 1,
-                approx = _appendix.approximates(EPSILON),
                 lowerbound,
                 upperbound;
 
@@ -435,11 +435,12 @@ var model = function(name, config) {
     _model.set = function(quantity, value) {
         var q = _model.quantities[quantity];
 
-        if (value < q.minimum) {
-            value = q.minimum;
-        } else if (value > q.maximum) {
-            value = q.maximum;
+        if (value < parseFloat(q.minimum)) {
+            value = parseFloat(q.minimum);
+        } else if (value > parseFloat(q.maximum)) {
+            value = parseFloat(q.maximum);
         }
+
 
         // q.minimum ≤ value ≤ q.maximum
 
@@ -489,7 +490,8 @@ var model = function(name, config) {
 
     _model.graphs_shown = {
         tailpoints: false,
-        line: false
+        line: false,
+        arrows: false
     };
 
    
@@ -504,6 +506,9 @@ var model = function(name, config) {
                     break;
                 case "tailpoints":
                     g.show_tailpoints(_model.name);
+                    break;
+                case "arrows":
+                    g.show_arrows(_model.name);
                     break;
             }
         }
@@ -522,6 +527,9 @@ var model = function(name, config) {
                     break;
                 case "tailpoints":
                     g.hide_tailpoints(_model.name);
+                    break;
+                case "arrows":
+                    g.hide_arrows(_model.name);
                     break;
             }
         }
@@ -552,7 +560,7 @@ var model = function(name, config) {
         };
 
 
-    var step = config.step_size || 5;
+    var step = config.step_size || T_STEP ;
     function step_size(size) {
         if (arguments.length === 1) {
             step = size;

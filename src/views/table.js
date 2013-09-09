@@ -205,7 +205,6 @@ var table = function(config) {
                             type: "change",
                             callback: function(event) {
                                 var value = this.value;
-
                                 if (value < model.get_minimum(q)) {
                                     model.reset();
                                 } else if (model.get_maximum(q) < value) {
@@ -256,7 +255,7 @@ var table = function(config) {
                 if (action.type && action.type === "slider") {
                     attributes.type = "range";
                     attributes.min = 1;
-                    attributes.max = 50;
+                    attributes.max = 10 * model.step_size();
                     attributes.step = 1;
                     attributes.value = model.step_size();
 

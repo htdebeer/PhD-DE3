@@ -8,7 +8,7 @@ var actions = function(config) {
     // Running model actions
 
     var running_models = {},
-        current_speed = config.speed || 10;
+        current_speed = 17; // refresh rate of about 60 updates per second  || config.speed || 10;
 
     _actions.speed = function( speed ) {
         if (arguments.length === 1) {
@@ -134,6 +134,26 @@ var actions = function(config) {
                 } else {
                     this.setAttribute("data-toggled", true);
                     model.show_graph("line");
+                }
+            };
+        }
+    };
+
+    _actions.toggle_arrows = {
+        name: "toggle_arrows",
+        group: "toggle_view",
+        icon: "icon-long-arrow-right ",
+        tooltip: "Show/hide the arrows graph of this model",
+        enabled: true,
+        toggled: false,
+        callback: function(model) {
+            return function() {
+                if (model.graph_is_shown("arrows")) {
+                    this.removeAttribute("data-toggled");
+                    model.hide_graph("arrows");
+                } else {
+                    this.setAttribute("data-toggled", true);
+                    model.show_graph("arrows");
                 }
             };
         }

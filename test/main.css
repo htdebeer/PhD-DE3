@@ -252,3 +252,10 @@ div.tooltip {
     border-radius: 1ex;
     opacity: 0.7;
 }
+
+div.speed_tooltip {
+    padding: 1ex;
+    background-color: greenyellow;
+    border-radius: 1ex;
+    opacity: 0.7;
+}

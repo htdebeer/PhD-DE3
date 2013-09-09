@@ -58,6 +58,7 @@ var graph = function(config_) {
             width: CONTAINER.width - MARGINS.left - MARGINS.right,
             height: CONTAINER.height - MARGINS.top - MARGINS.bottom
         };
+    var GRAPH_LINE_WIDTH = 3;
 
 
     _graph.fragment = document
@@ -113,11 +114,13 @@ var graph = function(config_) {
     function show_tangent_triangle() {
             var tangent_triangle = svg.select("g.tangent_triangle");
             if (tangent_triangle) tangent_triangle.style("visibility", "visible");
+            speed_tooltip.style("visibility", "visible");
     }
 
     function hide_tangent_triangle() {
             var tangent_triangle = svg.select("g.tangent_triangle");
             if (tangent_triangle) tangent_triangle.style("visibility", "hidden");
+            speed_tooltip.style("visibility", "hidden");
     }
 
     function show_zoom() {
@@ -233,9 +236,26 @@ var graph = function(config_) {
                         MARGINS.left + "," + 
                         MARGINS.right + ")");
 
+    svg.append("defs")
+        .append("marker")
+        .attr({
+            id: "arrowhead",
+            markerWidth: "4",
+            markerHeight: "6",
+            refX: "4",
+            refY: "3",
+            orient: "auto"
+        })
+        .append("path")
+            .attr({
+                d: "M0,0 l0,6 l4,-3 l-4,-3"
+            })
+        .style("fill", "black");
+
 
     var showline = false,
-        showtailpoints = false;
+        showtailpoints = false,
+        showarros = false;
 
     function draw_tailpoints(model_name) {
         var model = _graph.get_model(model_name).model,
@@ -256,6 +276,9 @@ var graph = function(config_) {
             model_tailpoints.parentNode.removeChild(model_tailpoints);
         }
 
+        var POINT_R = 3,
+            TAIL_WIDTH = 3,
+            COLOR = model.color();
 
         svg.select("g.tailpoints")
                 .append("g")
@@ -274,11 +297,10 @@ var graph = function(config_) {
                     return x_scale(d[x_quantity.name]);
                 })
                 .attr("y2", y_scale(0))
-                .attr("stroke", model.color || "red")
-                .style("stroke-width", 1)
-//                .style("stroke-opacity", 0.7)
-//                .style("stroke-dasharray", [3,1])
+                .attr("stroke", COLOR)
+                .style("stroke-width", TAIL_WIDTH)
                 ;
+
         svg.select("g.tailpoints g." + model_name)
                 .selectAll("circle")
                 .data(data)
@@ -290,18 +312,54 @@ var graph = function(config_) {
                 .attr("cy", function(d) {
                     return y_scale(d[y_quantity.name]);
                 })
-                .attr("r", 2)
-                .attr("stroke", "black")
-                .attr("fill", "white")
-                .style("stroke-width", 1.5)
+                .attr("r", POINT_R)
+                .attr("stroke", COLOR)
+                .attr("fill", COLOR)
+                .style("stroke-width", 0)
                 .on("mouseover.tooltip", add_tooltip(model_name))
                 .on("mouseout.tooltip", remove_tooltip(model_name))
                 ;
+
+        var arrow_data = data.slice(0, -1);
+        svg.select("g.tailpoints g." + model_name )
+            .append("g")
+            .classed("arrows", true)
+            .selectAll("line")
+            .data(arrow_data)
+            .enter()
+            .append("line")
+            .attr({
+                x1: function (d, i) {
+                    return x_scale(d[x_quantity.name]);
+                },
+                y1: function (d, i) {
+                    return y_scale(d[y_quantity.name]);
+                },
+                x2: function (d, i) {
+                    return x_scale(data[i+1][x_quantity.name]);
+                },
+                y2: function (d, i) {
+                    return y_scale(data[i+1][y_quantity.name]);
+                },
+                "marker-end": "url(#arrowhead)"
+            })
+            .style({
+                "stroke-width": 1.5,
+                stroke: "black",
+                fill: "black"
+            });
+
 
         if (model.graph_is_shown("tailpoints")) {
             _graph.show_tailpoints(model_name);
         } else {
             _graph.hide_tailpoints(model_name);
+        }
+
+        if (model.graph_is_shown("arrows")) {
+            _graph.show_arrows(model_name);
+        } else {
+            _graph.hide_arrows(model_name);
         }
 
     }
@@ -343,7 +401,7 @@ var graph = function(config_) {
                 .attr("class", "graph")
                 .attr("fill", "none")
                 .attr("stroke", model.color || "red")
-                .style("stroke-width", 3)
+                .style("stroke-width", GRAPH_LINE_WIDTH)
                 .on("mouseover.tooltip", add_tooltip(model_name))
                 .on("mousemove.tooltip", add_tooltip(model_name))
                 .on("mouseout.tooltip", remove_tooltip(model_name))
@@ -404,99 +462,6 @@ var graph = function(config_) {
     }
 
 
-
-    var tangent_triangle = svg
-        .append("g")
-        .classed("tangent_triangle", true);
-    tangent_triangle.append("line")
-        .classed("tangent", true)
-        .style({
-            "stroke-width": 3,
-            "stroke": "crimson"
-        });
-
-    function add_tangent_triangle(model_name) {
-        return function(d, i) {
-            var container = _graph.fragment.querySelector("svg > g"),
-                path = d3.event.target || d3.event.srcElement,
-                point = d3.mouse(container);
-
-
-            var length_at_point = 0,
-                total_length = path.getTotalLength(),
-                INTERVAL = 50;
-
-            while (path.getPointAtLength(length_at_point).x < point[0] && 
-                    length_at_point < total_length) {
-                        length_at_point += INTERVAL;
-                    }
-
-            length_at_point -= INTERVAL;
-
-            while (path.getPointAtLength(length_at_point).x < point[0] && 
-                    length_at_point < total_length) {
-                        length_at_point++;
-                    }
-
-
-            var x_scale = horizontal_axis.scale,
-                x_quantity = horizontal_axis.quantity,
-                y_scale = vertical_axis.scale,
-                y_quantity = vertical_axis.quantity,
-                x_unit = x_quantity.unit,
-                y_unit = y_quantity.unit,
-                cur = {
-                    x: x_scale.invert(point[0]).toFixed(x_quantity.precision || 0),
-                    y: y_scale.invert(point[1]).toFixed(y_quantity.precision || 0)
-                };
-
-            var prev,
-                next,
-                delta;
-
-            if (length_at_point > 1 && length_at_point < (total_length - 1)) {
-                prev = path.getPointAtLength(length_at_point - 0.1);
-                next = path.getPointAtLength(length_at_point + 0.1);
-                delta = {
-                    x: next.x - prev.x,
-                    y: next.y - prev.y
-                };
-            } else {
-
-                // don't worry about the first
-                // and last pixel or so
-                return;
-            }
-
-        
-
-
-            var tangent = tangent_triangle.select("g.tangent_triangle line.tangent");
-
-            var LENGTH = 200;
-
-            point = path.getPointAtLength(length_at_point);
-            var x1 = point.x - delta.x * LENGTH,
-                y1 = point.y - delta.y * LENGTH,
-                x2 = point.x + delta.x * LENGTH,
-                y2 = point.y + delta.y * LENGTH;
-
-            tangent.attr("x1", x1)
-                .attr("y1", y1)
-                .attr("x2", x2)
-                .attr("y2", y2);
-
-
-            svg.select("g.tangent_triangle").style("opacity", 1);
-        };
-    }
-
-    function remove_tangent_triangle(model_name) {
-        return function() {
-            var tangent_triangle = svg.select("g.tangent_triangle");
-            tangent_triangle.style("opacity", 0);
-        };
-    }
 
 
     function set_axis(quantity_name, orientation) {
@@ -633,12 +598,127 @@ var graph = function(config_) {
         svg.append("g")
             .attr("class", "tailpoints");
 
-        tangent_triangle.style("visibility", "hidden");
+
+        svg.append("g")
+            .classed("tangent_triangle", true)
+            .style({
+                "visibility": "hidden"
+            })
+            .append("line")
+                .classed("tangent", true)
+                .style({
+                    "stroke-width": 3,
+                    "stroke": "crimson"
+                });
+
 
 
     }
     create_graph();
     _graph.update_all();
+
+    var speed_tooltip = d3.select("body")
+        .append("div")
+        .attr("class", "speed_tooltip")
+        .style("position", "absolute")
+        .style("visibility", "hidden")
+        .style("opacity", 0);
+
+    function add_tangent_triangle(model_name) {
+        return function(d, i, event) {
+            var container = _graph.fragment.querySelector("svg > g"),
+                path = d3.event.target || d3.event.srcElement,
+                point = d3.mouse(container);
+
+
+            var length_at_point = 0,
+                total_length = path.getTotalLength(),
+                INTERVAL = 50;
+
+            while (path.getPointAtLength(length_at_point).x < point[0] && 
+                    length_at_point < total_length) {
+                        length_at_point += INTERVAL;
+                    }
+
+            length_at_point -= INTERVAL;
+
+            while (path.getPointAtLength(length_at_point).x < point[0] && 
+                    length_at_point < total_length) {
+                        length_at_point++;
+                    }
+
+
+            var x_scale = horizontal_axis.scale,
+                x_quantity = horizontal_axis.quantity,
+                y_scale = vertical_axis.scale,
+                y_quantity = vertical_axis.quantity,
+                x_unit = x_quantity.unit,
+                y_unit = y_quantity.unit,
+                cur = {
+                    x: x_scale.invert(point[0]).toFixed(x_quantity.precision || 0),
+                    y: y_scale.invert(point[1]).toFixed(y_quantity.precision || 0)
+                };
+
+            var prev,
+                next,
+                a, 
+                b;
+
+            if (length_at_point > 1 && length_at_point < (total_length - 1)) {
+                prev = path.getPointAtLength(length_at_point - 0.1);
+                next = path.getPointAtLength(length_at_point + 0.1);
+                a = (y_scale.invert(next.y) - y_scale.invert(prev.y)) /
+                    (x_scale.invert(next.x) - x_scale.invert(prev.x));
+                b = y_scale.invert(prev.y) - a*x_scale.invert(prev.x);
+            } else {
+
+                // don't worry about the first
+                // and last pixel or so
+                return;
+            }
+
+
+            var x1 = x_quantity.minimum, x2, y1, y2;
+            if (a > 0) {
+                y2 = y_quantity.maximum;
+            } else {
+                y2 = y_quantity.minimum;
+            }
+                
+            y1 = a*x1 + b;
+            x2 = (y2 - b)/a;
+
+            var tangent = svg.select("g.tangent_triangle line.tangent");
+            var SEP = GRAPH_LINE_WIDTH;
+            tangent.attr("x1", x_scale(x1) - 1)
+                .attr("y1", y_scale(y1) - SEP)
+                .attr("x2", x_scale(x2) - 1)
+                .attr("y2", y_scale(y2) - SEP);
+
+            var tangent_text = (a).toFixed(y_quantity.precision || 0) + " " + y_quantity.unit + " per " + x_quantity.unit;
+            
+
+            var WIDTH = 100,
+                X_SEP = 70,
+                Y_SEP = 30;
+            speed_tooltip
+                .style("left", (d3.event.pageX - WIDTH - X_SEP) + "px")     
+                .style("top", (d3.event.pageY - Y_SEP) + "px");   
+            speed_tooltip.html(tangent_text);
+            speed_tooltip.style("opacity", 0.7);
+
+            svg.select("g.tangent_triangle").style("opacity", 1);
+        };
+    }
+
+    function remove_tangent_triangle(model_name) {
+        return function() {
+            var tangent_triangle = svg.select("g.tangent_triangle");
+            tangent_triangle.style("opacity", 0);
+            speed_tooltip.style("opacity", 0);
+        };
+    }
+
 
     _graph.remove = function(model_name) {
         var model_line = _graph.fragment
@@ -665,6 +745,24 @@ var graph = function(config_) {
     _graph.update = function(model_name) {
         draw_line(model_name);
         draw_tailpoints(model_name);
+    };
+
+    _graph.show_arrows = function(model_name) {
+        var model_arrows = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name + " g.arrows" );
+
+        if (model_arrows) {
+            model_arrows.style.visibility = "visible";
+        }
+    };
+
+    _graph.hide_arrows = function(model_name) {
+        var model_arrows = _graph.fragment
+            .querySelector("svg g.tailpoints g." + model_name + " g.arrows" );
+
+        if (model_arrows) {
+            model_arrows.style.visibility = "hidden";
+        }
     };
 
     _graph.show_tailpoints = function(model_name) {

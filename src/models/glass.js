@@ -52,7 +52,7 @@ var glass = function(name, config) {
             end: quantities.tijd.maximum*1000,
             step: step
         },        
-        action_list = config.actions || ["start", "pause", "reset", "finish","toggle_line", "toggle_tailpoints", "step_size"],
+        action_list = config.actions || ["start", "pause", "reset", "finish","toggle_line", "toggle_tailpoints", "toggle_arrows", "step_size"],
         default_actions = require("../actions/actions")({speed: step});
 
     function create_actions(action_list) {
@@ -164,7 +164,7 @@ var glass = function(name, config) {
             }];
 
         while (l > l_start) {
-            l--;
+            l -= 0.1;
             prev = cur;
             cur = point(l);
             r = px_to_cm((cur.x+prev.x)/2);
@@ -179,7 +179,9 @@ var glass = function(name, config) {
             vol += delta_vol;
 
             if (delta_time >= ms_step ) {
-                time += delta_time;
+                //time += delta_time;
+                time += ms_step;
+                vol = time * flow_rate;
                 delta_time = 0;
                 values.push({
                     tijd: time,
