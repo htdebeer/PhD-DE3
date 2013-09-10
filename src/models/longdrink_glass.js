@@ -107,7 +107,7 @@ var longdrink_glass = function(name, config) {
             value: 0,
             unit: 'cm/sec',
             name: 'stijgsnelheid',
-            label: 'stijgsnelheid',
+            label: 'stijgsnelheid in cm/sec',
             stepsize: 0.01,
             monotone: false,
             precision: 2
