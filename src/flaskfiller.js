@@ -48,8 +48,30 @@ window.flaskfiller = window.flaskfiller || function flaskfiller(config) {
             stepsize: 0.01,
             precision: 2,
             monotone: true
+        },
+        stijgsnelheid: {
+            minimum: 0,
+            maximum: 0,
+            value: 0,
+            unit: 'cm/sec',
+            name: 'stijgsnelheid',
+            label: 'stijgsnelheid',
+            stepsize: 0.01,
+            monotone: false,
+            precision: 2
         }
     };
+
+    if (config.not_in_table) {
+        config.not_in_table.forEach(function(q) {
+            quantities[q].not_in_table = true;
+        });
+    }
+    if (config.not_in_graph) {
+        config.not_in_graph.forEach(function(q) {
+            quantities[q].not_in_graph = true;
+        });
+    }
 
     var views = {};
     if (config.simulation) {

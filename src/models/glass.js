@@ -42,6 +42,17 @@ var glass = function(name, config) {
             stepsize: 0.01,
             monotone: true,
             precision: 2
+        },
+        stijgsnelheid: {
+            minimum: 0,
+            maximum: 0,
+            value: 0,
+            unit: 'cm/sec',
+            name: 'stijgsnelheid',
+            label: 'stijgsnelheid',
+            stepsize: 0.01,
+            monotone: false,
+            precision: 2
         }
     };
 
@@ -147,7 +158,8 @@ var glass = function(name, config) {
             r,
             area,
             vol = 0,
-            time = 0;
+            time = 0,
+            speed = 0;
 
         var l = l_end-1,
             prev = point(l),
@@ -160,7 +172,8 @@ var glass = function(name, config) {
                 tijd: time,
                 hoogte: h,
                 volume: vol,
-                length: l
+                length: l,
+                stijgsnelheid: speed
             }];
 
         while (l > l_start) {
@@ -182,16 +195,21 @@ var glass = function(name, config) {
                 //time += delta_time;
                 time += ms_step;
                 vol = time * flow_rate;
-                delta_time = 0;
+                speed = (h - values[values.length - 1].hoogte) / delta_time;
+
                 values.push({
                     tijd: time,
                     hoogte: h,
                     volume: vol,
-                    length: l
+                    length: l,
+                    stijgsnelheid: speed
                 });
+
+                delta_time = 0;
             }
         }
 
+        values[0].stijgsnelheid = values[1].stijgsnelheid;
         return values;
     }
 
@@ -217,10 +235,13 @@ var glass = function(name, config) {
         _model.quantities.hoogte.maximum = max.hoogte.toFixed(quantities.hoogte.precision);
         _model.quantities.hoogte.minimum = 0;//min.hoogte.toFixed(quantities.hoogte.precision);
         _model.quantities.volume.maximum = max.volume.toFixed(quantities.volume.precision);
+
+        _model.quantities.stijgsnelheid.maximum = Math.max.apply(null, values.map(function(v) {return v.stijgsnelheid;})) + 1;
+
+        _model.quantities.stijgsnelheid.minimum = Math.min.apply(null, values.map(function(v) {return v.stijgsnelheid;})) - 1;
     }
 
     compute_maxima();
-
 
     _model.measure_moment = function(moment) {
         return values[moment];

@@ -21,44 +21,35 @@
                     type: "longdrink",
                     radius: 1.1,
                     height: 5.8,
-                    register: false,
                     multiple: true
                 }, {
                     name: "longdrinkglas",
-                    type: "predefined",
-                    register: false
+                    type: "predefined"
                 }, {
                     name: "klein_longdrinkglas",
-                    type: "predefined",
-                    register: false
+                    type: "predefined"
                 }, {
                     name: "groter_longdrinkglas",
-                    type: "predefined",
-                    register: false
+                    type: "predefined"
                 }, {
                     name: "breed_longdrinkglas",
-                    type: "predefined",
-                    register: false
+                    type: "predefined"
                 }, {
                     name: "klein_cocktailglas",
-                    type: "predefined",
-                    register: false
+                    type: "predefined"
                 }, {
                     name: "wijnglas",
-                    type: "predefined",
-                    register: false
+                    type: "predefined"
                 }, {
                     name: "bierglas",
                     type: "predefined",
                     register: true
                 }, {
                     name: "cognacglas",
-                    type: "predefined",
-                    register: false
+                    type: "predefined"
                 }, {
                     name: "cocktailglas",
-                    type: "predefined",
-                    register: false
+                    type: "predefined"
                 }
             ];
 
@@ -99,7 +90,10 @@
                     hide_actions: [
                         "locally_zoom"
                     ]
-                }
+                },
+not_in_table: ["stijgsnelheid"],
+              not_in_graph: ["stijgsnelheid"]
+                  
 
             });
 

@@ -42,6 +42,7 @@ var table = function(config) {
             enabled: true,
             callback: function(model) {
                 return function() {
+                    model.action("reset").callback(model)();
                     config.microworld.unregister(model.name);
                 };
             }
@@ -144,7 +145,9 @@ var table = function(config) {
         }));
 
         // quantities, if any
-        var number_of_quantities = Object.keys(_table.quantities).length;
+        var number_of_quantities = Object.keys(_table.quantities)
+            .filter(function(q) {return !_table.quantities[q].not_in_table;})
+            .length;
         if (number_of_quantities > 0) {
                 var add_cell = function(q) {
                     var quantity = _table.quantities[q];
@@ -155,7 +158,9 @@ var table = function(config) {
                     }));
                 };                            
 
-            Object.keys(_table.quantities).forEach(add_cell);
+            Object.keys(_table.quantities)
+                .filter(function(q) {return !_table.quantities[q].not_in_table;})
+                .forEach(add_cell);
         }
 
         // actions, if any
@@ -233,7 +238,11 @@ var table = function(config) {
                 }
                 return cell;
             },
-            quantity_elts = Object.keys(_table.quantities).map(create_quantity_elt);
+            quantity_elts = Object.keys(_table.quantities)
+                .filter(function(q) {
+                    return !_table.quantities[q].not_in_table;
+                })
+                .map(create_quantity_elt);
 
         var group,
             create_action_elt = function(action_name) {
@@ -348,7 +357,7 @@ var table = function(config) {
         var moment = model.current_moment(),
             update_quantity = function(q) {
                 var quantity = _table.quantities[q];
-                if (quantity) {
+                if (quantity && !quantity.not_in_table) {
                     var query = "[data-quantity='" + q + "']",
                         cell = row.querySelector(query);
 
@@ -366,7 +375,8 @@ var table = function(config) {
             };
 
 
-        Object.keys(moment).forEach(update_quantity);
+        Object.keys(moment)
+            .forEach(update_quantity);
 
         var update_action =  function(action_name) {
             var query = "button[data-action='" + action_name + "']",

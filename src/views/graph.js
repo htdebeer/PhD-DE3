@@ -155,10 +155,16 @@ var graph = function(config_) {
                     return option;
                 };
             },
-            horizontal_quantity_list = quantity_names.map(
-                    create_option(horizontal_selected_index)),
-            vertical_quantity_list = quantity_names.map(
-                    create_option(vertical_selected_index));
+            horizontal_quantity_list = quantity_names
+                .filter(function(q) {
+                    return !_graph.quantities[q].not_in_graph;
+                })
+                .map(create_option(horizontal_selected_index)),
+            vertical_quantity_list = quantity_names
+                .filter(function(q) {
+                    return !_graph.quantities[q].not_in_graph;
+                })
+                .map(create_option(vertical_selected_index));
 
         var create_action = function(action) {
                 var attributes = {
@@ -493,6 +499,7 @@ var graph = function(config_) {
                 return axis;
             },
             axis = create_axis(quantity, orientation);
+
        
         if (orientation === "horizontal") {
             horizontal = quantity_name;
@@ -607,7 +614,7 @@ var graph = function(config_) {
             .append("line")
                 .classed("tangent", true)
                 .style({
-                    "stroke-width": 3,
+                    "stroke-width": 2,
                     "stroke": "crimson"
                 });
 
@@ -690,21 +697,30 @@ var graph = function(config_) {
 
             var tangent = svg.select("g.tangent_triangle line.tangent");
             var SEP = GRAPH_LINE_WIDTH;
+
+            if (a >= 0) {
             tangent.attr("x1", x_scale(x1) - 1)
                 .attr("y1", y_scale(y1) - SEP)
                 .attr("x2", x_scale(x2) - 1)
                 .attr("y2", y_scale(y2) - SEP);
+            } else {
+            tangent.attr("x1", x_scale(x1) + 1)
+                .attr("y1", y_scale(y1) + SEP)
+                .attr("x2", x_scale(x2) + 1)
+                .attr("y2", y_scale(y2) + SEP);
+            }
+
 
             var tangent_text = (a).toFixed(y_quantity.precision || 0) + " " + y_quantity.unit + " per " + x_quantity.unit;
             
 
-            var WIDTH = 100,
-                X_SEP = 70,
+            speed_tooltip.html(tangent_text);
+            var WIDTH = speed_tooltip.clientHeight || tangent_text.length*10,
+                X_SEP = 10,
                 Y_SEP = 30;
             speed_tooltip
                 .style("left", (d3.event.pageX - WIDTH - X_SEP) + "px")     
                 .style("top", (d3.event.pageY - Y_SEP) + "px");   
-            speed_tooltip.html(tangent_text);
             speed_tooltip.style("opacity", 0.7);
 
             svg.select("g.tangent_triangle").style("opacity", 1);
