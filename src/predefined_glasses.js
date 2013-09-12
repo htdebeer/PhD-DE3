@@ -27,6 +27,9 @@ var glass_specifications = {
     },
     bierglas: {
         "bowl":{"top":{"x":108,"y":122},"bottom":{"x":71,"y":459},"path":"l1,100.8125 c0,15,-10,15,-18,33 l-20,203.1875"},"base":{"top":{"x":71,"y":459},"bottom":{"x":71,"y":465},"path":"l0,6"},"scale":3
+    },
+    vaas: {
+        "bowl":{"top":{"x":53,"y":227},"bottom":{"x":119,"y":456},"path":"l0,95.96875 l66,1 l0,132.03125"},"base":{"top":{"x":119,"y":456},"bottom":{"x":119,"y":465},"path":"l0,9"},"scale":3
     }
 };
 
