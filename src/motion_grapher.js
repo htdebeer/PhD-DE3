@@ -8,135 +8,6 @@ window.motion_grapher = window.motion_grapher || function motion_grapher(config)
 
     var microworld = {};
 
-    function convert_distance(distance, from_unit, to_unit) {
-        var converter = {
-            "mm": {
-                "mm": function(distance) {
-                    return distance;
-                },
-                "cm": function(distance) {
-                    return distance/10;
-                },
-                "m": function(distance) {
-                    return distance/1000;
-                },
-                "km": function(distance) {
-                    return ditance/1000000;
-                }
-            },
-            "cm": {
-                "mm": function(distance) {
-                    return distance*10;
-                },
-                "cm": function(distance) {
-                    return distance;
-                },
-                "m": function(distance) {
-                    return distance/100;
-                },
-                "km": function(distance) {
-                    return ditance/100000;
-                }
-            },
-            "m": {
-                "mm": function(distance) {
-                    return distance*1000;
-                },
-                "cm": function(distance) {
-                    return distance*100;
-                },
-                "m": function(distance) {
-                    return distance;
-                },
-                "km": function(distance) {
-                    return ditance/1000;
-                }
-            },
-            "km": {
-                "mm": function(distance) {
-                    return distance*1000000;
-                },
-                "cm": function(distance) {
-                    return distance*100000;
-                },
-                "m": function(distance) {
-                    return distance*1000;
-                },
-                "km": function(distance) {
-                    return ditance;
-                }
-            }
-        };
-
-        return converter[from_unit][to_unit](distance);
-    }
-
-    function convert_time(time, from_unit, to_unit) {
-        var converter = {
-            "ms": {
-                "ms": function(time) {
-                    return time;
-                },
-                "sec": function(time) {
-                    return time/1000;
-                },
-                "min": function(time) {
-                    return time/60000;
-                },
-                "uur": function(time) {
-                    return time/3600000;
-                }
-            },
-            "sec": {
-                "ms": function(time) {
-                    return time*1000;
-                },
-                "sec": function(time) {
-                    return time;
-                },
-                "min": function(time) {
-                    return time/60;
-                },
-                "uur": function(time) {
-                    return time/3600;
-                }
-            },
-            "min": {
-                "ms": function(time) {
-                    return time*60000;
-                },
-                "sec": function(time) {
-                    return time*60;
-                },
-                "min": function(time) {
-                    return time;
-                },
-                "uur": function(time) {
-                    return time/60;
-                }
-            },
-            "uur": {
-                "ms": function(time) {
-                    return time*3600000;
-                },
-                "sec": function(time) {
-                    return time*3600;
-                },
-                "min": function(time) {
-                    return time*60;
-                },
-                "uur": function(time) {
-                    return time;
-                }
-            }
-        };
-
-        return converter[from_unit][to_unit](time);
-    }
-
-    function time_to_seconds(time, from_unit) {
-        return convert_time(time, from_unit, "sec");
-    }
 
     var quantities = {
         afgelegde_afstand: {
@@ -246,7 +117,8 @@ window.motion_grapher = window.motion_grapher || function motion_grapher(config)
                 model = motion_model(model_spec.name, {
                     name: model_spec.name,
                     starting_speed: model_spec.starting_speed || 0,
-                    specification: model_spec.specification || {}
+                    specification: model_spec.specification || {},
+                    editor: views.editor
                 });
                 break;
         }
@@ -318,4 +190,142 @@ window.motion_grapher = window.motion_grapher || function motion_grapher(config)
     microworld.unregister = unregister;
     return microworld;
             
+};
+
+motion_grapher.distance_units_conversion_table = {
+    "mm": {
+        "mm": function(distance) {
+            return distance;
+        },
+        "cm": function(distance) {
+            return distance/10;
+        },
+        "m": function(distance) {
+            return distance/1000;
+        },
+        "km": function(distance) {
+            return ditance/1000000;
+        }
+    },
+    "cm": {
+        "mm": function(distance) {
+            return distance*10;
+        },
+        "cm": function(distance) {
+            return distance;
+        },
+        "m": function(distance) {
+            return distance/100;
+        },
+        "km": function(distance) {
+            return ditance/100000;
+        }
+    },
+    "m": {
+        "mm": function(distance) {
+            return distance*1000;
+        },
+        "cm": function(distance) {
+            return distance*100;
+        },
+        "m": function(distance) {
+            return distance;
+        },
+        "km": function(distance) {
+            return ditance/1000;
+        }
+    },
+    "km": {
+        "mm": function(distance) {
+            return distance*1000000;
+        },
+        "cm": function(distance) {
+            return distance*100000;
+        },
+        "m": function(distance) {
+            return distance*1000;
+        },
+        "km": function(distance) {
+            return ditance;
+        }
+    }
+};
+
+motion_grapher.is_distance_unit = function(unit) {
+    return Object.keys(distance_units_conversion_table).indexOf(unit) !== -1;
+};
+
+motion_grapher.convert_distance = function(distance, from_unit, to_unit) {
+    return motion_grapher.distance_units_conversion_table[from_unit][to_unit](distance);
+};
+
+motion_grapher.time_units_conversion_table = {
+    "ms": {
+        "ms": function(time) {
+            return time;
+        },
+        "sec": function(time) {
+            return time/1000;
+        },
+        "min": function(time) {
+            return time/60000;
+        },
+        "uur": function(time) {
+            return time/3600000;
+        }
+    },
+    "sec": {
+        "ms": function(time) {
+            return time*1000;
+        },
+        "sec": function(time) {
+            return time;
+        },
+        "min": function(time) {
+            return time/60;
+        },
+        "uur": function(time) {
+            return time/3600;
+        }
+    },
+    "min": {
+        "ms": function(time) {
+            return time*60000;
+        },
+        "sec": function(time) {
+            return time*60;
+        },
+        "min": function(time) {
+            return time;
+        },
+        "uur": function(time) {
+            return time/60;
+        }
+    },
+    "uur": {
+        "ms": function(time) {
+            return time*3600000;
+        },
+        "sec": function(time) {
+            return time*3600;
+        },
+        "min": function(time) {
+            return time*60;
+        },
+        "uur": function(time) {
+            return time;
+        }
+    }
+};
+
+motion_grapher.is_time_unit = function(unit) {
+    return Object.keys(time_units_conversion_table).indexOf(unit) !== -1;
+};
+
+motion_grapher.convert_time = function(time, from_unit, to_unit) {
+        return motion_grapher.time_units_conversion_table[from_unit][to_unit](time);
+};
+
+motion_grapher.time_to_seconds = function(time, from_unit) {
+        return motion_grapher.convert_time(time, from_unit, "sec");
 };

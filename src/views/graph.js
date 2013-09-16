@@ -145,7 +145,8 @@ var graph = function(config_) {
                 return function(quantity_name, index) {
                     var option = {
                         name: "option",
-                        value: quantity_name
+                        value: quantity_name,
+                        text: quantity_name.replace("_", " ")
                     };
                     if (index === selected_index) {
                         option.attributes = {
@@ -614,7 +615,7 @@ var graph = function(config_) {
             .append("line")
                 .classed("tangent", true)
                 .style({
-                    "stroke-width": 2,
+                    "stroke-width": 3,
                     "stroke": "crimson"
                 });
 
@@ -668,15 +669,24 @@ var graph = function(config_) {
 
             var prev,
                 next,
+                cur_px = path.getPointAtLength(length_at_point),
                 a, 
                 b;
 
             if (length_at_point > 1 && length_at_point < (total_length - 1)) {
-                prev = path.getPointAtLength(length_at_point - 0.1);
-                next = path.getPointAtLength(length_at_point + 0.1);
-                a = (y_scale.invert(next.y) - y_scale.invert(prev.y)) /
-                    (x_scale.invert(next.x) - x_scale.invert(prev.x));
-                b = y_scale.invert(prev.y) - a*x_scale.invert(prev.x);
+                prev = path.getPointAtLength(length_at_point - 10);
+                next = path.getPointAtLength(length_at_point + 10);
+
+                var compute_a = function(p, n) {
+                    return (y_scale.invert(n.y) - y_scale.invert(p.y)) /
+                    (x_scale.invert(n.x) - x_scale.invert(p.x));
+                    },
+                    compute_b = function(a, p) {
+                        return y_scale.invert(p.y) - a*x_scale.invert(p.x);
+                    };
+                a = compute_a(prev, next);
+                b = compute_b(a, cur_px);
+
             } else {
 
                 // don't worry about the first

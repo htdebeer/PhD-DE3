@@ -56,11 +56,15 @@ var dom = {
         }
 
         if (spec.value) {
-            if (spec.name === "input") {
+            if (spec.name === "input" || spec.name === "option") {
                 elt.value = spec.value;
             } else {
                 elt.innerHTML = spec.value;
             }
+        }
+
+        if (spec.text) {
+            elt.innerHTML = spec.text;
         }
 
         if (spec.style) {

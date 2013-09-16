@@ -203,7 +203,7 @@ var longdrink_glass = function(name, config) {
             compute_speed();
             _model.reset_model();
             compute_maxima();
-            _model.update_views();
+            _model.update_all_views();
         }
         return height;
     };
@@ -213,7 +213,7 @@ var longdrink_glass = function(name, config) {
             compute_speed();
             _model.reset_model();
             compute_maxima();
-            _model.update_views();
+            _model.update_all_views();
         }
         return radius;
     };
@@ -223,7 +223,7 @@ var longdrink_glass = function(name, config) {
             compute_speed();
             _model.reset_model();
             compute_maxima();
-            _model.update_views();
+            _model.update_all_views();
         }
         return flow_rate;
     };

@@ -134,6 +134,18 @@ var model = function(name, config) {
     };
     _model.update_views = update_views;
 
+    var update_all_views = function() {
+        var update_view = function(view) {
+            if (view.update_all) {
+                view.update_all();
+            } else {
+                view.update(_model.name);
+            }
+        };
+        views.forEach(update_view);
+    };
+    _model.update_all_views = update_all_views;
+
     _model.register = function(view) {
         var view_found = views.indexOf(view);
         if (view_found === -1) {

@@ -75,7 +75,7 @@ var table = function(config) {
         function create_option(model, index) {
             return {
                 name: "option",
-                value: model.name.split("_").join(" "),
+                text: model.name.replace("_", " "),
                 attributes: {
                     value: index
                 }
@@ -88,10 +88,8 @@ var table = function(config) {
             },
             children: [{
                 name: "option",
-                value: "toevoegen ...",
-                attributes: {
-                    value: -1
-                }
+                text: "toevoegen ...",
+                value: -1
             }].concat(config.models.map(create_option)),
             on: {
                 type: "change",
@@ -154,7 +152,7 @@ var table = function(config) {
 
                     head.appendChild( dom.create({
                         name: "th",
-                        value: quantity.name
+                        value: quantity.name.replace("_", " ")
                     }));
                 };                            
 
