@@ -101,7 +101,11 @@ var motion_editor = function(config_) {
         update_button = button_group
             .appendChild(dom.create({
                 name: "button",
-                value: "Update"
+                value: "Update",
+                on: {
+                    type: "click",
+                    callback: update_movement
+                }
             }));
         cancel_button = button_group
             .appendChild(dom.create({
@@ -110,7 +114,6 @@ var motion_editor = function(config_) {
                 on: {
                     type: "click",
                     callback: function() {
-                        console.log("geannuleerd");
                         _editor.hide();
                     }
                 }
@@ -118,24 +121,23 @@ var motion_editor = function(config_) {
     }
     create_editor();
 
-    function update_movement(model) {
-        var listener = this;
-
-        return function() {
-            model.specification(textarea.value.trim());
-            model.compute_maxima();
+    var current_model = {};
+    function update_movement() {
+        console.log(current_model.specification());
+            current_model.specification(textarea.value.trim());
+        console.log(current_model.specification());
             _editor.hide();
-            update_button.removeEventListener("click", listener);
-        };
     }
 
 
 
     _editor.show_model = function(model) {
-        title.innerHTML = "Stel de fietsroute van " + model.name.replace("_", " ") + " in";
-        textarea.innerHTML = model.specification();
-        update_button.addEventListener("click", update_movement(model));
-        _editor.show();
+        return function() {
+            current_model = model;
+            title.innerHTML = "Stel de fietsroute van " + model.name.replace("_", " ") + " in";
+            textarea.value = current_model.specification();
+            _editor.show();
+        };
     };
 
 

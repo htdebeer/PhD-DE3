@@ -2,12 +2,17 @@
 var motion_model = require("./models/motion"),
     motion_editor = require("./views/motion_editor"),
     table = require("./views/table"),
-    graph = require("./views/graph");
+    graph = require("./views/graph"),
+    mg_util = require("./motion/util");
 
 window.motion_grapher = window.motion_grapher || function motion_grapher(config) {
 
     var microworld = {};
 
+    var distance_unit = config.distance_unit || "m",
+        time_unit = config.time_unit || "sec",
+        speed_unit = config.speed_unit || distance_unit + "/" + time_unit,
+        acceleration_unit = config.acceleration_unit || speed_unit + "/" + time_unit;
 
     var quantities = {
         afgelegde_afstand: {
@@ -15,8 +20,8 @@ window.motion_grapher = window.motion_grapher || function motion_grapher(config)
             minimum: 0,
             maximum: 0,
             value: 0,
-            label: "afgelegde afstand in " + (config.distance_unit || "m"),
-            unit: config.distance_unit || "m",
+            label: "afgelegde afstand in " + distance_unit,
+            unit: distance_unit,
             stepsize: 0.01,
             precision: 2,
             monotone: true
@@ -26,36 +31,36 @@ window.motion_grapher = window.motion_grapher || function motion_grapher(config)
             minimum: 0,
             maximum: config.duration || 10,
             value: 0,
-            label: "tijd in " + (config.time_unit || "sec"),
-            unit: config.time_unit || "sec",
+            label: "tijd in " + time_unit,
+            unit: time_unit,
             stepsize: 0.01,
             precision: 2,
             monotone: true
-        }
-    };
-
-    quantities.snelheid = {
+        },
+        snelheid : {
             name: "snelheid",
             minimum: 0,
             maximum: 0,
             value: config.starting_speed || 0,
-            label: "snelheid in " + quantities.afgelegde_afstand.unit + "/" + quantities.tijd.unit,
-            unit: quantities.afgelegde_afstand.unit + "/" + quantities.tijd.unit,
+            label: "snelheid in " + speed_unit,
+            unit: speed_unit,
             stepsize: 0.01,
             precision: 2,
             monotone: false
-        };
-    quantities.versnelling = {
+        },
+        versnelling: {
             name: "versnelling",
             minimum: 0,
             maximum: 0,
             value: 0,
-            label: "versnelling in " + quantities.snelheid.unit + "/" + quantities.tijd.unit,
-            unit: quantities.snelheid.unit + "/" + quantities.tijd.unit,
+            label: "versnelling in " + acceleration_unit,
+            unit: acceleration_unit,
             stepsize: 0.01,
             precision: 2,
             monotone: false
+        }
     };
+
 
     if (config.not_in_table) {
         config.not_in_table.forEach(function(q) {
@@ -112,14 +117,24 @@ window.motion_grapher = window.motion_grapher || function motion_grapher(config)
             // cannot create the same model twice
             return;
         }
+        var model_config = {
+            name: model_spec.name,
+            starting_speed: model_spec.starting_speed || 0,
+            specification: model_spec.specification || {},
+            distance_unit: model_spec.distance_unit || "m",
+            time_unit: model_spec.time_unit || "m",
+            editor: views.editor
+        };
+
+        model_config.speed_unit = model_spec.speed_unit ||
+            model_config.distance_unit + "/" + model_config.time_unit;
+
+        model_config.acceleration_unit = model_spec.acceleration_unit || 
+            model_config.speed_unit + "/" + model_config.time_unit;
+
         switch(model_spec.type) {
             case "motion":
-                model = motion_model(model_spec.name, {
-                    name: model_spec.name,
-                    starting_speed: model_spec.starting_speed || 0,
-                    specification: model_spec.specification || {},
-                    editor: views.editor
-                });
+                model = motion_model(model_spec.name, model_config);
                 break;
         }
 
@@ -190,142 +205,4 @@ window.motion_grapher = window.motion_grapher || function motion_grapher(config)
     microworld.unregister = unregister;
     return microworld;
             
-};
-
-motion_grapher.distance_units_conversion_table = {
-    "mm": {
-        "mm": function(distance) {
-            return distance;
-        },
-        "cm": function(distance) {
-            return distance/10;
-        },
-        "m": function(distance) {
-            return distance/1000;
-        },
-        "km": function(distance) {
-            return ditance/1000000;
-        }
-    },
-    "cm": {
-        "mm": function(distance) {
-            return distance*10;
-        },
-        "cm": function(distance) {
-            return distance;
-        },
-        "m": function(distance) {
-            return distance/100;
-        },
-        "km": function(distance) {
-            return ditance/100000;
-        }
-    },
-    "m": {
-        "mm": function(distance) {
-            return distance*1000;
-        },
-        "cm": function(distance) {
-            return distance*100;
-        },
-        "m": function(distance) {
-            return distance;
-        },
-        "km": function(distance) {
-            return ditance/1000;
-        }
-    },
-    "km": {
-        "mm": function(distance) {
-            return distance*1000000;
-        },
-        "cm": function(distance) {
-            return distance*100000;
-        },
-        "m": function(distance) {
-            return distance*1000;
-        },
-        "km": function(distance) {
-            return ditance;
-        }
-    }
-};
-
-motion_grapher.is_distance_unit = function(unit) {
-    return Object.keys(distance_units_conversion_table).indexOf(unit) !== -1;
-};
-
-motion_grapher.convert_distance = function(distance, from_unit, to_unit) {
-    return motion_grapher.distance_units_conversion_table[from_unit][to_unit](distance);
-};
-
-motion_grapher.time_units_conversion_table = {
-    "ms": {
-        "ms": function(time) {
-            return time;
-        },
-        "sec": function(time) {
-            return time/1000;
-        },
-        "min": function(time) {
-            return time/60000;
-        },
-        "uur": function(time) {
-            return time/3600000;
-        }
-    },
-    "sec": {
-        "ms": function(time) {
-            return time*1000;
-        },
-        "sec": function(time) {
-            return time;
-        },
-        "min": function(time) {
-            return time/60;
-        },
-        "uur": function(time) {
-            return time/3600;
-        }
-    },
-    "min": {
-        "ms": function(time) {
-            return time*60000;
-        },
-        "sec": function(time) {
-            return time*60;
-        },
-        "min": function(time) {
-            return time;
-        },
-        "uur": function(time) {
-            return time/60;
-        }
-    },
-    "uur": {
-        "ms": function(time) {
-            return time*3600000;
-        },
-        "sec": function(time) {
-            return time*3600;
-        },
-        "min": function(time) {
-            return time*60;
-        },
-        "uur": function(time) {
-            return time;
-        }
-    }
-};
-
-motion_grapher.is_time_unit = function(unit) {
-    return Object.keys(time_units_conversion_table).indexOf(unit) !== -1;
-};
-
-motion_grapher.convert_time = function(time, from_unit, to_unit) {
-        return motion_grapher.time_units_conversion_table[from_unit][to_unit](time);
-};
-
-motion_grapher.time_to_seconds = function(time, from_unit) {
-        return motion_grapher.convert_time(time, from_unit, "sec");
 };

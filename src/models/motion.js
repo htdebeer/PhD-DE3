@@ -1,12 +1,17 @@
 var model = require("./model");
-var motion_grapher = require("../motion_grapher");
-var MG = motion_grapher;
+var mg_util = require("../motion/util");
 
 var motion = function(name, config) {
 
     var a;
 
     var _model = {};
+
+    var distance_unit = config.distance_unit || "m",
+        time_unit = config.time_unit || "sec",
+        speed_unit = config.speed_unit || distance_unit + "/" + time_unit,
+        acceleration_unit = config.acceleration_unit || speed_unit + "/" + time_unit;
+
 
     function create_actions(action_list) {
         var actions = {},
@@ -25,8 +30,8 @@ var motion = function(name, config) {
             minimum: 0,
             maximum: 0,
             value: 0,
-            label: "afgelegde afstand in " + (config.distance_unit || "m"),
-            unit: config.distance_unit || "m",
+            label: "afgelegde afstand in " + distance_unit,
+            unit: distance_unit,
             stepsize: 0.01,
             precision: 2,
             monotone: true
@@ -36,37 +41,35 @@ var motion = function(name, config) {
             minimum: 0,
             maximum: config.duration || 10,
             value: 0,
-            label: "tijd in " + (config.time_unit || "sec"),
-            unit: config.time_unit || "sec",
+            label: "tijd in " + time_unit,
+            unit: time_unit,
             stepsize: 0.01,
             precision: 2,
             monotone: true
-        }
-    };
-
-    quantities.snelheid = {
+        },
+        snelheid : {
             name: "snelheid",
             minimum: 0,
             maximum: 0,
             value: config.starting_speed || 0,
-            label: "snelheid in " + quantities.afgelegde_afstand.unit + "/" + quantities.tijd.unit,
-            unit: quantities.afgelegde_afstand.unit + "/" + quantities.tijd.unit,
+            label: "snelheid in " + speed_unit,
+            unit: speed_unit,
             stepsize: 0.01,
             precision: 2,
             monotone: false
-        };
-    quantities.versnelling = {
+        },
+        versnelling: {
             name: "versnelling",
             minimum: 0,
             maximum: 0,
             value: 0,
-            label: "versnelling in " + quantities.snelheid.unit + "/" + quantities.tijd.unit,
-            unit: quantities.snelheid.unit + "/" + quantities.tijd.unit,
+            label: "versnelling in " + acceleration_unit,
+            unit: acceleration_unit,
             stepsize: 0.01,
             precision: 2,
             monotone: false
+        }
     };
-
 
 
     var step = config.step || 10,
@@ -85,10 +88,8 @@ var motion = function(name, config) {
         tooltip: "Edit motion model",
         enabled: true,
         callback: function() {
-            return function() {
-                config.editor.show_model(_model);
-            };
-        }
+                return config.editor.show_model(_model);
+            }
     };
     
     default_actions.edit = edit_action;
@@ -217,17 +218,47 @@ var motion = function(name, config) {
             var unit = q.unit,
                 value = q.value;
 
-            if (unit.per) {
-            } else {
-                if (MG.is_time_unit(unit.unit)) {
-                    value = MG.time_to_seconds(value, unit.unit);
-                }
-            }
-
             return value;
         } else {
             return null;
         }
+    }
+
+    function it_to_mt(it) {
+        return it / 1000;
+    }
+
+    function mt_to_it(mt) {
+        return mt * 1000;
+    }
+
+    function ms_to_mt(ms) {
+        return mg_util.convert_time(ms, "ms", time_unit);
+    }
+
+    function convert_speed_to_distance(speed, from_unit) {
+        mg_util.convert_distance(speed, from_unit.unit, distance_unit);
+    }
+
+    function step_speed(speed) {
+        var value = speed.value,
+            unit = speed.unit;
+
+        var to_time = mg_util.convert_time(value, time_unit, unit.per);
+        var to_distance = mg_util.convert_distance(to_time, distance_unit, unit.unit);
+
+        return to_distance;
+    }
+
+    function step_acceleration(acceleration) {
+        var value = acceleration.value,
+            unit = acceleration.unit;
+
+        var to_time = mg_util.convert_time(value, time_unit, unit.per);
+        var to_speed = mg_util.convert_time(to_time, time_unit, unit.unit.per);
+        var to_distance = mg_util.convert_distance(to_speed, distance_unit, unit.unit);
+
+        return to_distance;
     }
 
 
@@ -238,10 +269,25 @@ var motion = function(name, config) {
         var current_direction = directions[0],
             previous_direction;
 
-        var time = ts_to_ms(current_direction.timestamp),
-            distance = q_to_ms_value(current_direction.quantities.distance) || 0,
-            speed = q_to_ms_value(current_direction.quantities.speed) || 0,
-            acceleration = q_to_ms_value(current_direction.quantities.acceleration) || 0;
+        var time, distance, speed, acceleration;
+
+        var mt_step = it_to_mt(step);
+        
+        time = ms_to_mt(ts_to_ms(current_direction.timestamp));
+
+        distance = q_to_ms_value(current_direction.quantities.distance) || 0;
+
+        if (current_direction.quantities.speed) {
+            speed = step_speed(current_direction.quantities.speed);
+        } else {
+            speed = 0;
+        }
+
+        if (current_direction.quantities.acceleration) {
+            acceleration = step_acceleration(current_direction.quantities.acceleration);
+        } else {
+            acceleration = 0;
+        }
 
         values.push({
             tijd: time,
@@ -250,6 +296,7 @@ var motion = function(name, config) {
             versnelling: acceleration
         });
 
+
         var duration = 0;
 
         for (var i = 1; i < directions.length; i++) {
@@ -257,17 +304,25 @@ var motion = function(name, config) {
             current_direction = directions[i];
             previous_direction = directions[i-1];
             
-            duration = ts_to_ms(current_direction.timestamp) - 
-                ts_to_ms(previous_direction.timestamp);
-            acceleration = q_to_ms_value(previous_direction.quantities.acceleration) || acceleration;
-            speed = q_to_ms_value(previous_direction.quantities.speed) || speed;
+            duration = mt_to_it(ms_to_mt(ts_to_ms(current_direction.timestamp)) - 
+                ms_to_mt(ts_to_ms(previous_direction.timestamp)));
+
+            if (previous_direction.quantities.acceleration) {
+                acceleration = step_acceleration(previous_direction.quantities.acceleration);
+            } else {
+                acceleration = 0;
+            }
+
+            if (previous_direction.quantities.speed) {
+                speed = step_speed(previous_direction.quantities.speed);
+            }
             distance = q_to_ms_value(previous_direction.quantities.distance) || distance;
 
 
             while (duration > 0) {
-                time += step;
-                speed += step*acceleration;
-                distance += step*speed;
+                time += mt_step;
+                speed += mt_step*acceleration;
+                distance += mt_step*speed;
                 values.push({
                     tijd: time,
                     afgelegde_afstand: distance,
@@ -324,16 +379,16 @@ var motion = function(name, config) {
         };
     };
 
-    function specification(new_spec) {
+    var spec = config.specification;
+    _model.specification = function(new_spec) {
         if (arguments.length === 1) {
-            config.specification = new_spec;
+            spec = new_spec;
             _model.reset_model();
             compute_maxima();
             _model.update_all_views();
         }
-        return config.specification;
-    }
-    _model.specification = specification;
+        return spec;
+    };
 
     _model.step();
     _model.compute_maxima = compute_maxima;
