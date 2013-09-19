@@ -246,7 +246,8 @@ var model = function(name, config) {
 
     function reset_model() {
         moments = [];
-        _model.reset();
+        _model.action("reset").callback(_model)();
+//        _model.reset();
     }
     _model.reset_model = reset_model;
 
