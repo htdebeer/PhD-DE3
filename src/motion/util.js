@@ -138,4 +138,64 @@ mg_util.time_to_seconds = function(time, from_unit) {
         return mg_util.convert_time(time, from_unit, "sec");
 };
 
+
+mg_util.parse_unit = function(u) {
+    var parts = u.split("/");
+
+    function create_unit(last, rest) {
+        if (rest.length === 0) {
+            return {
+                unit: last
+            };
+        } else if (rest.length === 1) {
+            return {
+                unit: rest[0],
+                per: last
+            };
+        } else {
+            return {
+                unit: create_unit(rest.pop(), rest),
+                per: last
+            };
+        }
+    }
+
+    return create_unit(parts.pop(), parts);
+};
+
+mg_util.determine_unit_type = function(unit_name) {
+    if (mg_util.is_time_unit(unit_name)) {
+        return "time";
+    } else {
+        return "distance";
+    }
+};
+
+mg_util.analyse_unit = function(unit) {
+    var type, compound, name;
+    if (unit.per) {
+        if (unit.unit.per) {
+            compound = "double_compound";
+            name = unit.unit.unit;
+            type = mg_util.determine_unit_type(name);
+        } else {
+            compound = "compound";
+            name = unit.unit;
+            type = mg_util.determine_unit_type(name);
+        }
+    } else {
+        name = unit.unit;
+        compound = "single";
+        type = mg_util.determine_unit_type(name);
+    }
+
+    return {
+        name: name,
+        type: type,
+        compound:  compound,
+        unit: unit
+    };           
+};
+
+
 module.exports = mg_util;

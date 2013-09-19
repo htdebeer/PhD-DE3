@@ -123,9 +123,7 @@ var motion_editor = function(config_) {
 
     var current_model = {};
     function update_movement() {
-        console.log(current_model.specification());
             current_model.specification(textarea.value.trim());
-        console.log(current_model.specification());
             _editor.hide();
     }
 
