@@ -1,8 +1,7 @@
 
 var view = require("../view"),
     draw_thermometer = require("./thermometer"),
-    dom = require("../../dom/dom"),
-    raphael = require("raphael-browserify");
+    dom = require("../../dom/dom");
 
 var temperaturetyper = function(config, scale_, dimensions_) {
     
@@ -90,7 +89,7 @@ var temperaturetyper = function(config, scale_, dimensions_) {
     // y-coordinate when the canvas isn't part of the DOM
     document.body.appendChild(_temperaturetyper.fragment);
 
-    var canvas = raphael(measuring_simulation, 
+    var canvas = Raphael(measuring_simulation, 
             CONTAINER.width, 
             CONTAINER.height);
     

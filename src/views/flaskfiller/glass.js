@@ -1,7 +1,3 @@
-
-var raphael = require("raphael-browserify");
-
-
 var glass = function(canvas, model, SCALE) {
     var _glass = canvas.set();
 
@@ -161,7 +157,7 @@ var glass = function(canvas, model, SCALE) {
             MAX_LINE_SKIP = 5,
             BORDERS_ADD = _glass.bowl_shape.attr("stroke-width") * 2,
             MAX_LINE_Y = y + height - model.get_maximum("hoogte") * 10 * SCALE - BORDERS_ADD,
-            INTERSECTIONS = raphael.pathIntersection(
+            INTERSECTIONS = Raphael.pathIntersection(
                    _glass.bowl_shape.attr("path"),
                   "M0," + (MAX_LINE_Y) + "h1000"),
             MAX_LINE_X = Math.min.apply(null,INTERSECTIONS.map(function(e) {return e.x;})) || x

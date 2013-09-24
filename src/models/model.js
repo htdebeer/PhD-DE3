@@ -573,7 +573,7 @@ var model = function(name, config) {
         };
 
 
-    var step = config.step_size || T_STEP ;
+    var step = (config.step_size || T_STEP)*5 ;
     function step_size(size) {
         if (arguments.length === 1) {
             step = size;

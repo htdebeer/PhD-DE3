@@ -1,6 +1,5 @@
 
 
-var raphael = require("raphael-browserify");
 var dom = require("../../dom/dom");
 var ruler = require("./ruler");
 var contour_line = require("./contour_line");
@@ -101,7 +100,7 @@ var glass_grafter = function(config) {
     // y-coordinate when the canvas isn't part of the DOM
     document.body.appendChild(_grafter.fragment);
 
-    var canvas = raphael(_grafter.fragment,
+    var canvas = Raphael(_grafter.fragment,
             CONTAINER.width,
             CONTAINER.height
         );

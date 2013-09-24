@@ -1,7 +1,6 @@
 
 
 var model = require("./model.js");
-var raphael = require("raphael-browserify");
 var paths = require("../svg/path");
 
 var glass = function(name, config) {
@@ -139,14 +138,14 @@ var glass = function(name, config) {
 
         var h_start = px_to_cm(base.bottom.y - base.top.y),
             l_start = 0,
-            l_end = raphael.getTotalLength(path);
+            l_end = Raphael.getTotalLength(path);
 
         function px_to_cm(px) {
             return px / scale / 10;
         }
 
         function point(length) {
-            return raphael.getPointAtLength(path, length);
+            return Raphael.getPointAtLength(path, length);
         }
 
         function ml_to_ms(ml) {

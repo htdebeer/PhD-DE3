@@ -2,7 +2,6 @@
 var view = require("../view"),
     dom = require("../../dom/dom"),
     ruler = require("./ruler"),
-    raphael = require("raphael-browserify"),
     longdrink = require("./longdrink_glass"),
     various_glass = require("./glass");
 
@@ -68,7 +67,7 @@ var flaskfiller = function(config) {
     // y-coordinate when the canvas isn't part of the DOM
     document.body.appendChild(_flaskfiller.fragment);
 
-    var canvas = raphael(_flaskfiller.fragment, 
+    var canvas = Raphael(_flaskfiller.fragment, 
             CONTAINER.width, 
             CONTAINER.height);
 

@@ -1,13 +1,12 @@
 
-var raphael = require("raphael-browserify");
 
 function start_of_path(path) {
-    return raphael.getPointAtLength(path, 0);
+    return Raphael.getPointAtLength(path, 0);
 }
 
 function end_of_path(path) {
-    return raphael.getPointAtLength(path,
-            raphael.getTotalLength());
+    return Raphael.getPointAtLength(path,
+            Raphael.getTotalLength());
 }
 
 function complete_path(part, fill_length) {
@@ -17,17 +16,17 @@ function complete_path(part, fill_length) {
     
     if (fill_length) {
         path = "m" + start.x + "," + start.y + path;
-        start = raphael.getPointAtLength(path, fill_length);
+        start = Raphael.getPointAtLength(path, fill_length);
 
-        var total_length = raphael.getTotalLength(path);
+        var total_length = Raphael.getTotalLength(path);
 
-        path = raphael.getSubpath(path, fill_length, total_length);
-        path = raphael.pathToRelative(path);
+        path = Raphael.getSubpath(path, fill_length, total_length);
+        path = Raphael.pathToRelative(path);
         path.shift(); // remove the M command
         path = path.toString();
     }
    
-    var segments = raphael.parsePathString(path),
+    var segments = Raphael.parsePathString(path),
         completed_path = "m" + start.x + "," + start.y + path;
 
 
@@ -112,7 +111,7 @@ function scale_shape(shape, scale_) {
         };
 
     function scale_path(path, factor) {
-        var path_segments = raphael.parsePathString(path),
+        var path_segments = Raphael.parsePathString(path),
             scale_segment = function(segment) {
                 var segment_arr = segment,
                     command = segment_arr.shift();

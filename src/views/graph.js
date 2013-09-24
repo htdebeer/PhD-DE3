@@ -472,6 +472,7 @@ var graph = function(config_) {
 
 
     function set_axis(quantity_name, orientation) {
+        var axes_g = svg.select("g.axes");
         var quantity = _graph.quantities[quantity_name],
             create_scale = function(quantity, orientation) {
                 var range;
@@ -510,7 +511,7 @@ var graph = function(config_) {
                 xaxisg.parentNode.removeChild(xaxisg);
             }
 
-            svg.append("g")
+            axes_g.append("g")
                 .attr("class", "x axis")
                 .attr("transform", "translate(0," + GRAPH.height + ")")
                 .call(axis);
@@ -520,7 +521,7 @@ var graph = function(config_) {
                 xgridg.parentNode.removeChild(xgridg);
             }
 
-            svg.append("g")
+            axes_g.append("g")
                 .attr("class", "x grid")
                 .attr("transform", "translate(0," + GRAPH.height + ")")
                 .call(axis.tickSize(- GRAPH.height, 0, 0).tickFormat(""));
@@ -530,7 +531,7 @@ var graph = function(config_) {
                 xlabel.parentNode.removeChild(xlabel);
             }
 
-            svg.append('text')
+            axes_g.append('text')
                 .attr('text-anchor', 'middle')
                 .attr("class", "x label")
                 .text(quantity.label)
@@ -550,7 +551,7 @@ var graph = function(config_) {
                 yaxisg.parentNode.removeChild(yaxisg);
             }
 
-            svg.append("g")
+            axes_g.append("g")
                 .attr("class",  "y axis")
                 .call(axis);
 
@@ -559,7 +560,7 @@ var graph = function(config_) {
                 ygridg.parentNode.removeChild(ygridg);
             }
 
-            svg.append("g")
+            axes_g.append("g")
                 .attr("class", "y grid")
                 .call(axis.tickSize(- GRAPH.width, 0, 0).tickFormat(""));
 
@@ -568,7 +569,7 @@ var graph = function(config_) {
                 ylabel.parentNode.removeChild(ylabel);
             }
 
-            svg.append('text')
+            axes_g.append('text')
                 .attr('text-anchor', 'middle')
                 .attr("class", "y label")
                 .text(quantity.label)
@@ -599,14 +600,14 @@ var graph = function(config_) {
     function create_graph() {
 
         // scales and axes (make all axis pre-made?)
+        svg.append("g")
+            .classed("axes", true);
         set_axis(horizontal, "horizontal");
         set_axis(vertical, "vertical");
         svg.append("g")
             .attr("class", "lines");
         svg.append("g")
             .attr("class", "tailpoints");
-
-
         svg.append("g")
             .classed("tangent_triangle", true)
             .style({
