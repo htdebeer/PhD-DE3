@@ -12,18 +12,11 @@
         <hr />
         <figure id="thermometer"></figure>
         <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+        <script src="../lib/raphael.js"></script>
         <script src="../lib/temperature_taker.js"></script>
         <script src="../lib/temperature_grapher.js"></script>
         <script>
             var models = [
-                {
-                    name: "afkoelende_thee",
-                    id: 123
-                },
-                {
-                    name: "ijswater",
-                    id: 255
-                }
             ];
 
             var hide_actions = [
@@ -36,6 +29,7 @@
 
             temperature_grapher({
                 models: models,
+                load_models: true,
                 table: {
                     id: "measure"
 //                     hide_actions: [
@@ -53,8 +47,8 @@
                         "locally_zoom"
                     ]
                 },
-              not_in_table: ["snelheid"],
-              not_in_graph: ["snelheid"]
+              not_in_table: [],
+              not_in_graph: []
             });
             temperature_taker({
                 models: models,

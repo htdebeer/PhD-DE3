@@ -30,17 +30,6 @@ window.temperature_taker = window.temperature_taker || function temperature_take
             stepsize: 0.01,
             precision: 2,
             monotone: true
-        },
-        snelheid: {
-            minimum: 0,
-            maximum: 0,
-            value: 0,
-            unit: '°C/sec',
-            name: 'snelheid',
-            label: 'snelheid in °C/sec',
-            stepsize: 0.01,
-            monotone: false,
-            precision: 2
         }
     };
 
@@ -59,13 +48,6 @@ window.temperature_taker = window.temperature_taker || function temperature_take
     if (config.thermometer) {
         views.thermometer = create_view(config.thermometer, thermometer);
     }
-    if (config.table) {
-        views.table = create_view(config.table, table, config.models);
-    }
-    if (config.graph) {
-        views.graph = create_view(config.graph, graph);
-    }
-
 
     var models = {};
     config.models.filter(register_model).forEach(register);
@@ -101,7 +83,7 @@ window.temperature_taker = window.temperature_taker || function temperature_take
         switch(model_spec.type) {
             case "sensor":
                 model = {};
-                break
+                break;
             case "data":
                 model = {};
                 break;

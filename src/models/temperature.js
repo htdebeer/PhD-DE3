@@ -110,14 +110,14 @@ var temperature = function(name, config) {
         return {
             tijd: tijd,
             temperatuur: temperatuur,
-            snelheid: snelheid,
+            snelheid: snelheid
         };
     };
 
 
     _model.step();
     _model.compute_maxima = compute_maxima;
-    _model.type = "motion";
+    _model.type = "temperature";
 
     return _model;
 };

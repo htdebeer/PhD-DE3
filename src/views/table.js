@@ -21,10 +21,13 @@
  */
 
 var dom = require("../dom/dom");
+var data_util = require("../data/util");
 
 var table = function(config) {
     var _table = require("./view")(config),
         _appendix = {};
+
+    var model_specs = config.models;
 
     var TOGGLED_COLOR = "gold";
 
@@ -49,13 +52,31 @@ var table = function(config) {
         };
     }
 
+    function show_progress(model) {
+    }
+
+    function hide_progress() {
+    }
+
+    function process_data(model) {
+        return function(data) {
+            config.microworld.register(model, data);
+            hide_progress();
+        };
+    }
+
 
     function add_model() {
         return function() {
             if (this.selectedIndex > 0) {
                 var selected_option = this.options[this.selectedIndex].value;
-                var model = config.models[selected_option];
-                config.microworld.register(model);
+                var model = model_specs[selected_option];
+                if (model.data_model) {
+                    show_progress(model);                    
+                    data_util.load(model, process_data(model));                    
+                } else {
+                    config.microworld.register(model);
+                }
                 this.selectedIndex = 0;
             }
         };
@@ -67,11 +88,7 @@ var table = function(config) {
             name: "table"
         }));
 
-    var create_foot = function() {
-        var table_foot = table_fragment
-            .appendChild(dom.create({name: "tfoot"}));
-
-
+    function create_model_option_list(list) {
         function create_option(model, index) {
             return {
                 name: "option",
@@ -82,20 +99,28 @@ var table = function(config) {
             };
         }
 
-        var model_list = {
+        return {
             name: "select",
             attributes: {
+                "class": "model_list"
             },
             children: [{
                 name: "option",
                 text: "toevoegen ...",
                 value: -1
-            }].concat(config.models.map(create_option)),
+            }].concat(list.map(create_option)),
             on: {
                 type: "change",
                 callback: add_model()
             }
         };
+    }
+
+    var create_foot = function() {
+        var table_foot = table_fragment
+            .appendChild(dom.create({name: "tfoot"}));
+
+
 
         table_foot.appendChild(dom.create({
             name: "tr",
@@ -111,7 +136,7 @@ var table = function(config) {
                                 attributes: {
                                     "class": "icon-plus"
                                 }
-                            }, model_list]
+                            }, create_model_option_list(config.models)]
                 }, {
                     name: "th",
                     attributes: {
@@ -124,6 +149,19 @@ var table = function(config) {
 
     };
     create_foot();
+
+    _table.add_models_to_list = function(new_model_specs) {
+        var list = model_specs.concat(new_model_specs);
+
+        var model_list_select = table_fragment.querySelector("select.model_list");
+        if (model_list_select) {
+            var parent = model_list_select.parentNode;
+            parent.removeChild(model_list_select);
+            parent.appendChild(dom.create(create_model_option_list(list)));
+        }
+
+        model_specs = list;
+    };
 
 
     var create_head = function() {

@@ -3,7 +3,9 @@
 var 
     table = require("./views/table"),
     graph = require("./views/graph"),
-    temp_model = require("./models/temperature")
+    temp_model = require("./models/temperature"),
+    data_model = require("./models/data"),
+    data_util = require("./data/util")
     ;
 
 window.temperature_grapher = window.temperature_grapher || function temperature_grapher(config) {
@@ -14,17 +16,18 @@ window.temperature_grapher = window.temperature_grapher || function temperature_
         tijd: {
             name: "tijd",
             minimum: 0,
-            maximum: 100,
+            maximum: 180,
             value: 0,
-            label: "tijd in sec",
-            unit: "sec",
+            label: "tijd in min",
+            unit: "min",
             stepsize: 0.01,
             precision: 2,
             monotone: true
         },
         temperatuur: {
             name: "temperatuur",
-            minimum: -20,
+            minimum: 0,
+            dont_compute_minimum: true,
             maximum: 100,
             value: 0,
             label: "temperatuur in °C",
@@ -32,17 +35,6 @@ window.temperature_grapher = window.temperature_grapher || function temperature_
             stepsize: 0.01,
             precision: 2,
             monotone: true
-        },
-        snelheid: {
-            minimum: 0,
-            maximum: 0,
-            value: 0,
-            unit: '°C/sec',
-            name: 'snelheid',
-            label: 'snelheid in °C/sec',
-            stepsize: 0.01,
-            monotone: false,
-            precision: 2
         }
     };
 
@@ -69,7 +61,15 @@ window.temperature_grapher = window.temperature_grapher || function temperature_
     var models = {
     };
     config.models.filter(register_model).forEach(register);
-    // get list of models from the server)
+
+
+
+    if (config.load_models) {
+        // get list of models from the server)
+        data_util.load_model_list(function(model_list) {
+                views.table.add_models_to_list(model_list);
+        });
+    }
 
 
     function unregister(model_name) {
@@ -88,15 +88,21 @@ window.temperature_grapher = window.temperature_grapher || function temperature_
         return model_spec.register;
     }
 
-    function register(model_spec) {
+    function register(model_spec, data) {
         var model;
         if (models[model_spec.name]) {
             // cannot create the same model twice
             return;
         }
-        model = temp_model(model_spec.name, {
-            id: model_spec.id
-        });
+
+        if (model_spec.data_model) {
+            model_spec.data = data;
+            model = data_model(model_spec.name, model_spec);
+        } else {
+            model = temp_model(model_spec.name, {
+                id: model_spec.name
+            });
+        }
 
         Object.keys(views).forEach(add_model);
         models[model_spec.name] = model_spec;

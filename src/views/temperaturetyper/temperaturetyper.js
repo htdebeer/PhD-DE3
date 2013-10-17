@@ -1,6 +1,7 @@
 
 var view = require("../view"),
     draw_thermometer = require("./thermometer"),
+    data_util = require("../../data/util"),
     dom = require("../../dom/dom");
 
 var temperaturetyper = function(config, scale_, dimensions_) {
