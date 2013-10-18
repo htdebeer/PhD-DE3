@@ -1,5 +1,87 @@
 var utils = {};
 
+
+utils.create = function(metadata, callback) {
+    var httpRequest = new XMLHttpRequest();
+    httpRequest.onreadystatechange = function() {
+        if (httpRequest.readyState === 4) {
+            // everything is good, the response is received
+            if (httpRequest.status === 200) {
+                // perfect!
+                callback.call(null, {});
+            } else {
+                //     // there was a problem with the request,
+                //         // for example the response may contain a 404
+                //         (Not Found)
+                //             // or 500 (Internal Server Error) response
+                //             code
+                console.log("Error: " + httpRequest.status);
+            }
+        } else {
+           // still not ready
+        }
+    };
+
+    httpRequest.open("POST", "http://primarycalculus.org/DOEN/start_measuring.php");
+    httpRequest.setRequestHeader('Content-Type', 'application/json; charset=utf-8');
+    httpRequest.send(JSON.stringify(metadata));
+};
+
+utils.update = function(data, callback) {
+    var httpRequest = new XMLHttpRequest();
+    httpRequest.onreadystatechange = function() {
+        if (httpRequest.readyState === 4) {
+            // everything is good, the response is received
+            if (httpRequest.status === 200) {
+                // perfect!
+                if (callback) {
+                    callback.call(null, {});
+                }
+            } else {
+                //     // there was a problem with the request,
+                //         // for example the response may contain a 404
+                //         (Not Found)
+                //             // or 500 (Internal Server Error) response
+                //             code
+                console.log("Error: " + httpRequest.status);
+            }
+        } else {
+           // still not ready
+        }
+    };
+
+    httpRequest.open("POST", "http://primarycalculus.org/DOEN/update_data.php");
+    httpRequest.setRequestHeader('Content-Type', 'application/json; charset=utf-8');
+    httpRequest.send(JSON.stringify(data));
+};
+
+utils.close = function(callback) {
+    var httpRequest = new XMLHttpRequest();
+    httpRequest.onreadystatechange = function() {
+        if (httpRequest.readyState === 4) {
+            // everything is good, the response is received
+            if (httpRequest.status === 200) {
+                // perfect!
+                callback.call(null, httpRequest.responseText);
+            } else {
+                //     // there was a problem with the request,
+                //         // for example the response may contain a 404
+                //         (Not Found)
+                //             // or 500 (Internal Server Error) response
+                //             code
+                console.log("Error: " + httpRequest.status);
+            }
+        } else {
+           // still not ready
+        }
+    };
+
+    httpRequest.open("GET", "http://primarycalculus.org/DOEN/stop_measuring.php");
+    httpRequest.send(null);
+};
+
+
+
 utils.load_model_list = function(callback) {
     var httpRequest = new XMLHttpRequest();
     httpRequest.onreadystatechange = function() {
@@ -26,6 +108,7 @@ utils.load_model_list = function(callback) {
 };
 
 utils.load = function(model, callback) {
+    console.log(model);
     var httpRequest = new XMLHttpRequest();
     httpRequest.onreadystatechange = function () {
         if (httpRequest.readyState === 4) {
@@ -61,6 +144,9 @@ utils.parse_data = function(data, format, quantities) {
             break;
         case "CSV":
             FIELD_SEP = ",";
+            break;
+        case "SSV":
+            FIELD_SEP = ";";
             break;
         default:
             FIELD_SEP = ";";
