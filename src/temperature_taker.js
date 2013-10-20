@@ -14,22 +14,25 @@ window.temperature_taker = window.temperature_taker || function temperature_take
             minimum: 0,
             maximum: 100,
             value: 0,
-            label: "tijd in sec",
-            unit: "sec",
+            label: "tijd in min",
+            unit: "min",
             stepsize: 0.01,
             precision: 2,
-            monotone: true
+            monotone: true,
+            type: "time"
         },
         temperatuur: {
             name: "temperatuur",
-            minimum: -20,
+            minimum: 0,
+            dont_compute_minimum: true,
             maximum: 100,
             value: 0,
             label: "temperatuur in °C",
             unit: "°C",
             stepsize: 0.01,
             precision: 2,
-            monotone: true
+            monotone: false,
+            type: "real"
         }
     };
 

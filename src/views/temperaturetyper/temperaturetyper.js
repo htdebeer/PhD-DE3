@@ -198,13 +198,16 @@ var temperaturetyper = function(config, scale_, dimensions_) {
         if (key === 13 || key === 10 || key === "Enter") {
             // enter - key
             event.preventDefault();
-            var lastline = this.value.substr(this.value.lastIndexOf("\n")+1),
-                temperature = parseFloat(lastline.substr(lastline.lastIndexOf(";")+1));
-            if (!isNaN(temperature)) {
-                if (-20 <= temperature && temperature <= 100) {
-                    thermometer.set_temperature(temperature);
+            var lastline = this.value.substr(this.value.lastIndexOf("\n")+1);
+            var parts = lastline.trim().split(';');
+            if (parts.length === 2 && parts[0].length > 0 && parts[1].length > 0) {
+                var temperature = parseFloat(lastline.substr(lastline.lastIndexOf(";")+1));
+                if (!isNaN(temperature)) {
+                    if (-20 <= temperature && temperature <= 100) {
+                        thermometer.set_temperature(temperature);
+                    }
+                    measurement_buffer.push(lastline);
                 }
-                measurement_buffer.push(lastline);
             }
             this.value += "\n";
             return false;
@@ -230,13 +233,35 @@ var temperaturetyper = function(config, scale_, dimensions_) {
         var data = {};
         data.name = name_field.value;
         data.description = description_field.value;
-        data.quantities = [];
-        Object.keys(config.quantities).forEach(function(q) {
-            data.quantities.push(config.quantities[q]);
-        });
+        data.quantities = [{
+            name: "tijd",
+            minimum: 0,
+            maximum: 100,
+            value: 0,
+            label: "tijd in min",
+            unit: "min",
+            stepsize: 0.01,
+            precision: 2,
+            monotone: true,
+            type: "time"
+        },{
+            name: "temperatuur",
+            minimum: 0,
+            dont_compute_minimum: true,
+            maximum: 100,
+            value: 0,
+            label: "temperatuur in °C",
+            unit: "°C",
+            stepsize: 0.01,
+            precision: 2,
+            monotone: false,
+            type: "real"
+        }
+            ];
         data.format = "SSV"; // semicolon separated values
 
         if (data.name && data.name !== "") {
+            data.name = "meting-" + data.name.replace(/\W/g, "_");
             name_field.setAttribute("readonly", true);
             description_field.setAttribute("readonly", true);
             message.classList.remove("error");

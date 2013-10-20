@@ -108,7 +108,6 @@ utils.load_model_list = function(callback) {
 };
 
 utils.load = function(model, callback) {
-    console.log(model);
     var httpRequest = new XMLHttpRequest();
     httpRequest.onreadystatechange = function () {
         if (httpRequest.readyState === 4) {

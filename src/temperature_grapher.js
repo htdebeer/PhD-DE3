@@ -22,7 +22,8 @@ window.temperature_grapher = window.temperature_grapher || function temperature_
             unit: "min",
             stepsize: 0.01,
             precision: 2,
-            monotone: true
+            monotone: true,
+            type: "time"
         },
         temperatuur: {
             name: "temperatuur",
@@ -34,7 +35,8 @@ window.temperature_grapher = window.temperature_grapher || function temperature_
             unit: "°C",
             stepsize: 0.01,
             precision: 2,
-            monotone: true
+            monotone: false,
+            type: "real"
         }
     };
 
