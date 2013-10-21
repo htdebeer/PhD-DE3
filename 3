@@ -17,12 +17,10 @@ var data = function(name, config) {
     var quantities = {};
     config.quantities.forEach(function(q) {quantities[q.name] = q;});
 
-    var values = config.data.slice();
-
     var step = config.step || 10,
         time = {
             start: 0,
-            end: (values.length - 1) * step,
+            end: config.data.length * step,
             step: step
         },
         action_list = config.actions || ["start", "pause", "reset", "finish", "toggle_line", "toggle_tailpoints", "toggle_arrows", "step_size"],
@@ -38,6 +36,7 @@ var data = function(name, config) {
 
 
     
+    values = config.data.slice();
     function compute_maxima() {
 
         function extrema(q) {

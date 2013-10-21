@@ -714,17 +714,18 @@ var graph = function(config_) {
             x2 = (y2 - b)/a;
 
             var tangent = svg.select("g.tangent_triangle line.tangent");
-            var SEP = GRAPH_LINE_WIDTH / 2;
+            var SEP = GRAPH_LINE_WIDTH / 1.75;
+            var STEP = GRAPH_LINE_WIDTH / 1.75;
 
             if (a >= 0) {
-            tangent.attr("x1", x_scale(x1) - 1)
+            tangent.attr("x1", x_scale(x1) - STEP)
                 .attr("y1", y_scale(y1) - SEP)
-                .attr("x2", x_scale(x2) - 1)
+                .attr("x2", x_scale(x2) - STEP)
                 .attr("y2", y_scale(y2) - SEP);
             } else {
-            tangent.attr("x1", x_scale(x1) + 1)
+            tangent.attr("x1", x_scale(x1) - STEP)
                 .attr("y1", y_scale(y1) + SEP)
-                .attr("x2", x_scale(x2) + 1)
+                .attr("x2", x_scale(x2) - STEP)
                 .attr("y2", y_scale(y2) + SEP);
             }
 

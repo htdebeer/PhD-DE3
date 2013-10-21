@@ -229,7 +229,8 @@ var temperaturetyper = function(config, scale_, dimensions_) {
         }
     }
 
-    function start_measuring() {
+    function start_measuring(event) {
+        event.preventDefault();
         var data = {};
         data.name = name_field.value;
         data.description = description_field.value;
@@ -282,7 +283,8 @@ var temperaturetyper = function(config, scale_, dimensions_) {
 
     }
 
-    function stop_measuring() {
+    function stop_measuring(event) {
+        event.preventDefault();
         measuring_data.setAttribute("readonly", true);
         message.classList.remove("error");
         stop_measurement_button.setAttribute("disabled", true);
